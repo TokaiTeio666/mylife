@@ -75,6 +75,10 @@ async def list_topics(
     ctx: RunContext = Depends(get_run_context),
     db: AsyncSession = Depends(get_db),
 ) -> TopicList:
+    from mylife_api import repositories
+
+    settings_row = await repositories.get_settings(db, ctx.workspace_id)
+    reviews_root = (settings_row or {}).get("reviews_root") or "wiki/复盘"
     items: list[TopicSummary] = []
     for slug, title in SLUG_TITLES.items():
         rows = await repo_review.list_topic_items(
@@ -86,7 +90,7 @@ async def list_topics(
             TopicSummary(
                 topic=title,
                 title=title,
-                path=f"wiki/复盘/专题/{title}.md",
+                path=f"{reviews_root.rstrip('/')}/专题/{title}.md",
                 open_count=open_count,
                 last_updated=last_updated,
             )
@@ -141,7 +145,7 @@ async def confirm_topic_item(
     if row["status"] != "pending":
         raise AppError(ErrorCode.CONFLICT, details={"status": row["status"]})
 
-    target = "open" if payload.decision == "accept" else "stale"
+    target = "open" if payload.decision == "accept" else "dropped"
     await repo_review.update_topic_status(
         db, workspace_id=ctx.workspace_id, item_id=item_id, status=target
     )

@@ -42,9 +42,19 @@ class Settings(BaseSettings):
     # 任务队列：redis（Celery）| off（测试/单机调试，任务保持 queued）
     queue_backend: Literal["redis", "off"] = "redis"
 
-    # 数据根（ZIP 原件、快照、导出）
+    # 数据根（ZIP 原件、快照、导出、交付产物）
     data_root: Path = Path("./data")
     max_zip_bytes: int = 200 * 1024 * 1024
+
+    # 交付：仅测试本地裸仓库时开启（SEC-12）。
+    allow_local_git: bool = False
+    # 调度器（进程内，单副本）与租约回收。
+    dispatcher_enabled: bool = True
+    dispatcher_interval_seconds: int = 60
+    review_sweeper: bool = True
+    review_sweeper_interval_seconds: int = 15
+    # 删除冷却天数（SEC-27；测试可调小）。
+    deletion_cooldown_days: int = 30
 
     # LLM（chat 精简分支）
     llm_provider: str = "mock"

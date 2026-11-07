@@ -56,7 +56,7 @@ def _summary(row: dict[str, Any]) -> ReviewSummary:
         generated_at=row["generated_at"],
         path=row.get("git_path"),
         degraded=bool(row.get("degraded")),
-        delivery_status="none",
+        delivery_status=row.get("delivery_status") or "none",
     )
 
 
@@ -421,12 +421,43 @@ async def approve_run(
     if run["state"] != "human_gate":
         raise AppError(ErrorCode.CONFLICT, details={"state": run["state"]})
 
+    payload = decode_state_payload(run)
+    edited = False
     if edited_content_md:
-        # 编辑后必须重新过门禁：Phase 3 仅拒绝绕过（完整重评审见 Phase 4）。
-        raise AppError(
-            ErrorCode.REVIEW_GATE_FAILED,
-            details={"reason": "EDITED_CONTENT_REQUIRES_REVIEW"},
+        # 编辑后必须重新过门禁；通过 = 新 draft 内容 + 重新评审，非绕过。
+        version = int(run.get("version") or 1)
+        review_id = run.get("review_id") or payload.get("review_id")
+        sections = await _edited_sections(
+            session,
+            workspace_id=workspace_id,
+            review_id=UUID(str(review_id)),
+            version=version,
+            kind=run["kind"],
+            edited_content_md=edited_content_md,
         )
+        verdict = await _recheck_edited(
+            session,
+            workspace_id=workspace_id,
+            run=run,
+            payload=payload,
+            sections=sections,
+        )
+        blocking = verdict.get("blocking") or []
+        if blocking:
+            raise AppError(
+                ErrorCode.REVIEW_GATE_FAILED,
+                details={"reason": "EDITED_CONTENT_FAILED_GATES", "issues": blocking[:20]},
+            )
+        await repo.update_section_content(
+            session,
+            workspace_id=workspace_id,
+            review_id=UUID(str(review_id)),
+            version=version,
+            sections=sections,
+        )
+        payload.setdefault("draft", {})["sections"] = sections
+        payload["verdict"] = verdict
+        edited = True
 
     from mylife_api.runtime import STREAM_EPOCH
 
@@ -437,6 +468,7 @@ async def approve_run(
         from_state="human_gate",
         to_state="delivering",
         reason="human_approved",
+        state_payload=payload if edited else None,
         stream_epoch=STREAM_EPOCH,
     )
     if not ok:
@@ -447,7 +479,7 @@ async def approve_run(
         user_id=user_id,
         action="review.approved",
         target=str(run_id),
-        detail={"note": note, "edited": False},
+        detail={"note": note, "edited": edited},
     )
     await session.commit()
     await set_rls_context(session, workspace_id, user_id)
@@ -553,3 +585,307 @@ def decode_state_payload(run: dict[str, Any]) -> dict[str, Any]:
     if isinstance(payload, str):
         return json.loads(payload)
     return payload
+
+
+# ---------------------------------------------------------------------------
+# 编辑重评审 / 回滚（API-CONTRACTS §3.7.5/§3.7.7；PHASE4-SPEC D34/D35）
+# ---------------------------------------------------------------------------
+
+
+def _split_markdown_sections(edited_content_md: str) -> list[dict[str, Any]]:
+    parts: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    for line in edited_content_md.splitlines():
+        if line.startswith("## "):
+            if current is not None:
+                parts.append(current)
+            current = {"title": line[3:].strip(), "lines": []}
+        elif current is not None:
+            current["lines"].append(line)
+    if current is not None:
+        parts.append(current)
+    return parts
+
+
+async def _edited_sections(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    review_id: UUID,
+    version: int,
+    kind: str,
+    edited_content_md: str,
+) -> list[dict[str, Any]]:
+    from mylife_contract.constants import SECTION_ORDINALS
+
+    existing_rows = await repo.list_sections(
+        session, workspace_id=workspace_id, review_id=review_id, version=version
+    )
+    existing = {row["section_key"]: row for row in existing_rows}
+    parts = _split_markdown_sections(edited_content_md)
+    result: list[dict[str, Any]] = []
+    for ordinal, key, title, _cap in SECTION_ORDINALS[kind]:
+        part = next((item for item in parts if item["title"] == title), None)
+        if part is None and len(parts) >= ordinal:
+            part = parts[ordinal - 1]
+        content = "\n".join(part["lines"]).strip() if part is not None else ""
+        if not content:
+            content = (existing.get(key) or {}).get("content_md") or ""
+        result.append(
+            {
+                "section_key": key,
+                "ordinal": ordinal,
+                "title": title,
+                "content_md": content,
+                "structured": (existing.get(key) or {}).get("structured_json") or {},
+            }
+        )
+    return result
+
+
+async def _recheck_edited(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    run: dict[str, Any],
+    payload: dict[str, Any],
+    sections: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """对编辑后的章节重跑确定性 G0–G9（使用 run 已冻结的 evidence）。"""
+    from mylife_agent.gates import GateContext, evaluate_gates
+    from mylife_contract.review import EvidenceItem
+    from mylife_delivery.renderer import review_path
+
+    version = int(run.get("version") or 1)
+    review_id = UUID(str(run.get("review_id") or payload.get("review_id")))
+    evidence_rows = await repo.list_evidence(
+        session, workspace_id=workspace_id, run_id=run["id"]
+    )
+    evidence = [
+        EvidenceItem(
+            evidence_id=row["evidence_id"],
+            source_type=row["source_type"],
+            document_id=row.get("document_id"),
+            chunk_id=row.get("chunk_id"),
+            source_path=row.get("source_path"),
+            source_date=row.get("source_date"),
+            occurred_on=row.get("occurred_on"),
+            document_content_hash=row.get("document_content_hash"),
+            heading=row.get("heading"),
+            line_range=(row["line_start"], row["line_end"])
+            if row.get("line_start") is not None and row.get("line_end") is not None
+            else None,
+            quote=row["quote"],
+            quote_hash=row["quote_hash"],
+            tags=list(row.get("tags") or []),
+        )
+        for row in evidence_rows
+    ]
+    entries = await repo.list_entries(
+        session, workspace_id=workspace_id, review_id=review_id, version=version
+    )
+    citations = await repo.list_citations(
+        session, workspace_id=workspace_id, review_id=review_id, version=version
+    )
+    claims: dict[str, dict[str, Any]] = {}
+    for citation in citations:
+        claim = claims.setdefault(
+            citation["claim_id"],
+            {"claim_id": citation["claim_id"], "section_key": None, "evidence_ids": []},
+        )
+        claim["evidence_ids"].append(citation["evidence_id"])
+
+    snapshot_id = payload.get("snapshot_id")
+    hashes = (
+        await repo.snapshot_hashes(
+            session, workspace_id=workspace_id, snapshot_id=UUID(str(snapshot_id))
+        )
+        if snapshot_id
+        else {}
+    )
+    reviews_root = (
+        (await repo0.get_settings(session, workspace_id)) or {}
+    ).get("reviews_root") or "wiki/复盘"
+    full_path = review_path(reviews_root, run["kind"], run["period_key"])
+    target = full_path[len(reviews_root.rstrip("/")) :].lstrip("/")
+
+    ctx = GateContext(
+        kind=run["kind"],
+        workspace_id=str(workspace_id),
+        sections=sections,
+        claims=list(claims.values()),
+        evidence=evidence,
+        bundle_snapshot_id=str(snapshot_id) if snapshot_id else None,
+        entries=[
+            {
+                "section_key": row["section_key"],
+                "item_type": row["item_type"],
+                "canonical_key": row["canonical_key"],
+                "fields": row.get("fields_json") or {},
+                "source_path": row.get("source_path"),
+                "line_range": [row["line_start"], row["line_end"]]
+                if row.get("line_start") is not None
+                else None,
+                "source_date": row.get("source_date"),
+            }
+            for row in entries
+        ],
+        snapshot_hashes=hashes,
+        frozen_text={},
+        citations=citations,
+        target_paths=(target,),
+        parser_version="mylife-parser-1",
+    )
+    verdict = evaluate_gates(
+        ctx, resolved_owners={item.evidence_id: str(workspace_id) for item in evidence}
+    )
+    return verdict.model_dump()
+
+
+async def rollback_review(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    user_id: UUID,
+    role: str,
+    review_id: UUID,
+    target_version: int,
+    confirm: bool,
+) -> dict[str, Any]:
+    """按版本指针恢复内容并生成一次交付（不删除任何旧行）。"""
+    if role not in {"owner", "admin"}:
+        raise AppError(ErrorCode.FORBIDDEN)
+    if not confirm:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            details={"field": "confirm", "reason": "CONFIRM_REQUIRED"},
+        )
+    review = await repo.get_review(
+        session, workspace_id=workspace_id, review_id=review_id
+    )
+    if review is None:
+        raise AppError(ErrorCode.NOT_FOUND)
+    active = await repo.find_active_review_run(
+        session,
+        workspace_id=workspace_id,
+        kind=review["kind"],
+        period_key=review["period_key"],
+    )
+    if active is not None:
+        raise AppError(
+            ErrorCode.CONFLICT,
+            details={"existing_run_id": str(active["id"]), "state": active["state"]},
+        )
+    target = await repo.get_version(
+        session,
+        workspace_id=workspace_id,
+        review_id=review_id,
+        version=target_version,
+    )
+    if target is None:
+        raise AppError(ErrorCode.REVIEW_VERSION_NOT_FOUND)
+
+    from mylife_api import services_delivery
+    from mylife_api.context import current_request_id
+    from mylife_api.runtime import STREAM_EPOCH
+
+    new_version = int(review["version"]) + 1
+    await repo.insert_version(
+        session,
+        workspace_id=workspace_id,
+        review_id=review_id,
+        version=new_version,
+        content_md=target["content_md"],
+        content_hash=target["content_hash"],
+        model=target.get("model") or "rollback",
+        prompt_version="rollback",
+        snapshot_id=target.get("snapshot_id"),
+    )
+    await repo.copy_version_children(
+        session,
+        workspace_id=workspace_id,
+        review_id=review_id,
+        from_version=target_version,
+        to_version=new_version,
+    )
+    await repo.finalize_review(
+        session,
+        workspace_id=workspace_id,
+        review_id=review_id,
+        version=new_version,
+        content_md=target["content_md"],
+        content_hash=target["content_hash"],
+        model=target.get("model") or "rollback",
+        git_path=review.get("git_path") or "",
+        status="delivered",
+        verdict=review.get("verdict_json"),
+        degraded=bool(review.get("degraded")),
+        degraded_reasons=list(review.get("degraded_reasons") or []),
+    )
+    run = await repo.insert_review_run(
+        session,
+        workspace_id=workspace_id,
+        kind=review["kind"],
+        period_key=review["period_key"],
+        review_id=review_id,
+        version=new_version,
+        state_payload={
+            "review_id": str(review_id),
+            "user_id": str(user_id),
+            "timezone": "Asia/Shanghai",
+            "trigger": "manual",
+            "rollback_from": target_version,
+            "snapshot_id": str(target["snapshot_id"])
+            if target.get("snapshot_id")
+            else None,
+            "attempts": {},
+        },
+        trace_id=current_request_id(),
+    )
+    ok = await repo.cas_transition(
+        session,
+        workspace_id=workspace_id,
+        run_id=run["id"],
+        from_state="created",
+        to_state="delivering",
+        reason="rollback",
+        stream_epoch=STREAM_EPOCH,
+    )
+    if not ok:
+        raise AppError(ErrorCode.CONFLICT)
+    outcome = await services_delivery.deliver_review(
+        session,
+        workspace_id=workspace_id,
+        run_id=run["id"],
+        review_id=review_id,
+        version=new_version,
+        kind=review["kind"],
+        period_key=review["period_key"],
+        title=review["title"],
+        content_md=target["content_md"],
+        content_hash=target["content_hash"],
+        degraded_reasons=list(review.get("degraded_reasons") or []),
+        verdict=review.get("verdict_json"),
+    )
+    await repo.cas_transition(
+        session,
+        workspace_id=workspace_id,
+        run_id=run["id"],
+        from_state="delivering",
+        to_state="succeeded",
+        reason="local_only"
+        if outcome.get("target") == "object_store"
+        else "commit_and_pr_ok",
+        stream_epoch=STREAM_EPOCH,
+    )
+    await insert_audit(
+        session,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        action="review.rolled_back",
+        target=str(review_id),
+        detail={"target_version": target_version, "new_version": new_version},
+    )
+    await session.commit()
+    await set_rls_context(session, workspace_id, user_id)
+    return {"run_id": run["id"], "target_version": target_version}

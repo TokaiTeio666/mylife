@@ -13,6 +13,8 @@ from mylife_contract.review import (
     ReviewCreateResponse,
     ReviewDetail,
     ReviewList,
+    RollbackRequest,
+    RollbackResponse,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -131,5 +133,28 @@ async def reject_run(
         note=payload.note,
     )
     return GateDecisionResponse(**result)
+
+
+@router.post(
+    "/reviews/{review_id}/rollback",
+    response_model=RollbackResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def rollback_review(
+    review_id: UUID,
+    payload: RollbackRequest,
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> RollbackResponse:
+    result = await services_review.rollback_review(
+        db,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        role=ctx.role,
+        review_id=review_id,
+        target_version=payload.version,
+        confirm=payload.confirm,
+    )
+    return RollbackResponse(**result)
 
 

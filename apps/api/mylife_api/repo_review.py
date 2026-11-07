@@ -78,6 +78,20 @@ async def get_review_by_period(
     return _row(result.first())
 
 
+async def get_review_by_git_path(
+    session: AsyncSession, *, workspace_id: UUID, path: str
+) -> dict[str, Any] | None:
+    result = await session.execute(
+        text(
+            "SELECT id, kind, period_key, title, version, content, content_hash, "
+            "       git_path, status, generated_at FROM reviews "
+            "WHERE workspace_id = :ws AND git_path = :path LIMIT 1"
+        ),
+        {"ws": workspace_id, "path": path},
+    )
+    return _row(result.first())
+
+
 async def get_review(
     session: AsyncSession, *, workspace_id: UUID, review_id: UUID
 ) -> dict[str, Any] | None:
@@ -188,6 +202,20 @@ async def get_run(
         {"ws": workspace_id, "id": run_id},
     )
     return _row(result.first())
+
+
+async def list_runs_for_review(
+    session: AsyncSession, *, workspace_id: UUID, review_id: UUID
+) -> list[dict[str, Any]]:
+    result = await session.execute(
+        text(
+            "SELECT id, kind, period_key, state, version, created_at, finished_at "
+            "FROM agent_runs WHERE workspace_id = :ws AND review_id = :review "
+            "ORDER BY created_at DESC"
+        ),
+        {"ws": workspace_id, "review": review_id},
+    )
+    return _rows(result)
 
 
 async def cas_transition(
@@ -336,6 +364,31 @@ async def insert_sections(
             for section in sections
         ],
     )
+
+
+async def update_section_content(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    review_id: UUID,
+    version: int,
+    sections: list[dict[str, Any]],
+) -> None:
+    for section in sections:
+        await session.execute(
+            text(
+                "UPDATE review_sections SET content_md = :content "
+                "WHERE workspace_id = :ws AND review_id = :review AND version = :version "
+                "AND section_key = :key"
+            ),
+            {
+                "content": section.get("content_md") or "",
+                "ws": workspace_id,
+                "review": review_id,
+                "version": version,
+                "key": section.get("section_key"),
+            },
+        )
 
 
 async def list_sections(
@@ -591,7 +644,7 @@ async def list_reviews(
     result = await session.execute(
         text(
             "SELECT id, kind, period_key, title, version, status, git_path, degraded, "
-            "       generated_at FROM reviews WHERE "
+            "       generated_at, delivery_status FROM reviews WHERE "
             + " AND ".join(conditions)
             + " ORDER BY period_key DESC, version DESC LIMIT :limit"
         ),
@@ -652,6 +705,61 @@ async def insert_evidence(
     )
 
 
+async def copy_version_children(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    review_id: UUID,
+    from_version: int,
+    to_version: int,
+) -> None:
+    """把某版本的结构化子表复制到新版本（回滚用）。"""
+    columns = {
+        "review_sections": "section_key, ordinal, content_md, structured_json",
+        "review_entries": (
+            "section_key, item_type, canonical_key, fields_json, source_path, "
+            "line_start, line_end, evidence_id, source_date, confidence"
+        ),
+        "review_citations": (
+            "claim_id, evidence_id, source_path, source_date, "
+            "document_content_hash, line_start, line_end, quote, quote_hash"
+        ),
+    }
+    for table, column_sql in columns.items():
+        await session.execute(
+            text(
+                f"INSERT INTO {table} "
+                f"(id, workspace_id, review_id, version, {column_sql}) "
+                f"SELECT gen_random_uuid(), workspace_id, review_id, :to_version, "
+                f"{column_sql} FROM {table} "
+                "WHERE workspace_id = :ws AND review_id = :review "
+                "AND version = :from_version"
+            ),
+            {
+                "ws": workspace_id,
+                "review": review_id,
+                "from_version": from_version,
+                "to_version": to_version,
+            },
+        )
+
+
+async def list_evidence(
+    session: AsyncSession, *, workspace_id: UUID, run_id: UUID
+) -> list[dict[str, Any]]:
+    result = await session.execute(
+        text(
+            "SELECT evidence_id, source_type, document_id, chunk_id, source_path, "
+            "       source_date, occurred_on, document_content_hash, heading, tags, "
+            "       line_start, line_end, quote, quote_hash "
+            "FROM evidence_items WHERE workspace_id = :ws AND run_id = :run "
+            "ORDER BY evidence_id ASC"
+        ),
+        {"ws": workspace_id, "run": run_id},
+    )
+    return _rows(result)
+
+
 async def snapshot_hashes(
     session: AsyncSession, *, workspace_id: UUID, snapshot_id: UUID
 ) -> dict[str, str]:
@@ -684,17 +792,21 @@ async def upsert_topic_item(
     canonical_key: str,
     title: str,
     source_date: date,
+    fields_json: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    import json
+
     result = await session.execute(
         text(
             "INSERT INTO topic_items "
             "(id, workspace_id, topic, canonical_key, title, first_seen, last_seen, "
-            " occurrence_count, status) "
-            "VALUES (:id, :ws, :topic, :key, :title, :date, :date, 1, 'pending') "
+            " occurrence_count, status, fields_json) "
+            "VALUES (:id, :ws, :topic, :key, :title, :date, :date, 1, 'pending', "
+            "        CAST(:fields AS jsonb)) "
             "ON CONFLICT (workspace_id, topic, canonical_key) DO UPDATE SET "
             "  last_seen = GREATEST(topic_items.last_seen, EXCLUDED.last_seen), "
             "  occurrence_count = topic_items.occurrence_count + 1 "
-            "RETURNING id, status, occurrence_count"
+            "RETURNING id, status, occurrence_count, fields_json, conflicts_json"
         ),
         {
             "id": uuid7(),
@@ -703,9 +815,37 @@ async def upsert_topic_item(
             "key": canonical_key,
             "title": title,
             "date": source_date,
+            "fields": json.dumps(fields_json or {}, ensure_ascii=False, default=str),
         },
     )
     return dict(result.one()._mapping)
+
+
+async def update_topic_conflicts(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    item_id: UUID,
+    conflicts: list[dict[str, Any]],
+    fields_json: dict[str, Any] | None = None,
+) -> None:
+    import json
+
+    await session.execute(
+        text(
+            "UPDATE topic_items SET conflicts_json = CAST(:conflicts AS jsonb), "
+            "  fields_json = COALESCE(CAST(:fields AS jsonb), fields_json) "
+            "WHERE workspace_id = :ws AND id = :id"
+        ),
+        {
+            "conflicts": json.dumps(conflicts, ensure_ascii=False, default=str),
+            "fields": json.dumps(fields_json, ensure_ascii=False, default=str)
+            if fields_json is not None
+            else None,
+            "ws": workspace_id,
+            "id": item_id,
+        },
+    )
 
 
 async def insert_topic_occurrence(
@@ -718,14 +858,23 @@ async def insert_topic_occurrence(
     line_range: list[int] | None,
     quote: str,
     evidence_id: str | None,
+    review_id: UUID | None = None,
+    version: int | None = None,
+    fields_json: dict[str, Any] | None = None,
 ) -> None:
+    import json
+
     await session.execute(
         text(
             "INSERT INTO topic_occurrences "
             "(id, workspace_id, item_id, source_date, source_path, line_start, line_end, "
-            " quote, evidence_id) "
-            "VALUES (:id, :ws, :item, :date, :path, :start, :end, :quote, :evidence) "
-            "ON CONFLICT (item_id, source_date, source_path, line_start) DO NOTHING"
+            " quote, evidence_id, review_id, version, fields_json) "
+            "VALUES (:id, :ws, :item, :date, :path, :start, :end, :quote, :evidence, "
+            "        :review, :version, CAST(:fields AS jsonb)) "
+            "ON CONFLICT (item_id, source_date, source_path, line_start) DO UPDATE SET "
+            "  quote = EXCLUDED.quote, evidence_id = EXCLUDED.evidence_id, "
+            "  line_end = EXCLUDED.line_end, review_id = EXCLUDED.review_id, "
+            "  version = EXCLUDED.version, fields_json = EXCLUDED.fields_json"
         ),
         {
             "id": uuid7(),
@@ -733,11 +882,46 @@ async def insert_topic_occurrence(
             "item": item_id,
             "date": source_date,
             "path": source_path,
-            "start": (line_range or [None, None])[0],
+            "start": (line_range or [None, None])[0] or 0,
             "end": (line_range or [None, None])[1],
             "quote": quote,
             "evidence": evidence_id,
+            "review": review_id,
+            "version": version,
+            "fields": json.dumps(fields_json or {}, ensure_ascii=False, default=str),
         },
+    )
+
+
+async def delete_topic_occurrences_for_review(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    review_id: UUID,
+    item_id: UUID,
+) -> None:
+    await session.execute(
+        text(
+            "DELETE FROM topic_occurrences WHERE workspace_id = :ws "
+            "AND review_id = :review AND item_id = :item"
+        ),
+        {"ws": workspace_id, "review": review_id, "item": item_id},
+    )
+
+
+async def refresh_topic_counts(
+    session: AsyncSession, *, workspace_id: UUID, item_id: UUID
+) -> None:
+    await session.execute(
+        text(
+            "UPDATE topic_items t SET "
+            "  occurrence_count = (SELECT count(*) FROM topic_occurrences o "
+            "    WHERE o.workspace_id = t.workspace_id AND o.item_id = t.id), "
+            "  last_seen = COALESCE((SELECT max(o.source_date) FROM topic_occurrences o "
+            "    WHERE o.workspace_id = t.workspace_id AND o.item_id = t.id), t.last_seen) "
+            "WHERE t.workspace_id = :ws AND t.id = :id"
+        ),
+        {"ws": workspace_id, "id": item_id},
     )
 
 
@@ -747,8 +931,8 @@ async def get_topic_item(
     result = await session.execute(
         text(
             "SELECT id, topic, canonical_key, title, first_seen, last_seen, "
-            "       occurrence_count, status FROM topic_items "
-            "WHERE workspace_id = :ws AND id = :id"
+            "       occurrence_count, status, fields_json, conflicts_json, dropped_at "
+            "FROM topic_items WHERE workspace_id = :ws AND id = :id"
         ),
         {"ws": workspace_id, "id": item_id},
     )
@@ -773,7 +957,8 @@ async def list_topic_items(
     result = await session.execute(
         text(
             "SELECT id, topic, canonical_key, title, first_seen, last_seen, "
-            "       occurrence_count, status FROM topic_items WHERE "
+            "       occurrence_count, status, fields_json, conflicts_json, dropped_at "
+            "FROM topic_items WHERE "
             + " AND ".join(conditions)
             + " ORDER BY (status = 'pending') DESC, last_seen DESC"
         ),
@@ -800,6 +985,10 @@ async def update_topic_status(
     session: AsyncSession, *, workspace_id: UUID, item_id: UUID, status: str
 ) -> None:
     await session.execute(
-        text("UPDATE topic_items SET status = :status WHERE workspace_id = :ws AND id = :id"),
+        text(
+            "UPDATE topic_items SET status = :status, "
+            "dropped_at = CASE WHEN :status = 'dropped' THEN now() ELSE dropped_at END "
+            "WHERE workspace_id = :ws AND id = :id"
+        ),
         {"status": status, "ws": workspace_id, "id": item_id},
     )

@@ -18,6 +18,7 @@ from mylife_runtime.paths import PathRejected, safe_join
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mylife_api import repo_phase1 as repo
+from mylife_api import repositories
 from mylife_api.errors import AppError
 from mylife_api.rendering import render_markdown
 
@@ -126,6 +127,39 @@ async def get_meta(
 async def get_by_path(
     session: AsyncSession, *, workspace_id: UUID, path: str
 ) -> DocumentDetail:
+    # 兼容读取别名：`data/reviews/...` → `{reviews_root}/...`（决策 1D，禁止双写）。
+    if path.startswith("data/reviews/"):
+        settings_row = await repositories.get_settings(session, workspace_id)
+        root = (settings_row or {}).get("reviews_root") or "wiki/复盘"
+        mapped = f"{root.rstrip('/')}/{path[len('data/reviews/'):]}"
+        from mylife_api import repo_review
+
+        review = await repo_review.get_review_by_git_path(
+            session, workspace_id=workspace_id, path=mapped
+        )
+        if review is not None:
+            return DocumentDetail(
+                id=review["id"],
+                path=mapped,
+                title=review["title"],
+                content=review["content"],
+                content_html=render_markdown(
+                    review["content"], document_id=str(review["id"])
+                ),
+                frontmatter={"mylife": True, "kind": review["kind"]},
+                tags=[],
+                links=[],
+                backlinks=[],
+                content_hash=review["content_hash"] or "",
+                size=len((review["content"] or "").encode("utf-8")),
+                mtime=review["generated_at"],
+                occurred_on=None,
+                indexed_at=review["generated_at"],
+                source_type="generated",
+                chunks=None,
+            )
+        path = mapped
+
     row = await repo.get_document_by_path(session, workspace_id, path)
     if row is None:
         raise AppError(ErrorCode.NOT_FOUND)

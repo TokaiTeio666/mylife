@@ -7,7 +7,6 @@ import zipfile
 from pathlib import Path
 
 import pytest
-
 from mylife_delivery.git_ops import GitDeliveryError, GitRepo, validate_relative_path
 from mylife_delivery.index_page import render_index_markdown
 from mylife_delivery.manifest import branch_name, commit_message

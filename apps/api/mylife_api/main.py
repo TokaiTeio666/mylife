@@ -17,6 +17,7 @@ from mylife_api.routers import (
     admin,
     auth,
     chat,
+    deliveries,
     documents,
     health,
     ingest,
@@ -70,6 +71,7 @@ def create_app() -> FastAPI:
     app.include_router(search.router, prefix=API_PREFIX)
     app.include_router(chat.router, prefix=API_PREFIX)
     app.include_router(reviews.router, prefix=API_PREFIX)
+    app.include_router(deliveries.router, prefix=API_PREFIX)
     app.include_router(topics.router, prefix=API_PREFIX)
     app.include_router(webhooks.router, prefix=API_PREFIX)
     app.include_router(admin.router, prefix=API_PREFIX)

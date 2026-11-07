@@ -547,11 +547,43 @@ class ReviewRunner:
         await self._materialize_topics(session, draft)
         await session.commit()
         await set_rls_context(session, self.workspace_id, self.payload.get("user_id"))
-        await self._transition(session, "succeeded", "local_only", payload=self.payload)
+
+        # 交付：Git 连接存在时 commit/PR；否则对象存储包 + ZIP（AC-39）。
+        from mylife_api import services_delivery
+
+        review_row = await repo.get_review(
+            session, workspace_id=self.workspace_id, review_id=self.review_id
+        )
+        outcome = await services_delivery.deliver_review(
+            session,
+            workspace_id=self.workspace_id,
+            run_id=self.run_id,
+            review_id=self.review_id,
+            version=self.version,
+            kind=self.kind,
+            period_key=self.period_key,
+            title=(review_row or {}).get("title") or f"{self.period_key} 复盘",
+            content_md=rendered.content_md,
+            content_hash=rendered.content_hash,
+            degraded_reasons=self.degraded_reasons,
+            verdict=self.payload.get("verdict"),
+        )
+        await session.commit()
+        await set_rls_context(session, self.workspace_id, self.payload.get("user_id"))
+        reason = {
+            "pr_open": "commit_and_pr_ok",
+            "merged": "commit_and_pr_ok",
+            "noop": "noop",
+        }.get(outcome["status"], "local_only")
+        payload = {**self.payload, "delivery": {k: str(v) for k, v in outcome.items()}}
+        await self._transition(session, "succeeded", reason, payload=payload)
 
     async def _materialize_topics(self, session: AsyncSession, draft: dict[str, Any]) -> None:
-        """AC-68：新条目 pending；同 canonical_key 复发只累加 occurrence。"""
+        """AC-68/AC-40：新条目 pending；复发追加 occurrence；字段冲突显式保留。"""
+        import json
+
         topic_by_type = {"error": "errors", "method": "methods", "action": "actions"}
+        cleared: set[UUID] = set()
         for entry in draft.get("entries") or []:
             topic = topic_by_type.get(entry["item_type"])
             if topic is None:
@@ -561,6 +593,7 @@ class ReviewRunner:
                 source_date = date.fromisoformat(source_date)
             if source_date is None:
                 continue
+            fields = entry.get("fields") or {}
             item = await repo.upsert_topic_item(
                 session,
                 workspace_id=self.workspace_id,
@@ -568,7 +601,48 @@ class ReviewRunner:
                 canonical_key=entry["canonical_key"],
                 title=_entry_title(entry),
                 source_date=source_date,
+                fields_json=fields,
             )
+            existing_fields = item.get("fields_json") or {}
+            if isinstance(existing_fields, str):
+                existing_fields = json.loads(existing_fields)
+            conflicts = item.get("conflicts_json") or []
+            if isinstance(conflicts, str):
+                conflicts = json.loads(conflicts)
+            changed = False
+            for field, value in fields.items():
+                old = existing_fields.get(field)
+                if old is None or str(old) == str(value):
+                    continue
+                entry_conflict = {
+                    "field": field,
+                    "values": [
+                        {"date": str(item.get("first_seen") or ""), "value": old},
+                        {"date": source_date.isoformat(), "value": value},
+                    ],
+                }
+                conflicts = [
+                    conflict
+                    for conflict in conflicts
+                    if conflict.get("field") != field
+                ] + [entry_conflict]
+                changed = True
+            if changed:
+                await repo.update_topic_conflicts(
+                    session,
+                    workspace_id=self.workspace_id,
+                    item_id=item["id"],
+                    conflicts=conflicts,
+                )
+            # 同 period 重跑：每个 item 只清一次旧贡献，再按当前版本重建（D40）。
+            if item["id"] not in cleared:
+                await repo.delete_topic_occurrences_for_review(
+                    session,
+                    workspace_id=self.workspace_id,
+                    review_id=self.review_id,
+                    item_id=item["id"],
+                )
+                cleared.add(item["id"])
             await repo.insert_topic_occurrence(
                 session,
                 workspace_id=self.workspace_id,
@@ -578,6 +652,12 @@ class ReviewRunner:
                 line_range=entry.get("line_range"),
                 quote=_entry_title(entry),
                 evidence_id=entry.get("evidence_id"),
+                review_id=self.review_id,
+                version=self.version,
+                fields_json=fields,
+            )
+            await repo.refresh_topic_counts(
+                session, workspace_id=self.workspace_id, item_id=item["id"]
             )
 
     # ------------------------------------------------------------------ 失败

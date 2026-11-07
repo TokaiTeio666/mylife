@@ -84,8 +84,7 @@ STATEMENTS: list[str] = [
     "ALTER TABLE delivery_records ADD COLUMN merged_at timestamptz",
     "CREATE INDEX idx_delivery_open ON delivery_records (workspace_id, status) "
     "WHERE status IN ('pending','committing','committed','pr_open')",
-    "CREATE UNIQUE INDEX uq_delivery_open_branch ON delivery_records (workspace_id, branch) "
-    "WHERE branch IS NOT NULL AND status IN ('pending','committing','committed','pr_open')",
+    "CREATE INDEX idx_delivery_branch ON delivery_records (workspace_id, branch)",
     # ------------------------------------------------------------ reviews cache
     "ALTER TABLE reviews ADD COLUMN delivery_status text",
     # ------------------------------------------------------------ topic_items
@@ -262,7 +261,7 @@ def downgrade() -> None:
     for column in ("dropped_at", "conflicts_json", "fields_json"):
         op.execute(f"ALTER TABLE topic_items DROP COLUMN IF EXISTS {column}")
     op.execute("ALTER TABLE reviews DROP COLUMN IF EXISTS delivery_status")
-    op.execute("DROP INDEX IF EXISTS uq_delivery_open_branch")
+    op.execute("DROP INDEX IF EXISTS idx_delivery_branch")
     op.execute("DROP INDEX IF EXISTS idx_delivery_open")
     for column in (
         "merged_at",

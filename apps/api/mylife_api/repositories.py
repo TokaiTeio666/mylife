@@ -263,7 +263,8 @@ async def get_settings(session: AsyncSession, workspace_id: UUID) -> dict[str, A
     result = await session.execute(
         text(
             "SELECT workspace_id, timezone, daily_at, weekly_at, yearly_at, reviews_root, "
-            "       retrieval_top_k, context_window_tokens, web_search_enabled "
+            "       retrieval_top_k, context_window_tokens, web_search_enabled, "
+            "       auto_merge_daily, delivery_policy_json, embedding_profile_id "
             "FROM workspace_settings WHERE workspace_id = :ws"
         ),
         {"ws": workspace_id},
