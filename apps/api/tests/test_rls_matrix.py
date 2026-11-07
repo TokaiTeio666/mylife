@@ -29,6 +29,18 @@ TENANT_TABLES = [
     "workspace_members",
     "audit_logs",
     "provider_credentials",
+    "evidence_items",
+    "review_sections",
+    "review_entries",
+    "review_citations",
+    "review_versions",
+    "review_search",
+    "topic_items",
+    "topic_occurrences",
+    "delivery_records",
+    "delivery_events",
+    "review_confirmations",
+    "idempotency_keys",
 ]
 
 
@@ -60,10 +72,86 @@ def _insert_tenant_rows(conn, helpers, *, user_b: str, ws_b: str) -> None:
         "VALUES (%s, %s, 'b-task', 'B 的任务', 'open', CURRENT_DATE, CURRENT_DATE)",
         (uuid7(), ws_b),
     )
+    review_b = uuid7()
     conn.execute(
         "INSERT INTO reviews (id, workspace_id, kind, period_key, title, content) "
         "VALUES (%s, %s, 'daily', '2026-10-27', 'B 的日报', '正文')",
-        (uuid7(), ws_b),
+        (review_b, ws_b),
+    )
+    run_b = uuid7()
+    conn.execute(
+        "INSERT INTO agent_runs (id, workspace_id, kind, period_key, state, idem_key, review_id) "
+        "VALUES (%s, %s, 'daily', '2026-10-27', 'succeeded', %s, %s)",
+        (run_b, ws_b, f"rls:{run_b}", review_b),
+    )
+    snap_b = uuid7()
+    conn.execute(
+        "INSERT INTO source_snapshots (id, workspace_id, commit_sha, manifest_digest, doc_count, as_of) "
+        "VALUES (%s, %s, 'sha-b', 'digest-b', 1, now())",
+        (snap_b, ws_b),
+    )
+    conn.execute(
+        "INSERT INTO evidence_items (id, workspace_id, run_id, evidence_id, snapshot_id, "
+        "source_type, source_path, quote, quote_hash) "
+        "VALUES (%s, %s, %s, 'e1', %s, 'task', 'b/task.md', 'B 证据', %s)",
+        (uuid7(), ws_b, run_b, snap_b, "b" * 64),
+    )
+    conn.execute(
+        "INSERT INTO review_sections (id, workspace_id, review_id, version, section_key, ordinal, content_md) "
+        "VALUES (%s, %s, %s, 1, 'today_tasks', 1, 'B 章节')",
+        (uuid7(), ws_b, review_b),
+    )
+    conn.execute(
+        "INSERT INTO review_entries (id, workspace_id, review_id, version, section_key, item_type, "
+        "canonical_key, fields_json) VALUES (%s, %s, %s, 1, 'mistakes', 'error', 'k-b', '{}')",
+        (uuid7(), ws_b, review_b),
+    )
+    conn.execute(
+        "INSERT INTO review_citations (id, workspace_id, review_id, version, claim_id, evidence_id, "
+        "quote, quote_hash) VALUES (%s, %s, %s, 1, 'c1', 'e1', 'B 引用', %s)",
+        (uuid7(), ws_b, review_b, "b" * 64),
+    )
+    conn.execute(
+        "INSERT INTO review_versions (id, workspace_id, review_id, version, content_md, content_hash) "
+        "VALUES (%s, %s, %s, 1, 'B 正文', %s)",
+        (uuid7(), ws_b, review_b, "b" * 64),
+    )
+    conn.execute(
+        "INSERT INTO review_search (id, workspace_id, review_id, version, kind, period_key, "
+        "title, path, content_hash) VALUES (%s, %s, %s, 1, 'daily', '2026-10-27', 'B 日报', "
+        "'wiki/复盘/每日复盘/2026/2026-10-27.md', %s)",
+        (uuid7(), ws_b, review_b, "b" * 64),
+    )
+    topic_b = uuid7()
+    conn.execute(
+        "INSERT INTO topic_items (id, workspace_id, topic, canonical_key, title, first_seen, last_seen) "
+        "VALUES (%s, %s, 'errors', 'k-b', 'B 专题', CURRENT_DATE, CURRENT_DATE)",
+        (topic_b, ws_b),
+    )
+    conn.execute(
+        "INSERT INTO topic_occurrences (id, workspace_id, item_id, source_date, source_path, quote) "
+        "VALUES (%s, %s, %s, CURRENT_DATE, 'b/note.md', 'B 发生')",
+        (uuid7(), ws_b, topic_b),
+    )
+    conn.execute(
+        "INSERT INTO delivery_records (id, workspace_id, review_id, version, target, status) "
+        "VALUES (%s, %s, %s, 1, 'object_store', 'pending')",
+        (uuid7(), ws_b, review_b),
+    )
+    conn.execute(
+        "INSERT INTO delivery_events (id, workspace_id, provider_delivery_id, event, payload_digest) "
+        "VALUES (%s, %s, %s, 'ping', %s)",
+        (uuid7(), ws_b, f"delivery-{uuid7()}", "d" * 64),
+    )
+    conn.execute(
+        "INSERT INTO review_confirmations (id, workspace_id, user_id, token_hash, kind, period_key, "
+        "expires_at) VALUES (%s, %s, %s, %s, 'daily', '2026-10-27', now() + interval '10 minutes')",
+        (uuid7(), ws_b, user_b, "t" * 64),
+    )
+    conn.execute(
+        "INSERT INTO idempotency_keys (id, workspace_id, user_id, endpoint, key, request_hash, expires_at) "
+        "VALUES (%s, %s, %s, 'POST /reviews', %s, %s, now() + interval '1 day')",
+        (uuid7(), ws_b, user_b, f"idem-{uuid7()}", "h" * 64),
     )
     conv_b = uuid7()
     conn.execute(
@@ -167,6 +255,12 @@ def test_composite_foreign_keys_exist(admin_conn):
         ("document_chunks", "documents"),
         ("document_links", "documents"),
         ("messages", "conversations"),
+        ("review_sections", "reviews"),
+        ("review_entries", "reviews"),
+        ("review_citations", "reviews"),
+        ("review_versions", "reviews"),
+        ("review_search", "reviews"),
+        ("delivery_records", "reviews"),
     ]:
         row = admin_conn.execute(
             """
