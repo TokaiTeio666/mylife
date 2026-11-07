@@ -806,12 +806,16 @@ source = { editable = "packages/agent" }
 dependencies = [
     { name = "httpx" },
     { name = "mylife-contract" },
+    { name = "mylife-runtime" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "mylife-contract", editable = "packages/contracts" },
+    { name = "mylife-runtime", editable = "packages/knowledge-runtime" },
+    { name = "pyyaml", specifier = ">=6,<7" },
 ]
 
 [[package]]
