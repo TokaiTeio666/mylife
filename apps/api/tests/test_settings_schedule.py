@@ -131,10 +131,11 @@ async def test_dispatch_tick_admits_skips_and_catchup(client, admin_conn, monkey
     assert next_at is not None and next_at > datetime.now(UTC)
 
     # 已有成功复盘 → 只记 period_already_succeeded
+    # （把所有 daily 置为 delivered，避免跨本地午夜的周期边界差异）
     admin_conn.execute(
         "UPDATE reviews SET status = 'delivered' WHERE workspace_id = %s "
-        "AND kind = 'daily' AND period_key = %s",
-        (workspace_id, period),
+        "AND kind = 'daily'",
+        (workspace_id,),
     )
     admin_conn.execute(
         "UPDATE workspace_schedules SET next_run_at = %s, last_skip_reason = NULL "
