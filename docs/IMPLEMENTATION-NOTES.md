@@ -75,6 +75,34 @@
 
 ---
 
+## 2C. Phase 3 实现偏差（2026-11-07）
+
+| # | 项目 | 现状 | 理由 / 后续 |
+|---|---|---|---|
+| P3-1 | 复盘执行位置 | API 进程内 `asyncio`（`review_runner`），非 Celery worker-review | 与 chat 同模式；事件/状态持久化不变。Phase 4 迁 worker-review（PHASE3-SPEC D8） |
+| P3-2 | Writer 形态 | 确定性装配器（`review_composer`），不调用生成式 LLM | Phase 3 的可验收性依赖确定性输出；真实 LLM 写作留 `model_profile` 扩展点。因此 `review_sections` 的叙述较模板化 |
+| P3-3 | 错误/方法论抽取 | 不做自动抽取；`mistakes`/`methods` 当日无条目时使用哨兵 | 抽取规则需需求 v1.1 明确（PHASE3-SPEC §6/§13）；`ITEM_SCHEMAS` 与物化链路已就绪 |
+| P3-4 | `reviews` 版本模型 | 每 `(ws,kind,period)` 一行，`version` 为当前指针，历史在 `review_versions` | 同时满足 DATA-MODEL §3.8 唯一约束与 §7.1 回滚指针；`superseded_by` 恒 NULL（PHASE3-SPEC D3） |
+| P3-5 | `reviews.status` | CHECK 扩为 DATA-MODEL 与 API 两套取值的并集，服务端只写 API 七值 | 兼容旧值与 `ReviewSummary.status`（D1） |
+| P3-6 | `is_active_state` | 移除 `needs_human` | API §7.1 将 `needs_human` 列为终态；0003 与之冲突（D2） |
+| P3-7 | 预算累计落点 | `usage_events` 新增 `run_id/attempt_id/role/cost`，按 run 聚合 | `state_payload` 是整块覆盖写，并发/回收会丢计数（D4） |
+| P3-8 | `run_events.stream_epoch` | 新增列 | API §7.2 要求，0003 未建（D14） |
+| P3-9 | `documents.parse_warnings` | 新增列，存日期来源冲突/非法候选 | AC-34 只要求“记 warning”，落点由实现确定（D15） |
+| P3-10 | SEC-16/17 范围 | 只做验签 + `delivery_events` 幂等；`pull_request.merged` 记 `ignored` | `delivery_records` 回写属 Phase 4（D5） |
+| P3-11 | webhook 租户定位 | `SECURITY DEFINER` 函数 `webhook_connection_lookup`，owner 为 `mylife_webhook`（BYPASSRLS，仅 `SELECT git_connections`） | 匿名请求无租户上下文；不放开表级 RLS |
+| P3-12 | `create_review` 确认通道 | `POST /reviews` 新增可选 `confirmation_token`；无 token 视为人工显式确认 | API §3.7.1 原请求体无该字段（D6） |
+| P3-13 | 复盘取消 | 仅 `created/snapshotting/planning`；之后走 `reject` | API §3.6.7 语义；`/runs/{id}/cancel` 按 kind 分流 |
+| P3-14 | `edited_content_md` | 拒绝绕过（`REVIEW_GATE_FAILED`） | 完整“编辑 → 新 draft → 重评审”链依赖 Phase 4 交付 |
+| P3-15 | 租约续租 | runner 内迁移时续租；独立 sweeper 留 Phase 4 | 单进程内不存在僵尸 run；多副本需 beat |
+| P3-16 | fixture 目录 | `apps/api/tests/fixtures/`，pytest marker `fixture` | ACCEPTANCE §4.1 写仓库根 `tests/fixtures/`（D16） |
+| P3-17 | `coverage_gaps` | 存 `review_sections.structured_json` + `run_events`，不新增表 | 文档未定义落点（D12） |
+| P3-18 | 年报学习地图 | 从 weekly `method_landing` 聚合，而非 daily `learning_summary` | 只读下级 rollup（AC-38）；无周报时为哨兵 |
+| P3-19 | 专题 topic 取值 | DB 英文枚举，API 中文 ↔ 英文双向映射 | DATA-MODEL §4.14 vs API §3.7.13（D17） |
+| P3-20 | `review_entries` 行号 | DB `line_start/line_end`，API 序列化为 `line_range` | 两处文档命名不一致（D18） |
+| P3-21 | `estimated_tokens` | 对象 `{input,output}`，并与 kind 预算比较 | §11.6 示例 vs 原 `int`（D19） |
+
+---
+
 ## 3. 运行时与平台注意事项
 
 1. **Windows + async psycopg**：psycopg 异步模式不支持 `ProactorEventLoop`。

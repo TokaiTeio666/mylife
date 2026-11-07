@@ -12,9 +12,10 @@
 | Phase 0 / M1（Auth、Workspace、RLS、Compose） | `dc355fb` | `PHASE0-STATUS.md` |
 | Phase 1 / M2（导入、混合检索、文档） | `4cf9f6f` | `PHASE1-STATUS.md` |
 | Phase 2 / M3（ToolGateway、chat、SSE、引用） | `f1c0025` | `PHASE2-STATUS.md` |
-| Phase 3 / M4（复盘 FSM、章节契约、Todo 台账、G0–G9） | 未开始 | — |
+| Phase 3 / M4（复盘 FSM、章节契约、Todo 台账、G0–G9） | 见 `git log`（C1–C14） | `PHASE3-STATUS.md`、`PHASE3-SPEC.md` |
+| Phase 4 / M4.5–M5（Git 交付、专题页、调度、仪表盘） | 未开始 | — |
 
-测试基线：`cd apps/api && uv run pytest -q` → **104 passed, 1 skipped**。
+测试基线：`cd apps/api && uv run pytest -q` → **202 passed, 1 skipped**。
 前端：`cd apps/web && npx tsc --noEmit && npm run lint && npm run build`。
 
 ---
@@ -22,14 +23,14 @@
 ## 2. 恢复会话的提示词（复制即用）
 
 ```text
-继续 mylife 项目。先读 docs/HANDOFF.md，再读 docs/PHASE2-STATUS.md §8
-与 docs/IMPLEMENTATION-NOTES.md §2B。当前要做 Phase 3：
-复盘 FSM、§5.1 章节契约、Todo 台账、G0–G9 确定性门禁、预算 guard。
-门禁：AC-25(create_review 确认)、AC-31…AC-38、AC-41、AC-42、AC-60、
-AC-66、AC-68；SEC-16/17/23；FX-01/02/03/04/10/12。
+继续 mylife 项目。先读 docs/HANDOFF.md，再读 docs/PHASE3-STATUS.md §6/§8
+与 docs/IMPLEMENTATION-NOTES.md §2C。当前要做 Phase 4：
+Git 交付（分支/commit/PR/auto-merge）、专题页重渲染、调度、仪表盘。
+门禁：AC-39、AC-40、AC-43…AC-48、AC-51、AC-52、AC-67；SEC-27；
+FX-07、FX-09（配置 Git 时 FX-08）。
 ```
 
-按阶段推进时，把“当前要做 Phase 3”替换成目标阶段即可。
+按阶段推进时，把“当前要做 Phase 4”替换成目标阶段即可。
 
 ---
 
