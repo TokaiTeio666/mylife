@@ -185,6 +185,125 @@ async def collect_period_tasks(
     return groups
 
 
+ERROR_HEADINGS = {"做错的事", "错误", "错误清单"}
+METHOD_HEADINGS = {"正确方法论", "方法论"}
+
+ERROR_FIELDS = {
+    "事件": "event",
+    "根因": "root_cause",
+    "代价": "cost",
+    "正确做法": "correct_action",
+    "复发触发": "recurrence_trigger",
+}
+METHOD_FIELDS = {
+    "名称": "name",
+    "来源": "source",
+    "场景": "applicable_scenario",
+    "步骤": "steps",
+    "边界": "boundaries",
+    "落地": "landing_action",
+    "验证": "verification_criteria",
+}
+
+
+def _parse_labeled_fields(text: str, mapping: dict[str, str]) -> dict[str, Any] | None:
+    fields: dict[str, Any] = {}
+    for chunk in text.replace("｜", "|").split("|"):
+        chunk = chunk.strip().lstrip("-*").strip()
+        if not chunk or "：" not in chunk:
+            continue
+        label, value = chunk.split("：", 1)
+        key = mapping.get(label.strip())
+        if key is None or not value.strip():
+            continue
+        fields[key] = value.strip()
+    return fields if len(fields) == len(mapping) else None
+
+
+def parse_entry_notes(content: str) -> list[dict[str, Any]]:
+    """从笔记的“做错的事 / 正确方法论”小节抽取条目（确定性，零 LLM）。
+
+    行格式：`- 事件：… | 根因：… | 代价：… | 正确做法：… | 复发触发：…`
+    """
+    from mylife_runtime.hashing import canonical_key
+
+    entries: list[dict[str, Any]] = []
+    mode: str | None = None
+    for line_number, line in enumerate((content or "").splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            heading = stripped.lstrip("#").strip()
+            if heading in ERROR_HEADINGS:
+                mode = "error"
+            elif heading in METHOD_HEADINGS:
+                mode = "method"
+            else:
+                mode = None
+            continue
+        if mode is None or not stripped.startswith(("-", "*")):
+            continue
+        mapping = ERROR_FIELDS if mode == "error" else METHOD_FIELDS
+        fields = _parse_labeled_fields(stripped, mapping)
+        if fields is None:
+            continue
+        if mode == "method":
+            steps = fields.get("steps")
+            if isinstance(steps, str):
+                fields["steps"] = [
+                    item.strip()
+                    for item in steps.replace("；", ";").split(";")
+                    if item.strip()
+                ]
+        # canonical_key 与 entry_materializer.TITLE_FIELDS 保持同一优先级：
+        # error → root_cause | event；method → name。
+        title = (
+            fields.get("root_cause") or fields.get("event")
+            if mode == "error"
+            else fields.get("name")
+        ) or ""
+        entries.append(
+            {
+                "item_type": mode,
+                "section_key": "mistakes" if mode == "error" else "methods",
+                "canonical_key": canonical_key(mode, title),
+                "fields": fields,
+                "source_path": None,
+                "line_range": [line_number, line_number],
+                "source_date": None,
+                "evidence_id": None,
+            }
+        )
+    return entries
+
+
+async def collect_mistake_entries(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    period_key: date,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    """抽取当天笔记中的错误/方法论条目（AC-40/FX-07 的素材来源）。"""
+    result = await session.execute(
+        text(
+            "SELECT id, path, content, occurred_on FROM documents "
+            "WHERE workspace_id = :ws AND source_type = 'user' "
+            "  AND occurred_on = :period "
+            "  AND (content LIKE '%做错的事%' OR content LIKE '%正确方法论%' "
+            "       OR content LIKE '%错误%' OR content LIKE '%方法论%') "
+            "ORDER BY path ASC LIMIT :limit"
+        ),
+        {"ws": workspace_id, "period": period_key, "limit": limit},
+    )
+    entries: list[dict[str, Any]] = []
+    for row in result:
+        for entry in parse_entry_notes(row.content or ""):
+            entry["source_path"] = row.path
+            entry["source_date"] = (row.occurred_on or period_key).isoformat()
+            entries.append(entry)
+    return entries
+
+
 async def collect_journal(
     session: AsyncSession,
     *,

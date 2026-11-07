@@ -54,9 +54,15 @@ def materialize_entries(
     sections: Sequence[dict[str, Any]],
     *,
     evidence_by_path: dict[str, dict[str, Any]] | None = None,
+    source_by_key: dict[tuple[str, str], dict[str, Any]] | None = None,
 ) -> list[MaterializedEntry]:
-    """把 Draft sections 的 structured items 转成可写入 review_entries 的行。"""
+    """把 Draft sections 的 structured items 转成可写入 review_entries 的行。
+
+    `source_by_key` 为 `(item_type, canonical_key) → {source_path, line_range,
+    source_date, evidence_id}`，用于来自笔记正文的确定性抽取条目（G4 可追溯）。
+    """
     evidence_by_path = evidence_by_path or {}
+    source_by_key = source_by_key or {}
     entries: list[MaterializedEntry] = []
     seen: set[tuple[str, str, str]] = set()
 
@@ -78,6 +84,17 @@ def materialize_entries(
                 continue
             seen.add(marker)
             evidence = _evidence_for(fields, evidence_by_path)
+            source = source_by_key.get((item_type, key)) or {}
+            if evidence is None and source:
+                evidence = source
+            source_date = evidence.get("source_date") if evidence else None
+            if isinstance(source_date, str):
+                from datetime import date as _date
+
+                try:
+                    source_date = _date.fromisoformat(source_date)
+                except ValueError:
+                    source_date = None
             entries.append(
                 MaterializedEntry(
                     section_key=section_key,
@@ -87,7 +104,7 @@ def materialize_entries(
                     source_path=evidence.get("source_path") if evidence else None,
                     line_range=evidence.get("line_range") if evidence else None,
                     evidence_id=evidence.get("evidence_id") if evidence else None,
-                    source_date=evidence.get("source_date") if evidence else None,
+                    source_date=source_date,
                     root_cause_fingerprint=(
                         root_cause_fingerprint(str(fields.get("root_cause")))
                         if item_type == "error" and fields.get("root_cause")

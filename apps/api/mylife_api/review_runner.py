@@ -236,6 +236,11 @@ class ReviewRunner:
                 reviews_root=reviews_root,
                 collector=collector,
             )
+            context["entries"] = await review_evidence.collect_mistake_entries(
+                session,
+                workspace_id=self.workspace_id,
+                period_key=period_start,
+            )
         else:
             source_kind = "daily" if self.kind == "weekly" else "weekly"
             context["entries"] = await review_evidence.collect_entries_for_period(
@@ -332,7 +337,20 @@ class ReviewRunner:
             self.degraded_reasons.append("missing")
 
         evidence_by_path = {item.evidence_id: item.as_dict() for item in collector.items}
-        materialized = materialize_entries(draft.as_sections(), evidence_by_path=evidence_by_path)
+        source_by_key = {
+            (entry["item_type"], entry["canonical_key"]): {
+                "source_path": entry.get("source_path"),
+                "line_range": entry.get("line_range"),
+                "source_date": entry.get("source_date"),
+                "evidence_id": entry.get("evidence_id"),
+            }
+            for entry in context.get("entries") or []
+        }
+        materialized = materialize_entries(
+            draft.as_sections(),
+            evidence_by_path=evidence_by_path,
+            source_by_key=source_by_key,
+        )
         await repo.insert_sections(
             session,
             workspace_id=self.workspace_id,
@@ -371,7 +389,7 @@ class ReviewRunner:
                     "source_path": entry.source_path,
                     "line_range": entry.line_range,
                     "evidence_id": entry.evidence_id,
-                    "source_date": entry.source_date.isoformat() if entry.source_date else None,
+                    "source_date": str(entry.source_date) if entry.source_date else None,
                 }
                 for entry in materialized
             ],

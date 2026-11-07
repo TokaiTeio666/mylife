@@ -250,11 +250,10 @@ async def _prepare_files(
                 version=None,
             )
         else:
-            files[full_path] = content
             inner_hashes[slug] = digest
             topic_states[slug] = state
-        if content == (existing or "") and existing is None:
-            files.pop(full_path, None)
+        # 人工区/既有内容原样带入新交付；manual 时 content == existing（不覆盖）。
+        files[full_path] = content
 
     latest = await repo.latest_reviews_by_kind(session, workspace_id=workspace_id)
     topic_counts = {
@@ -363,7 +362,13 @@ async def deliver_review(
     previous = await repo.latest_delivery_for_review(
         session, workspace_id=workspace_id, review_id=review_id
     )
-    if previous is not None and previous.get("content_hash") == content_hash:
+    # 只有“同一版本重试且内容未变”才是 noop；新版本即使正文相同也要重新
+    # 渲染专题页与索引（确认/解决专题条目会改变这些文件）。
+    if (
+        previous is not None
+        and int(previous.get("version") or 0) == version
+        and previous.get("content_hash") == content_hash
+    ):
         status = "noop"
 
     if status != "noop":
