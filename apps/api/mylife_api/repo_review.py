@@ -822,7 +822,8 @@ async def upsert_topic_item(
             "ON CONFLICT (workspace_id, topic, canonical_key) DO UPDATE SET "
             "  last_seen = GREATEST(topic_items.last_seen, EXCLUDED.last_seen), "
             "  occurrence_count = topic_items.occurrence_count + 1 "
-            "RETURNING id, status, occurrence_count, fields_json, conflicts_json"
+            "RETURNING id, status, occurrence_count, fields_json, conflicts_json, "
+            "  first_seen"
         ),
         {
             "id": uuid7(),

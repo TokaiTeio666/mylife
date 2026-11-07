@@ -90,7 +90,11 @@ async def resume_pending_runs(*, limit: int = 20) -> int:
     async with factory() as session:
         result = await session.execute(
             text(
-                "SELECT workspace_id, run_id, state FROM dispatch_resumable_review_runs(:limit)"
+                "SELECT r.workspace_id, r.run_id, r.state, "
+                "       (a.state_payload ? 'review_id') AS has_review "
+                "FROM dispatch_resumable_review_runs(:limit) r "
+                "JOIN agent_runs a ON a.id = r.run_id "
+                "  AND a.workspace_id = r.workspace_id"
             ),
             {"limit": limit},
         )
@@ -100,6 +104,9 @@ async def resume_pending_runs(*, limit: int = 20) -> int:
     started = 0
     for row in rows:
         if row["state"] not in {"created", "retry_wait"}:
+            continue
+        # 只有带 review_id 的 run 才能被 runner 接续（历史 chat/异常行跳过）。
+        if not row.get("has_review"):
             continue
         run_id = row["run_id"]
         if run_id in _inflight:

@@ -1,0 +1,24 @@
+{
+  "daily": {
+    "branch": "review/daily/2026-10-27",
+    "commit_sha": "a8da384b4d3144b2a2e395bace17ae68c2859e6b",
+    "pr_number": 1,
+    "status": "pr_open",
+    "trailers": [
+      "Run-Id: 01a1b6a8-7a59-704c-af27-eeb013520e52",
+      "Review-Id: 01a1b6a8-7a58-73b8-84b7-d5399c5f8601",
+      "Version: 1",
+      "Workspace: 01a1b6a8-7838-744f-b0f3-17298ebe08e5"
+    ]
+  },
+  "weekly_state": "succeeded",
+  "pr_count": 2,
+  "pr_body_sections": [
+    "30 秒结论",
+    "章节自检",
+    "证据前 10 条",
+    "变更文件",
+    "风险与回滚",
+    "GateResult"
+  ]
+}

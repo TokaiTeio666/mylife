@@ -1,0 +1,22 @@
+{
+  "canonical_key": "39d1a14e121907fa1f46e708780e61551b6c968cc1003005d90088e84d58e88e",
+  "occurrence_count": 3,
+  "status": "pending",
+  "conflicts": [
+    {
+      "field": "cost",
+      "values": [
+        {
+          "date": "2026-10-25",
+          "value": "2h"
+        },
+        {
+          "date": "2026-10-26",
+          "value": "半天"
+        }
+      ]
+    }
+  ],
+  "human_region_preserved": true,
+  "marker_inside_occurrences_match_db": true
+}

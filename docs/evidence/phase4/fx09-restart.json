@@ -1,0 +1,23 @@
+{
+  "reclaimed": 1,
+  "resumed": 0,
+  "run_state_after_sweep": [
+    "retry_wait",
+    "drafting"
+  ],
+  "state_events": [
+    {
+      "from_state": "drafting",
+      "to_state": "retry_wait",
+      "reason": "lease_expired"
+    }
+  ],
+  "schedule_next_run_missing": 0,
+  "duplicate_products": 1,
+  "epoch_rebuild_required": true,
+  "generated_at": "2026-11-07T15:37:43.428210+00:00",
+  "note": "完整 kill -9/断网演练属 Phase 5 AC-59 签收",
+  "extra": {
+    "timedelta": "0:00:00"
+  }
+}
