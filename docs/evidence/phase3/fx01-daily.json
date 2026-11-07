@@ -1,0 +1,27 @@
+{
+  "sections": [
+    "today_tasks",
+    "learning_summary",
+    "journal_events",
+    "mistakes",
+    "methods",
+    "tomorrow_actions",
+    "one_line_summary"
+  ],
+  "ordinals": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "carried_over": [
+    "读论文"
+  ],
+  "citations": 1,
+  "evidence": 15,
+  "rerun_diff_ratio": 0.0,
+  "state": "succeeded"
+}

@@ -53,6 +53,7 @@ testpaths = ["tests"]
 markers = [
   "db: 需要 PostgreSQL 的集成测试",
   "contract: 契约/OpenAPI 测试",
+  "fixture: golden fixture（ACCEPTANCE-CRITERIA §4）",
 ]
 filterwarnings = ["error::DeprecationWarning:mylife_api.*"]
 

@@ -1,0 +1,5 @@
+{
+  "warn_ratio": 0.85,
+  "stop_ratio": 1.0,
+  "workspace_scope": "workspace_monthly"
+}

@@ -1,0 +1,14 @@
+{
+  "sections": [
+    "today_tasks",
+    "learning_summary",
+    "journal_events",
+    "mistakes",
+    "methods",
+    "tomorrow_actions",
+    "one_line_summary"
+  ],
+  "all_sentinel": true,
+  "citations": 0,
+  "state": "succeeded"
+}
