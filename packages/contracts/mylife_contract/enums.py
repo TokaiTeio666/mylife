@@ -86,6 +86,7 @@ class TopicStatus(StrEnum):
     OPEN = "open"
     RESOLVED = "resolved"
     STALE = "stale"
+    DROPPED = "dropped"
 
 
 class DeliveryStatus(StrEnum):

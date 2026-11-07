@@ -41,6 +41,10 @@ TENANT_TABLES = [
     "delivery_events",
     "review_confirmations",
     "idempotency_keys",
+    "topic_files",
+    "outbox_events",
+    "deletion_requests",
+    "export_jobs",
 ]
 
 
@@ -162,6 +166,27 @@ def _insert_tenant_rows(conn, helpers, *, user_b: str, ws_b: str) -> None:
         "(id, workspace_id, user_id, endpoint, key, request_hash, expires_at) "
         "VALUES (%s, %s, %s, 'POST /reviews', %s, %s, now() + interval '1 day')",
         (uuid7(), ws_b, user_b, f"idem-{uuid7()}", "h" * 64),
+    )
+    conn.execute(
+        "INSERT INTO topic_files (id, workspace_id, topic, path) "
+        "VALUES (%s, %s, 'errors', 'wiki/复盘/专题/错误清单.md')",
+        (uuid7(), ws_b),
+    )
+    conn.execute(
+        "INSERT INTO outbox_events (id, workspace_id, topic, idempotency_key) "
+        "VALUES (%s, %s, 'review.scheduled', %s)",
+        (uuid7(), ws_b, f"outbox-{uuid7()}"),
+    )
+    conn.execute(
+        "INSERT INTO deletion_requests "
+        "(id, workspace_id, scope, purge_at, requested_by) "
+        "VALUES (%s, %s, 'workspace', now() + interval '30 days', %s)",
+        (uuid7(), ws_b, user_b),
+    )
+    conn.execute(
+        "INSERT INTO export_jobs (id, workspace_id, requested_by) "
+        "VALUES (%s, %s, %s)",
+        (uuid7(), ws_b, user_b),
     )
     conv_b = uuid7()
     conn.execute(

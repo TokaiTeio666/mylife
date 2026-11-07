@@ -175,3 +175,81 @@ SECTION_ORDINALS: Final[dict[str, tuple[tuple[int, str, str, int], ...]]] = {
 
 #: 全局证据上限（ARCHITECTURE §9.1 / FX-01）。
 MAX_EVIDENCE_PER_RUN: Final = 80
+
+# --- Phase 4 交付（ARCHITECTURE §8；DIRECTORY-CONSTRAINTS §4）---
+AUTO_MARKER_START: Final = "<!-- mylife:auto:start -->"
+AUTO_MARKER_END: Final = "<!-- mylife:auto:end -->"
+
+#: 专题 slug → 文件名（DB 英文 ↔ 交付文件中文）。
+TOPIC_FILE_NAMES: Final[dict[str, str]] = {
+    "errors": "错误清单",
+    "methods": "正确方法论",
+    "actions": "行动清单",
+}
+
+#: 交付仓库中的固定产物（相对 reviews_root）。
+INDEX_PATH: Final = "索引.md"
+
+#: PR 正文六段（ARCHITECTURE §8.2）。
+PR_BODY_SECTIONS: Final[tuple[str, ...]] = (
+    "30 秒结论",
+    "章节自检",
+    "证据前 10 条",
+    "变更文件",
+    "风险与回滚",
+    "GateResult",
+)
+
+#: 交付分支前缀（ARCHITECTURE §8.2）。
+REVIEW_BRANCH_PREFIX: Final = "review"
+
+# --- Phase 4 删除（SEC-27 / DATA-MODEL §9.2 并集，PHASE4-SPEC D19）---
+DELETION_PURGE_TABLES: Final[tuple[str, ...]] = (
+    "documents",
+    "document_chunks",
+    "document_links",
+    "tasks",
+    "task_occurrences",
+    "reviews",
+    "review_versions",
+    "review_sections",
+    "review_entries",
+    "review_citations",
+    "review_search",
+    "review_confirmations",
+    "topic_items",
+    "topic_occurrences",
+    "topic_files",
+    "conversations",
+    "messages",
+    "agent_runs",
+    "run_steps",
+    "run_events",
+    "evidence_items",
+    "source_snapshots",
+    "snapshot_documents",
+    "document_changes",
+    "delivery_records",
+    "delivery_events",
+    "provider_credentials",
+    "embedding_profiles",
+    "export_jobs",
+    "workspace_settings",
+    "workspace_schedules",
+    "git_connections",
+    "job_runs",
+    "idempotency_keys",
+    "outbox_events",
+    "usage_events",
+    "sessions",
+    "workspace_members",
+)
+
+DELETION_NOTICE: Final[dict[str, object]] = {
+    "will_delete": list(DELETION_PURGE_TABLES) + ["vectors", "minio_objects", "redis_keys"],
+    "will_retain": ["audit_logs(脱敏元数据)", "merged_git_history"],
+    "notice": (
+        "已合并到 Git 的历史提交会被保留且仍可通过 git log 读取；"
+        "mylife 不承诺从 Git 历史抹除，仅保证 mylife 侧数据删除。"
+    ),
+}

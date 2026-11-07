@@ -51,6 +51,7 @@ class DeliveryRecord(ApiModel):
     target: Literal["git", "object_store", "ui_diff"]
     provider: Literal["github", "gitlab"] | None = None
     branch: str | None = None
+    base_branch: str | None = None
     commit_sha: str | None = None
     pr_number: int | None = None
     pr_url: str | None = None
@@ -65,6 +66,8 @@ class DeliveryRecord(ApiModel):
         "failed",
     ]
     merged_commit: str | None = None
+    auto_merge: bool = False
+    error_code: str | None = None
     degraded: bool = False
     created_at: UtcDateTime
     updated_at: UtcDateTime
@@ -74,3 +77,29 @@ class DeliveryList(ApiModel):
     items: list[DeliveryRecord]
     next_cursor: str | None = None
     has_more: bool = False
+
+
+class DeliveryDiffSummary(ApiModel):
+    files_added: int = 0
+    files_modified: int = 0
+    files_unchanged: int = 0
+
+
+class DeliveryDetail(ApiModel):
+    delivery: DeliveryRecord
+    manifest: DeliveryManifest
+    diff_summary: DeliveryDiffSummary = Field(default_factory=DeliveryDiffSummary)
+
+
+class DeliveryRetryResponse(ApiModel):
+    delivery_id: UUID
+    status: Literal[
+        "pending",
+        "committed",
+        "pr_open",
+        "merged",
+        "closed",
+        "noop",
+        "blocked",
+        "failed",
+    ]
