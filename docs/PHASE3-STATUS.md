@@ -101,6 +101,25 @@
 
 ---
 
+## 6A. 容器化 E2E（本机，2026-11-07）
+
+服务：postgres / redis / migrate / api / worker / web / caddy；API 镜像已含
+`packages/delivery`，迁移到 `0004_phase3`。
+
+| 步骤 | 结果 |
+|---|---|
+| `POST /api/v1/reviews`（经 Caddy HTTPS，`allow_empty=true`） | 201，返回 run_id 与 review_id |
+| 轮询 `GET /runs/{id}` | `succeeded`；`budget.state=ok` |
+| `GET /reviews/{id}` | 7 节（ordinal 1–7）、`content_md` 非空、`versions=[1]` |
+| 再次触发同 period | 200，`version=2`，`review_versions` 2 行，旧版本仍可查 |
+| `GET /reviews` | 1 条 `daily 2026-10-27`，`status=delivered`，`degraded=false` |
+| `GET /topics` | 三专题（错误清单 / 正确方法论 / 行动清单） |
+| `GET /openapi.json` | 含 `/reviews`、`/topics/*`、`/webhooks/git/{provider}` |
+
+> 空 workspace 生成的是合法空日复盘：7 节全哨兵、`degraded=false`（与 FX-04 一致）。
+
+---
+
 ## 7. 复现命令
 
 ```bash
