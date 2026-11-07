@@ -20,6 +20,7 @@ from mylife_api.routers import (
     documents,
     health,
     ingest,
+    reviews,
     search,
     workspaces,
 )
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router, prefix=API_PREFIX)
     app.include_router(search.router, prefix=API_PREFIX)
     app.include_router(chat.router, prefix=API_PREFIX)
+    app.include_router(reviews.router, prefix=API_PREFIX)
     app.include_router(admin.router, prefix=API_PREFIX)
     return app
 

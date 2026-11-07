@@ -145,7 +145,8 @@ STATEMENTS: list[str] = [
       FOREIGN KEY (workspace_id, review_id) REFERENCES reviews (workspace_id, id) ON DELETE CASCADE
     )
     """,
-    "CREATE INDEX idx_review_entries_key ON review_entries (workspace_id, item_type, canonical_key)",
+    "CREATE INDEX idx_review_entries_key "
+    "ON review_entries (workspace_id, item_type, canonical_key)",
     "CREATE INDEX idx_review_entries_ver ON review_entries (review_id, version)",
     # ------------------------------------------------------------ review_citations
     """

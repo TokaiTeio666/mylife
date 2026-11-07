@@ -12,6 +12,7 @@ members = [
     "mylife-agent",
     "mylife-api",
     "mylife-contract",
+    "mylife-delivery",
     "mylife-retrieval",
     "mylife-runtime",
     "mylife-worker",
@@ -832,6 +833,7 @@ dependencies = [
     { name = "markdown-it-py" },
     { name = "mylife-agent" },
     { name = "mylife-contract" },
+    { name = "mylife-delivery" },
     { name = "mylife-retrieval" },
     { name = "mylife-runtime" },
     { name = "nh3" },
@@ -862,6 +864,7 @@ requires-dist = [
     { name = "markdown-it-py", specifier = ">=3,<4" },
     { name = "mylife-agent", editable = "packages/agent" },
     { name = "mylife-contract", editable = "packages/contracts" },
+    { name = "mylife-delivery", editable = "packages/delivery" },
     { name = "mylife-retrieval", editable = "packages/retrieval" },
     { name = "mylife-runtime", editable = "packages/knowledge-runtime" },
     { name = "nh3", specifier = ">=0.2.18,<1" },
@@ -894,6 +897,21 @@ dependencies = [
 requires-dist = [
     { name = "email-validator", specifier = ">=2.2,<3" },
     { name = "pydantic", specifier = ">=2.9,<3" },
+]
+
+[[package]]
+name = "mylife-delivery"
+version = "0.1.0"
+source = { editable = "packages/delivery" }
+dependencies = [
+    { name = "mylife-contract" },
+    { name = "mylife-runtime" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mylife-contract", editable = "packages/contracts" },
+    { name = "mylife-runtime", editable = "packages/knowledge-runtime" },
 ]
 
 [[package]]

@@ -8,6 +8,7 @@ dependencies = [
   "mylife-runtime",
   "mylife-retrieval",
   "mylife-agent",
+  "mylife-delivery",
   "celery[redis]>=5.4,<6",
   "fastapi>=0.115,<1",
   "uvicorn[standard]>=0.32,<1",
@@ -37,6 +38,7 @@ mylife-contract = { workspace = true }
 mylife-runtime = { workspace = true }
 mylife-retrieval = { workspace = true }
 mylife-agent = { workspace = true }
+mylife-delivery = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -86,7 +86,8 @@ def _insert_tenant_rows(conn, helpers, *, user_b: str, ws_b: str) -> None:
     )
     snap_b = uuid7()
     conn.execute(
-        "INSERT INTO source_snapshots (id, workspace_id, commit_sha, manifest_digest, doc_count, as_of) "
+        "INSERT INTO source_snapshots "
+        "(id, workspace_id, commit_sha, manifest_digest, doc_count, as_of) "
         "VALUES (%s, %s, 'sha-b', 'digest-b', 1, now())",
         (snap_b, ws_b),
     )
@@ -97,22 +98,26 @@ def _insert_tenant_rows(conn, helpers, *, user_b: str, ws_b: str) -> None:
         (uuid7(), ws_b, run_b, snap_b, "b" * 64),
     )
     conn.execute(
-        "INSERT INTO review_sections (id, workspace_id, review_id, version, section_key, ordinal, content_md) "
+        "INSERT INTO review_sections "
+        "(id, workspace_id, review_id, version, section_key, ordinal, content_md) "
         "VALUES (%s, %s, %s, 1, 'today_tasks', 1, 'B 章节')",
         (uuid7(), ws_b, review_b),
     )
     conn.execute(
-        "INSERT INTO review_entries (id, workspace_id, review_id, version, section_key, item_type, "
+        "INSERT INTO review_entries "
+        "(id, workspace_id, review_id, version, section_key, item_type, "
         "canonical_key, fields_json) VALUES (%s, %s, %s, 1, 'mistakes', 'error', 'k-b', '{}')",
         (uuid7(), ws_b, review_b),
     )
     conn.execute(
-        "INSERT INTO review_citations (id, workspace_id, review_id, version, claim_id, evidence_id, "
+        "INSERT INTO review_citations "
+        "(id, workspace_id, review_id, version, claim_id, evidence_id, "
         "quote, quote_hash) VALUES (%s, %s, %s, 1, 'c1', 'e1', 'B 引用', %s)",
         (uuid7(), ws_b, review_b, "b" * 64),
     )
     conn.execute(
-        "INSERT INTO review_versions (id, workspace_id, review_id, version, content_md, content_hash) "
+        "INSERT INTO review_versions "
+        "(id, workspace_id, review_id, version, content_md, content_hash) "
         "VALUES (%s, %s, %s, 1, 'B 正文', %s)",
         (uuid7(), ws_b, review_b, "b" * 64),
     )
@@ -124,12 +129,14 @@ def _insert_tenant_rows(conn, helpers, *, user_b: str, ws_b: str) -> None:
     )
     topic_b = uuid7()
     conn.execute(
-        "INSERT INTO topic_items (id, workspace_id, topic, canonical_key, title, first_seen, last_seen) "
+        "INSERT INTO topic_items "
+        "(id, workspace_id, topic, canonical_key, title, first_seen, last_seen) "
         "VALUES (%s, %s, 'errors', 'k-b', 'B 专题', CURRENT_DATE, CURRENT_DATE)",
         (topic_b, ws_b),
     )
     conn.execute(
-        "INSERT INTO topic_occurrences (id, workspace_id, item_id, source_date, source_path, quote) "
+        "INSERT INTO topic_occurrences "
+        "(id, workspace_id, item_id, source_date, source_path, quote) "
         "VALUES (%s, %s, %s, CURRENT_DATE, 'b/note.md', 'B 发生')",
         (uuid7(), ws_b, topic_b),
     )
@@ -139,17 +146,20 @@ def _insert_tenant_rows(conn, helpers, *, user_b: str, ws_b: str) -> None:
         (uuid7(), ws_b, review_b),
     )
     conn.execute(
-        "INSERT INTO delivery_events (id, workspace_id, provider_delivery_id, event, payload_digest) "
+        "INSERT INTO delivery_events "
+        "(id, workspace_id, provider_delivery_id, event, payload_digest) "
         "VALUES (%s, %s, %s, 'ping', %s)",
         (uuid7(), ws_b, f"delivery-{uuid7()}", "d" * 64),
     )
     conn.execute(
-        "INSERT INTO review_confirmations (id, workspace_id, user_id, token_hash, kind, period_key, "
-        "expires_at) VALUES (%s, %s, %s, %s, 'daily', '2026-10-27', now() + interval '10 minutes')",
+        "INSERT INTO review_confirmations "
+        "(id, workspace_id, user_id, token_hash, kind, period_key, expires_at) "
+        "VALUES (%s, %s, %s, %s, 'daily', '2026-10-27', now() + interval '10 minutes')",
         (uuid7(), ws_b, user_b, "t" * 64),
     )
     conn.execute(
-        "INSERT INTO idempotency_keys (id, workspace_id, user_id, endpoint, key, request_hash, expires_at) "
+        "INSERT INTO idempotency_keys "
+        "(id, workspace_id, user_id, endpoint, key, request_hash, expires_at) "
         "VALUES (%s, %s, %s, 'POST /reviews', %s, %s, now() + interval '1 day')",
         (uuid7(), ws_b, user_b, f"idem-{uuid7()}", "h" * 64),
     )
@@ -211,16 +221,10 @@ async def test_cross_tenant_rows_are_invisible(table, admin_conn, db_session):
     else:
         where, params = "workspace_id = :target", {"target": ws_b}
 
-    await db_session.execute(
-        text("SELECT set_config('app.workspace_id', :ws, true)"), {"ws": ws_a}
-    )
-    await db_session.execute(
-        text("SELECT set_config('app.user_id', :uid, true)"), {"uid": user_a}
-    )
+    await db_session.execute(text("SELECT set_config('app.workspace_id', :ws, true)"), {"ws": ws_a})
+    await db_session.execute(text("SELECT set_config('app.user_id', :uid, true)"), {"uid": user_a})
     count = (
-        await db_session.execute(
-            text(f"SELECT count(*) FROM {table} WHERE {where}"), params
-        )
+        await db_session.execute(text(f"SELECT count(*) FROM {table} WHERE {where}"), params)
     ).scalar_one()
     assert count == 0, f"{table} 泄露了其他租户的行"
     await db_session.rollback()

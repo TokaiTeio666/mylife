@@ -1,0 +1,17 @@
+[project]
+name = "mylife-delivery"
+version = "0.1.0"
+description = "mylife 交付层：复盘渲染、路径解析（不含业务语义与 Git 操作）"
+requires-python = ">=3.12"
+dependencies = ["mylife-contract", "mylife-runtime"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+mylife-contract = { workspace = true }
+mylife-runtime = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mylife_delivery"]

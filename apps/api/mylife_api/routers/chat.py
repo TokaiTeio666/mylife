@@ -164,7 +164,7 @@ async def cancel_run(
     db: AsyncSession = Depends(get_db),
 ) -> CancelResponse:
     result = await services_chat.cancel_run(
-        db, workspace_id=ctx.workspace_id, run_id=run_id
+        db, workspace_id=ctx.workspace_id, run_id=run_id, user_id=ctx.user_id
     )
     return CancelResponse(**result)
 

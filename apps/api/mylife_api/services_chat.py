@@ -219,8 +219,18 @@ async def _cancel_run(
 
 
 async def cancel_run(
-    session: AsyncSession, *, workspace_id: UUID, run_id: UUID
+    session: AsyncSession, *, workspace_id: UUID, run_id: UUID, user_id: UUID | None = None
 ) -> dict[str, Any]:
+    run = await repo.get_run(session, workspace_id=workspace_id, run_id=run_id)
+    if run is not None and run["kind"] != "chat":
+        # 复盘 run 只在 created/snapshotting/planning 可取消，之后需走 reject。
+        from mylife_api import services_review
+
+        if user_id is None:
+            raise AppError(ErrorCode.FORBIDDEN)
+        return await services_review.cancel_run(
+            session, workspace_id=workspace_id, run_id=run_id, user_id=user_id
+        )
     await _cancel_run(session, workspace_id, run_id)
     return {"run_id": run_id, "state": "cancelled"}
 

@@ -211,7 +211,8 @@ def gate_g2(ctx: GateContext) -> list[GateIssue]:
 
 
 def gate_g3a(ctx: GateContext) -> list[GateIssue]:
-    if not ctx.bundle_snapshot_id:
+    # 空素材日（FX-04）没有证据也没有快照，是合法输出。
+    if not ctx.bundle_snapshot_id and ctx.evidence:
         return [_issue("G3a", "SNAPSHOT_MISMATCH", "缺少 bundle.snapshot_id")]
     return []
 
@@ -225,15 +226,18 @@ def gate_g3b(ctx: GateContext) -> list[GateIssue]:
         if item.source_type not in {"document", "chunk", "review", "task"}:
             continue
         if not item.document_content_hash:
-            issues.append(
-                _issue(
-                    "G3b",
-                    "EVIDENCE_STALE",
-                    "证据缺少 document_content_hash",
-                    evidence_id=item.evidence_id,
-                    must_fix="重新取证并绑定快照哈希",
+            # DATA-MODEL §4.8 只对 document/chunk/review 强制哈希；
+            # task 证据来自台账（合成行），允许无哈希。
+            if item.source_type in {"document", "chunk", "review"}:
+                issues.append(
+                    _issue(
+                        "G3b",
+                        "EVIDENCE_STALE",
+                        "证据缺少 document_content_hash",
+                        evidence_id=item.evidence_id,
+                        must_fix="重新取证并绑定快照哈希",
+                    )
                 )
-            )
             continue
         frozen = ctx.snapshot_hashes.get(item.source_path or "")
         if frozen is not None and frozen != item.document_content_hash:
