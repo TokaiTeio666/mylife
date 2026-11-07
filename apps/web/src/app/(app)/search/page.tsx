@@ -38,13 +38,20 @@ export default function SearchPage() {
     extensions: "",
   });
   const [submitted, setSubmitted] = React.useState<Submitted | null>(null);
+  const [sourceType, setSourceType] = React.useState<"both" | "document" | "review">(
+    "both",
+  );
 
   const results = useQuery({
-    queryKey: queryKeys.search(workspaceId ?? "", submitted?.q ?? "", submitted),
+    queryKey: queryKeys.search(workspaceId ?? "", submitted?.q ?? "", {
+      ...submitted,
+      sourceType,
+    }),
     queryFn: () =>
       api.search({
         q: submitted?.q,
         top_k: 20,
+        source_type: sourceType,
         path_prefix: submitted?.path_prefix,
         tags: submitted?.tags,
         date_from: submitted?.date_from,
@@ -88,6 +95,27 @@ export default function SearchPage() {
             <SearchIcon className="h-4 w-4" aria-hidden="true" />
             {copy.search.submit}
           </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-small">
+          <span className="text-muted-foreground">{copy.search.sourceType}</span>
+          {(
+            [
+              ["both", copy.search.sourceBoth],
+              ["document", copy.search.sourceDocument],
+              ["review", copy.search.sourceReview],
+            ] as const
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={sourceType === value ? "default" : "outline"}
+              onClick={() => setSourceType(value)}
+            >
+              {label}
+            </Button>
+          ))}
         </div>
 
         <details className="text-small">
@@ -207,17 +235,34 @@ export default function SearchPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <Link
-                      href={`/documents/${item.path
-                        .split("/")
-                        .map(encodeURIComponent)
-                        .join("/")}`}
+                      href={
+                        item.source_type === "review"
+                          ? `/reviews/${
+                              item.path.includes("每周复盘")
+                                ? "weekly"
+                                : item.path.includes("年度复盘")
+                                  ? "yearly"
+                                  : "daily"
+                            }/${item.path.split("/").pop()?.replace(".md", "") ?? ""}`
+                          : `/documents/${item.path
+                              .split("/")
+                              .map(encodeURIComponent)
+                              .join("/")}`
+                      }
                       className="text-h3 font-medium text-primary underline-offset-4 hover:underline"
                     >
                       {item.title}
                     </Link>
-                    <Badge variant="muted">
-                      {matchedLabel[item.matched_by] ?? item.matched_by}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant={item.source_type === "review" ? "accent" : "muted"}>
+                        {item.source_type === "review"
+                          ? copy.search.sourceReview
+                          : copy.search.sourceDocument}
+                      </Badge>
+                      <Badge variant="muted">
+                        {matchedLabel[item.matched_by] ?? item.matched_by}
+                      </Badge>
+                    </div>
                   </div>
                   <p className="mt-1 font-mono text-caption text-muted-foreground">
                     {item.path}

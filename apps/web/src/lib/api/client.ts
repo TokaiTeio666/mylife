@@ -183,4 +183,104 @@ export const api = {
     apiFetch<{ run_id: string; state: string }>(`/runs/${runId}/cancel`, {
       method: "POST",
     }),
+  // ---------------------------------------------------------------- Phase 4
+  listReviews: (params: Record<string, string | number | undefined> = {}) => {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== "") search.set(key, String(value));
+    }
+    return apiFetch<{ items: import("./types").ReviewSummary[] }>(
+      `/reviews?${search}`,
+    );
+  },
+  getReview: (reviewId: string, version?: number) =>
+    apiFetch<import("./types").ReviewDetail>(
+      `/reviews/${reviewId}${version ? `?version=${version}` : ""}`,
+    ),
+  createReview: (body: { kind: string; period_key: string; allow_empty?: boolean }) =>
+    apiFetch<{ run_id: string; review_id: string; version: number }>("/reviews", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  approveRun: (runId: string, body: { decision_note?: string } = {}) =>
+    apiFetch<{ run_id: string; state: string; delivery_id: string | null }>(
+      `/runs/${runId}/approve`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  rejectRun: (runId: string, body: { reason_code: string; note?: string }) =>
+    apiFetch<{ run_id: string; state: string }>(`/runs/${runId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  rollbackReview: (reviewId: string, version: number) =>
+    apiFetch<{ run_id: string; target_version: number }>(
+      `/reviews/${reviewId}/rollback`,
+      { method: "POST", body: JSON.stringify({ version, confirm: true }) },
+    ),
+  listTopics: () =>
+    apiFetch<{ items: import("./types").TopicSummary[] }>("/topics"),
+  listTopicItems: (topic: string, status?: string) =>
+    apiFetch<{ items: import("./types").TopicItem[] }>(
+      `/topics/${encodeURIComponent(topic)}/items${status ? `?status=${status}` : ""}`,
+    ),
+  confirmTopicItem: (topic: string, itemId: string, decision: "accept" | "drop") =>
+    apiFetch<import("./types").TopicItem>(
+      `/topics/${encodeURIComponent(topic)}/items/${itemId}/confirm`,
+      { method: "POST", body: JSON.stringify({ decision }) },
+    ),
+  resolveTopicItem: (topic: string, itemId: string) =>
+    apiFetch<import("./types").TopicItem>(
+      `/topics/${encodeURIComponent(topic)}/items/${itemId}/resolve`,
+      { method: "POST", body: JSON.stringify({}) },
+    ),
+  listDeliveries: (reviewId: string) =>
+    apiFetch<{ items: import("./types").DeliveryRecord[] }>(
+      `/deliveries?review_id=${reviewId}`,
+    ),
+  getDelivery: (deliveryId: string) =>
+    apiFetch<import("./types").DeliveryDetail>(`/deliveries/${deliveryId}`),
+  retryDelivery: (deliveryId: string) =>
+    apiFetch<{ delivery_id: string; status: string }>(
+      `/deliveries/${deliveryId}/retry`,
+      { method: "POST" },
+    ),
+  dashboardLatest: () =>
+    apiFetch<import("./types").DashboardLatest>("/dashboard/latest"),
+  dashboardTasks: (status?: string) =>
+    apiFetch<import("./types").DashboardTaskList>(
+      `/dashboard/tasks${status ? `?status=${status}` : ""}`,
+    ),
+  dashboardCalendar: (year: number, month?: number) =>
+    apiFetch<import("./types").DashboardCalendar>(
+      `/dashboard/calendar?year=${year}${month ? `&month=${month}` : ""}`,
+    ),
+  dashboardStats: (range = "30d") =>
+    apiFetch<import("./types").DashboardStats>(`/dashboard/stats?range=${range}`),
+  getSchedule: () =>
+    apiFetch<import("./types").ScheduleSettings>("/settings/schedule"),
+  putSchedule: (body: Record<string, unknown>) =>
+    apiFetch<import("./types").ScheduleSettings>("/settings/schedule", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  listGitConnections: () =>
+    apiFetch<{ items: import("./types").GitConnectionSummary[] }>("/settings/git"),
+  putGitConnection: (body: Record<string, unknown>) =>
+    apiFetch<import("./types").GitConnectionSummary>("/settings/git", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteGitConnections: () =>
+    apiFetch<void>("/settings/git", { method: "DELETE" }),
+  currentDeletion: () =>
+    apiFetch<import("./types").DeletionRequest | null>("/deletions/current"),
+  requestDeletion: (body: { scope: string; confirm_text: string }) =>
+    apiFetch<import("./types").DeletionRequest>("/deletions", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  cancelDeletion: (deletionId: string) =>
+    apiFetch<{ state: string }>(`/deletions/${deletionId}/cancel`, {
+      method: "POST",
+    }),
 };

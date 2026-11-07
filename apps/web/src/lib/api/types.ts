@@ -287,3 +287,222 @@ export interface ErrorEnvelope {
   error: ApiErrorBody;
   request_id: string;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4：复盘、专题、交付、仪表盘与设置
+// ---------------------------------------------------------------------------
+
+export interface ReviewSummary {
+  id: string;
+  kind: "daily" | "weekly" | "yearly";
+  period_key: string;
+  title: string;
+  version: number;
+  status: string;
+  generated_at: string;
+  path: string | null;
+  degraded: boolean;
+  delivery_status: string;
+}
+
+export interface ReviewSection {
+  section_key: string;
+  ordinal: number;
+  content_md: string;
+  structured: Record<string, unknown>;
+}
+
+export interface ReviewCitation {
+  claim_id: string;
+  evidence_id: string;
+  source_path: string | null;
+  source_date: string | null;
+  line_range: number[] | null;
+  quote: string;
+}
+
+export interface ReviewEntry {
+  section_key: string;
+  item_type: string;
+  canonical_key: string;
+  fields: Record<string, unknown>;
+  source_path: string | null;
+  line_range: number[] | null;
+  confidence: number | null;
+}
+
+export interface VersionRef {
+  version: number;
+  content_hash: string;
+  git_sha: string | null;
+  generated_at: string;
+  is_current: boolean;
+}
+
+export interface ReviewDetail extends ReviewSummary {
+  current_version: number;
+  content_md: string;
+  content_html: string;
+  sections: ReviewSection[];
+  citations: ReviewCitation[];
+  entries: ReviewEntry[];
+  verdict: Record<string, unknown> | null;
+  model: string | null;
+  snapshot_id: string | null;
+  degraded_reasons: string[];
+  git_path: string | null;
+  versions: VersionRef[];
+}
+
+export interface TopicSummary {
+  topic: string;
+  title: string;
+  path: string;
+  open_count: number;
+  last_updated: string | null;
+}
+
+export interface TopicOccurrence {
+  source_date: string;
+  source_path: string;
+  line_range: number[] | null;
+  quote: string;
+  evidence_id: string | null;
+}
+
+export interface TopicItem {
+  item_id: string;
+  canonical_key: string;
+  title: string;
+  status: "pending" | "open" | "resolved" | "stale" | "dropped";
+  first_seen: string;
+  last_seen: string;
+  occurrence_count: number;
+  occurrences: TopicOccurrence[];
+}
+
+export interface DeliveryRecord {
+  id: string;
+  review_id: string;
+  version: number;
+  target: "git" | "object_store" | "ui_diff";
+  provider: "github" | "gitlab" | null;
+  branch: string | null;
+  base_branch: string | null;
+  commit_sha: string | null;
+  pr_number: number | null;
+  pr_url: string | null;
+  status: string;
+  merged_commit: string | null;
+  auto_merge: boolean;
+  error_code: string | null;
+  degraded: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliveryDetail {
+  delivery: DeliveryRecord;
+  manifest: Record<string, unknown>;
+  diff_summary: { files_added: number; files_modified: number; files_unchanged: number };
+}
+
+export interface TaskItem {
+  id: string;
+  text: string;
+  status: "open" | "done" | "carried" | "dropped";
+  first_seen: string;
+  last_seen: string;
+  days_open: number;
+  done_date: string | null;
+  source_path: string | null;
+  line_number: number | null;
+  occurrence_count: number;
+}
+
+export interface DashboardLatest {
+  daily: ReviewSummary | null;
+  weekly: ReviewSummary | null;
+  yearly: ReviewSummary | null;
+  generated_at: string;
+  completion_rate: number;
+  open_tasks: number;
+}
+
+export interface DashboardTaskList {
+  items: TaskItem[];
+  next_cursor: string | null;
+  has_more: boolean;
+  counts: { open: number; carried: number; done_today: number };
+}
+
+export interface DayCell {
+  date: string;
+  has_daily: boolean;
+  daily_status: string | null;
+  degraded: boolean;
+  open_tasks: number;
+}
+
+export interface MonthCell {
+  month: number;
+  has_weekly: boolean;
+  weekly_period_key: string | null;
+  completion_rate: number | null;
+}
+
+export interface DashboardCalendar {
+  year: number;
+  months: MonthCell[];
+  days: DayCell[];
+}
+
+export interface DashboardStats {
+  range: string;
+  completion_rate: number;
+  tasks: { completed: number; total: number; carried_over: number };
+  reviews: { daily: number; weekly: number; yearly: number };
+  no_evidence_ratio: number;
+  degraded_rate: number;
+  tokens: { prompt: number; completion: number };
+}
+
+export interface ScheduleSettings {
+  timezone: string;
+  daily_at: string;
+  weekly_at: string;
+  yearly_at: string;
+  catchup_days: number;
+  enabled: { daily: boolean; weekly: boolean; yearly: boolean };
+  next_run_at: { daily: string | null; weekly: string | null; yearly: string | null };
+}
+
+export interface GitConnectionSummary {
+  id: string;
+  role: "source" | "output";
+  provider: "github" | "gitlab" | "generic";
+  repo_full_name: string;
+  base_branch: string;
+  auth_type: "github_app" | "deploy_key" | "pat";
+  mode: string | null;
+  reviews_root: string | null;
+  sync_interval_minutes: number;
+  sync_enabled: boolean;
+  next_sync_at: string | null;
+  last_sync_at: string | null;
+  last_sync_status: string | null;
+  credential_status: "valid" | "invalid" | "untested";
+  last_tested_at: string | null;
+}
+
+export interface DeletionRequest {
+  deletion_id: string;
+  scope: "workspace" | "account";
+  state: "requested" | "cooling" | "purged" | "cancelled";
+  purge_at: string;
+  requested_at: string;
+  requested_by: string;
+  can_cancel: boolean;
+  export_recommended: boolean;
+  notice: { will_delete: string[]; will_retain: string[]; notice: string };
+}

@@ -12,4 +12,11 @@ export const queryKeys = {
   dashboard: (workspaceId: string, section: string) =>
     ["dashboard", workspaceId, section] as const,
   settings: (workspaceId: string) => ["settings", workspaceId] as const,
+  review: (workspaceId: string, reviewId: string) =>
+    ["review", workspaceId, reviewId] as const,
+  topics: (workspaceId: string, topic?: string) =>
+    ["topics", workspaceId, topic ?? ""] as const,
+  deliveries: (workspaceId: string, reviewId: string) =>
+    ["deliveries", workspaceId, reviewId] as const,
+  deletion: (workspaceId: string) => ["deletion", workspaceId] as const,
 };

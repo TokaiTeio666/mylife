@@ -42,9 +42,9 @@ const NAV: NavItem[] = [
   { href: "/documents", label: copy.nav.documents, icon: FolderTree, available: true },
   { href: "/search", label: copy.nav.search, icon: Search, available: true },
   { href: "/chat", label: copy.nav.chat, icon: MessageSquare, available: true },
-  { href: "/reviews", label: copy.nav.reviews, icon: CalendarCheck, available: false },
-  { href: "/topics", label: copy.nav.topics, icon: Tags, available: false },
-  { href: "/settings", label: copy.nav.settings, icon: Settings, available: false },
+  { href: "/reviews", label: copy.nav.reviews, icon: CalendarCheck, available: true },
+  { href: "/topics", label: copy.nav.topics, icon: Tags, available: true },
+  { href: "/settings", label: copy.nav.settings, icon: Settings, available: true },
 ];
 
 function ThemeToggle() {
