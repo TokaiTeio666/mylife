@@ -134,10 +134,17 @@ async def receive_git_webhook(
             "event": event,
         }
 
-    disposition = services_webhooks.phase3_disposition(provider, event, payload)
+    disposition = await services_webhooks.handle_event(
+        db,
+        workspace_id=workspace_id,
+        provider=provider,
+        event=event,
+        payload=payload,
+    )
     await services_webhooks.mark_handled(
         db, provider_delivery_id=delivery_id, status=disposition
     )
+    await db.commit()
     return {
         "received": True,
         "delivery_id": delivery_id,

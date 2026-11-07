@@ -149,6 +149,52 @@ async def test_merged_pr_is_ignored_in_phase3(client, admin_conn):
 
 
 @pytest.mark.asyncio
+async def test_merged_pr_writes_back_delivery_record(client, admin_conn):
+    workspace_id, user_id = await helpers.prepare_workspace_with_docs(
+        client, admin_conn, email="hook5@example.com", files={}
+    )
+    await _seed_connection(admin_conn, workspace_id=workspace_id)
+    review_id = uuid.uuid4()
+    delivery_id = uuid.uuid4()
+    admin_conn.execute(
+        "INSERT INTO reviews (id, workspace_id, kind, period_key, title, content, version) "
+        "VALUES (%s, %s, 'daily', '2026-10-27', 'x', 'x', 1)",
+        (review_id, workspace_id),
+    )
+    admin_conn.execute(
+        "INSERT INTO delivery_records "
+        "(id, workspace_id, review_id, version, target, provider, branch, status) "
+        "VALUES (%s, %s, %s, 1, 'git', 'github', 'review/daily/2026-10-27', 'pr_open')",
+        (delivery_id, workspace_id, review_id),
+    )
+    payload = {
+        "action": "closed",
+        "pull_request": {
+            "number": 3,
+            "merged": True,
+            "merge_commit_sha": "a" * 40,
+            "head": {"ref": "review/daily/2026-10-27"},
+        },
+        "repository": {"full_name": REPO},
+    }
+    body = json.dumps(payload).encode()
+    response = await client.post(
+        f"{API}/webhooks/git/github",
+        content=body,
+        headers=_headers(
+            signature=_sign(body), delivery_id="d-5", event="pull_request"
+        ),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["handled"] is True
+    row = admin_conn.execute(
+        "SELECT status, merged_commit FROM delivery_records WHERE id = %s",
+        (delivery_id,),
+    ).fetchone()
+    assert row == ("merged", "a" * 40)
+
+
+@pytest.mark.asyncio
 async def test_unsupported_provider(client, admin_conn):
     response = await client.post(
         f"{API}/webhooks/git/bitbucket",

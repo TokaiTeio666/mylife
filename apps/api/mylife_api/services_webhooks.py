@@ -142,15 +142,65 @@ def parse_event(provider: str, raw_body: bytes) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def phase3_disposition(provider: str, event: str, payload: dict[str, Any]) -> str:
-    """Phase 3 只做验签与幂等；交付回写属 Phase 4（PHASE3-SPEC D5）。"""
-    if provider == "github" and event == "ping":
+def _github_merged(payload: dict[str, Any]) -> tuple[str | None, str | None]:
+    if payload.get("action") != "closed":
+        return None, None
+    pull = payload.get("pull_request") or {}
+    if not pull.get("merged"):
+        return None, None
+    head = (pull.get("head") or {}).get("ref")
+    return head, pull.get("merge_commit_sha")
+
+
+def _gitlab_merged(payload: dict[str, Any]) -> tuple[str | None, str | None]:
+    attrs = payload.get("object_attributes") or {}
+    if attrs.get("state") != "merged":
+        return None, None
+    return attrs.get("source_branch"), attrs.get("merge_commit_sha") or attrs.get("sha")
+
+
+async def handle_event(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    provider: str,
+    event: str,
+    payload: dict[str, Any],
+) -> str:
+    """Phase 4 回写：PR 合并 → delivery_records.merged（SEC-17 幂等）。
+
+    其余事件记为 handled/ignored；签名失败路径在调用前已被拒绝。
+    """
+    from mylife_api import repo_delivery
+
+    if event == "ping":
         return "handled"
+    merged_branch: str | None = None
+    merged_commit: str | None = None
     if provider == "github" and event == "pull_request":
-        action = payload.get("action")
-        merged = (payload.get("pull_request") or {}).get("merged")
-        if action == "closed" and merged:
-            return "ignored"
+        merged_branch, merged_commit = _github_merged(payload)
+    elif provider == "gitlab" and event in {"Merge Request Hook", "merge_request"}:
+        merged_branch, merged_commit = _gitlab_merged(payload)
+    if merged_branch:
+        row = await repo_delivery.find_by_branch(
+            session, workspace_id=workspace_id, branch=merged_branch
+        )
+        if row is not None:
+            await repo_delivery.mark_merged(
+                session,
+                workspace_id=workspace_id,
+                delivery_id=row["id"],
+                merged_commit=merged_commit,
+            )
+            await repo_delivery.set_review_delivery_status(
+                session,
+                workspace_id=workspace_id,
+                review_id=row["review_id"],
+                status="merged",
+            )
+        return "handled"
+    if event in {"push", "Push Hook"}:
+        return "handled"
     return "ignored"
 
 
@@ -158,9 +208,9 @@ __all__ = [
     "WebhookResult",
     "delivery_id_for",
     "event_name",
+    "handle_event",
     "mark_handled",
     "parse_event",
-    "phase3_disposition",
     "record_delivery_event",
     "verify_provider",
 ]
