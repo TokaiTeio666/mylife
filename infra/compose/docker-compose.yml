@@ -1,0 +1,153 @@
+name: mylife
+
+x-api-env: &api-env
+  MYLIFE_ENV: ${MYLIFE_ENV:-production}
+  MYLIFE_LOG_LEVEL: ${MYLIFE_LOG_LEVEL:-INFO}
+  MYLIFE_DB_HOST: postgres
+  MYLIFE_DB_PORT: "5432"
+  MYLIFE_DB_NAME: ${POSTGRES_DB:-mylife}
+  MYLIFE_APP_DB_USER: ${MYLIFE_APP_DB_USER:-mylife_app}
+  MYLIFE_APP_DB_PASSWORD: ${MYLIFE_APP_DB_PASSWORD:-change-me-app}
+  MYLIFE_REDIS_URL: redis://redis:6379/0
+  MYLIFE_SECRET_KEY: ${MYLIFE_SECRET_KEY:-dev-only-change-me-please-32-bytes-min}
+  MYLIFE_COOKIE_SECURE: ${MYLIFE_COOKIE_SECURE:-true}
+  MYLIFE_WEB_ORIGIN: ${MYLIFE_WEB_ORIGIN:-http://localhost:3000}
+  MYLIFE_PUBLIC_BASE_URL: ${MYLIFE_PUBLIC_BASE_URL:-http://localhost:8000}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mylife}
+      POSTGRES_USER: ${POSTGRES_USER:-mylife_migrator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-migrator}
+      MYLIFE_APP_DB_PASSWORD: ${MYLIFE_APP_DB_PASSWORD:-change-me-app}
+      MYLIFE_SYSTEM_DB_PASSWORD: ${MYLIFE_SYSTEM_DB_PASSWORD:-change-me-system}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mylife_migrator} -d ${POSTGRES_DB:-mylife}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MYLIFE_S3_ACCESS_KEY:-change-me-minio}
+      MINIO_ROOT_PASSWORD: ${MYLIFE_S3_SECRET_KEY:-change-me-minio-secret}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  createbuckets:
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set mylife http://minio:9000 ${MYLIFE_S3_ACCESS_KEY:-change-me-minio} ${MYLIFE_S3_SECRET_KEY:-change-me-minio-secret} &&
+      mc mb --ignore-existing mylife/${MYLIFE_S3_BUCKET:-mylife} &&
+      mc anonymous set none mylife/${MYLIFE_S3_BUCKET:-mylife}
+      "
+    networks: [internal]
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    environment:
+      <<: *api-env
+      MYLIFE_MIGRATION_URL: postgresql+psycopg://${POSTGRES_USER:-mylife_migrator}:${POSTGRES_PASSWORD:-change-me-migrator}@postgres:5432/${POSTGRES_DB:-mylife}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [internal]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [edge, internal]
+
+  web:
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge]
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MYLIFE_DOMAIN: ${MYLIFE_DOMAIN:-localhost}
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      - api
+      - web
+    networks: [edge]
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  caddydata:
+  caddyconfig:
+
+networks:
+  edge:
+  internal:
+    internal: true

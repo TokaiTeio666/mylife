@@ -1,0 +1,27 @@
+# 本地开发 override：把依赖端口映射到 127.0.0.1，便于在宿主上跑 pytest / next dev。
+# 用法：docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d postgres redis minio
+services:
+  postgres:
+    # 5432 落在 Windows 保留端口段内，本地开发改用 25432。
+    ports:
+      - "25432:5432"
+  redis:
+    # 宿主端口仅用于本地调试；容器间仍走 redis:6379。
+    ports:
+      - "26379:6379"
+  minio:
+    ports:
+      - "29000:9000"
+      - "29001:9001"
+  api:
+    ports:
+      - "8000:8000"
+  web:
+    ports:
+      - "3000:3000"
+
+# Docker 不会为仅接入 internal 网络的容器发布端口；本地开发关闭该隔离，
+# 生产 base compose 仍保持 internal: true（数据库不暴露宿主端口）。
+networks:
+  internal:
+    internal: false

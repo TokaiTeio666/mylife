@@ -1,0 +1,1 @@
+"""HTTP 路由域（ARCHITECTURE §2.5）。"""

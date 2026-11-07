@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boundaries:
+    name: 依赖方向（DIRECTORY-CONSTRAINTS §2.1）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check_boundaries.py
+
+  backend:
+    name: 后端（ruff + pytest + RLS 矩阵）
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: mylife
+          POSTGRES_USER: mylife_migrator
+          POSTGRES_PASSWORD: change-me-migrator
+          MYLIFE_APP_DB_PASSWORD: change-me-app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mylife_migrator -d mylife"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      MYLIFE_TEST_DB_HOST: localhost
+      MYLIFE_TEST_DB_PORT: "5432"
+      MYLIFE_TEST_ADMIN_URL: postgresql://mylife_migrator:change-me-migrator@localhost:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: cp .env.example .env
+      # 顶层 compose 的 migrate 服务先跑一次，确保生产迁移路径可用
+      - run: uv sync --all-packages
+      - run: uv run ruff check packages/contracts apps/api
+      - name: Alembic 迁移可执行（生产路径）
+        working-directory: apps/api
+        env:
+          POSTGRES_USER: mylife_migrator
+          POSTGRES_PASSWORD: change-me-migrator
+          POSTGRES_DB: mylife
+          MYLIFE_DB_HOST: localhost
+          MYLIFE_MIGRATION_URL: postgresql+psycopg://mylife_migrator:change-me-migrator@localhost:5432/mylife
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+      - name: pytest（契约 + 数据库集成）
+        working-directory: apps/api
+        run: uv run pytest -q
+
+  frontend:
+    name: 前端（tsc + lint + build）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run build

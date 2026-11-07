@@ -1,0 +1,12 @@
+[project]
+name = "mylife"
+version = "0.1.0"
+description = "mylife — 个人知识库 SaaS（Phase 0）"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["packages/contracts", "apps/api"]
+
+[tool.uv]
+package = false

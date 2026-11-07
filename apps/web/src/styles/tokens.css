@@ -1,0 +1,50 @@
+/* Design tokens 单一来源（FRONTEND-DESIGN §2）。组件禁止写死 hex。 */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --surface: 210 20% 98%;
+  --surface-2: 210 16% 95%;
+  --muted: 210 16% 93%;
+  --muted-foreground: 215 16% 47%;
+  --border: 214 20% 88%;
+  --input: 214 20% 88%;
+  --ring: 221 83% 53%;
+
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 173 58% 39%;
+  --accent-foreground: 0 0% 100%;
+
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+  --danger: 0 72% 51%;
+  --citation: 38 92% 50%;
+  --citation-bg: 38 92% 95%;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 20% 98%;
+  --surface: 222 40% 10%;
+  --surface-2: 222 36% 12%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 217 91% 60%;
+
+  --primary: 217 91% 60%;
+  --primary-foreground: 222 47% 7%;
+  --accent: 173 58% 47%;
+  --accent-foreground: 222 47% 7%;
+
+  --success: 142 69% 58%;
+  --warning: 38 92% 55%;
+  --danger: 0 72% 58%;
+  --citation: 38 92% 55%;
+  --citation-bg: 38 40% 18%;
+}

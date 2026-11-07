@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+**/__pycache__
+**/*.pyc
+apps/web/node_modules
+apps/web/.next
+node_modules
+data
+*.log
+.env
+.env.local
+docs/evidence

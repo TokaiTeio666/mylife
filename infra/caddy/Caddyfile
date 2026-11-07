@@ -1,0 +1,34 @@
+# mylife 反向代理。SSE 必须禁用缓冲（ARCHITECTURE §11）。
+{$MYLIFE_DOMAIN:localhost} {
+	encode zstd gzip
+
+	@api_sse path /api/v1/runs/*/events
+	handle @api_sse {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle /healthz {
+		reverse_proxy api:8000
+	}
+
+	handle /readyz {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

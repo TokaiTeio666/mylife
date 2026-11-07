@@ -1,0 +1,16 @@
+[project]
+name = "mylife-contract"
+version = "0.1.0"
+description = "mylife 单一事实源契约包（Pydantic v2 模型、枚举、常量）"
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.9,<3", "email-validator>=2.2,<3"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mylife_contract"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
