@@ -28,6 +28,7 @@ from mylife_contract.ingest import (
     SnapshotSummary,
     ZipImportSummary,
 )
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -371,3 +372,61 @@ async def list_sources(session: AsyncSession, *, workspace_id: UUID) -> IngestSo
             for r in zip_rows
         ],
     )
+
+
+async def create_scheduled_sync(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    connection_id: UUID,
+    interval_minutes: int,
+) -> dict[str, Any]:
+    """dispatcher 到点触发的定时拉取（AC-52；PHASE4-SPEC D26/D64）。
+
+    返回值 `{"status": "queued"|"skipped", "job_id": ...}`；任何异常都不抛出，
+    以免单连接失败拖垮整个 tick。
+    """
+    from datetime import UTC, datetime, timedelta
+
+    next_sync = (
+        datetime.now(UTC) + timedelta(minutes=interval_minutes)
+        if interval_minutes > 0
+        else None
+    )
+    active = await repo.count_active_ingest(session, workspace_id)
+    if active:
+        await session.execute(
+            text(
+                "UPDATE git_connections SET last_sync_status = 'skipped', "
+                "  next_sync_at = :next_sync, updated_at = now() "
+                "WHERE workspace_id = :ws AND id = :id"
+            ),
+            {"next_sync": next_sync, "ws": workspace_id, "id": connection_id},
+        )
+        await session.commit()
+        return {"status": "skipped", "job_id": None}
+    row = await repo.insert_job(
+        session,
+        workspace_id=workspace_id,
+        kind="sync",
+        payload={"source": "git", "connection_id": str(connection_id)},
+    )
+    await insert_audit(
+        session,
+        workspace_id=workspace_id,
+        user_id=None,
+        action="ingest.scheduled_sync",
+        target=str(row["id"]),
+        detail={"connection_id": str(connection_id)},
+    )
+    enqueue_ingest("git", str(row["id"]), str(workspace_id))
+    await session.execute(
+        text(
+            "UPDATE git_connections SET last_sync_at = now(), last_sync_status = 'ok', "
+            "  next_sync_at = :next_sync, updated_at = now() "
+            "WHERE workspace_id = :ws AND id = :id"
+        ),
+        {"next_sync": next_sync, "ws": workspace_id, "id": connection_id},
+    )
+    await session.commit()
+    return {"status": "queued", "job_id": str(row["id"])}

@@ -78,6 +78,19 @@ async def get_review_by_period(
     return _row(result.first())
 
 
+async def period_succeeded(
+    session: AsyncSession, *, workspace_id: UUID, kind: str, period_key: str
+) -> bool:
+    result = await session.execute(
+        text(
+            "SELECT 1 FROM reviews WHERE workspace_id = :ws AND kind = :kind "
+            "AND period_key = :period AND status IN ('delivered','approved') LIMIT 1"
+        ),
+        {"ws": workspace_id, "kind": kind, "period": period_key},
+    )
+    return result.first() is not None
+
+
 async def get_review_by_git_path(
     session: AsyncSession, *, workspace_id: UUID, path: str
 ) -> dict[str, Any] | None:
@@ -158,14 +171,16 @@ async def insert_review_run(
     version: int,
     state_payload: dict[str, Any],
     trace_id: str,
+    trigger_type: str = "manual",
 ) -> dict[str, Any]:
     run_id = uuid7()
     result = await session.execute(
         text(
             "INSERT INTO agent_runs (id, workspace_id, kind, period_key, state, "
-            "  state_payload, attempt_id, idem_key, trace_id, review_id, version) "
+            "  state_payload, attempt_id, idem_key, trace_id, review_id, version, "
+            "  trigger_type) "
             "VALUES (:id, :ws, :kind, :period, 'created', CAST(:payload AS jsonb), "
-            "        :attempt, :idem, :trace, :review, :version) "
+            "        :attempt, :idem, :trace, :review, :version, :trigger) "
             "RETURNING id, state, created_at"
         ),
         {
@@ -179,6 +194,7 @@ async def insert_review_run(
             "trace": trace_id,
             "review": review_id,
             "version": version,
+            "trigger": trigger_type,
         },
     )
     return dict(result.one()._mapping)

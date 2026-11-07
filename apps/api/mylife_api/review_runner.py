@@ -87,7 +87,23 @@ class ReviewRunner:
                 return
 
             try:
-                if resume_from == "delivering":
+                if run["state"] == "retry_wait":
+                    target = run.get("retry_from_state") or "retrieving"
+                    ok = await repo.cas_transition(
+                        session,
+                        workspace_id=self.workspace_id,
+                        run_id=self.run_id,
+                        from_state="retry_wait",
+                        to_state=target,
+                        reason="retry",
+                        lease_owner=LEASE_OWNER,
+                        stream_epoch=STREAM_EPOCH,
+                    )
+                    if not ok:
+                        return
+                    run["state"] = target
+                    self.run["state"] = target
+                if resume_from == "delivering" or run["state"] == "delivering":
                     await self._deliver(session)
                     return
                 await self._advance(session, run)

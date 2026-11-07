@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -27,6 +29,9 @@ from mylife_api.routers import (
     webhooks,
     workspaces,
 )
+from mylife_api.routers import (
+    settings as settings_router,
+)
 from mylife_api.settings import settings
 
 configure_logging(settings.log_level, "mylife-api")
@@ -34,7 +39,18 @@ configure_logging(settings.log_level, "mylife-api")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    sweeper: asyncio.Task | None = None
+    if settings.review_sweeper:
+        from mylife_api.services_lease import review_sweeper_loop
+
+        sweeper = asyncio.create_task(
+            review_sweeper_loop(settings.review_sweeper_interval_seconds)
+        )
     yield
+    if sweeper is not None:
+        sweeper.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sweeper
     from mylife_api.db import dispose_engine
 
     await get_limiter().close()
@@ -72,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(chat.router, prefix=API_PREFIX)
     app.include_router(reviews.router, prefix=API_PREFIX)
     app.include_router(deliveries.router, prefix=API_PREFIX)
+    app.include_router(settings_router.router, prefix=API_PREFIX)
     app.include_router(topics.router, prefix=API_PREFIX)
     app.include_router(webhooks.router, prefix=API_PREFIX)
     app.include_router(admin.router, prefix=API_PREFIX)

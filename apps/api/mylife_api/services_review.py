@@ -133,6 +133,12 @@ async def create_review(
     """准入；返回 (response, http_status)。"""
     if role not in {"owner", "admin"}:
         raise AppError(ErrorCode.FORBIDDEN)
+    if payload.trigger == "schedule":
+        # 调度触发只能由 dispatcher 的服务层准入产生（PHASE4-SPEC D15）。
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            details={"field": "trigger", "reason": "SCHEDULE_TRIGGER_INTERNAL_ONLY"},
+        )
     settings_row = await repo0.get_settings(session, workspace_id)
     timezone = payload.timezone or (settings_row or {}).get("timezone") or "Asia/Shanghai"
 
@@ -242,6 +248,7 @@ async def create_review(
             "attempts": {},
         },
         trace_id=current_request_id(),
+        trigger_type=payload.trigger,
     )
     await insert_audit(
         session,
@@ -889,3 +896,105 @@ async def rollback_review(
     await session.commit()
     await set_rls_context(session, workspace_id, user_id)
     return {"run_id": run["id"], "target_version": target_version}
+
+
+async def admit_scheduled_review(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    kind: str,
+    period_key: str,
+    inline: bool = True,
+) -> dict[str, Any]:
+    """调度器内部准入（不经过 HTTP；PHASE4-SPEC D15/D16）。
+
+    - `trigger_type='schedule'`；
+    - 固定 `allow_empty=True`（空周期是合法空日复盘）；
+    - 同 period 已有活跃 run 或已有成功版本时返回 `admitted=False` 与原因。
+    """
+    workspace = await repo0.get_workspace(session, workspace_id)
+    if workspace is None:
+        return {"admitted": False, "reason": "workspace_missing"}
+    owner_id = workspace["owner_id"]
+    settings_row = await repo0.get_settings(session, workspace_id) or {}
+    timezone = settings_row.get("timezone") or "Asia/Shanghai"
+    _validate_period(
+        ReviewCreateRequest(
+            kind=kind, period_key=period_key, trigger="schedule", allow_empty=True
+        ),
+        timezone=timezone,
+        now=datetime.now(UTC),
+    )
+
+    await repo.lock_period(
+        session, workspace_id=workspace_id, kind=kind, period_key=period_key
+    )
+    active = await repo.find_active_review_run(
+        session, workspace_id=workspace_id, kind=kind, period_key=period_key
+    )
+    if active is not None:
+        return {"admitted": False, "reason": "active", "run_id": active["id"]}
+    active_count = await repo.count_active_review_runs(
+        session, workspace_id=workspace_id
+    )
+    if active_count >= REVIEW_CONCURRENCY:
+        return {"admitted": False, "reason": "concurrency"}
+
+    existing = await repo.get_review_by_period(
+        session, workspace_id=workspace_id, kind=kind, period_key=period_key
+    )
+    snapshot = await repo.latest_snapshot(session, workspace_id=workspace_id)
+    snapshot_id = snapshot["id"] if snapshot else None
+    if existing is not None:
+        version = await repo.next_review_version(
+            session, workspace_id=workspace_id, review_id=existing["id"]
+        )
+        review_id = existing["id"]
+    else:
+        version = 1
+        created = await repo.insert_review(
+            session,
+            workspace_id=workspace_id,
+            kind=kind,
+            period_key=period_key,
+            title=_title(kind, period_key),
+            version=version,
+            snapshot_id=snapshot_id,
+        )
+        review_id = created["id"]
+
+    run = await repo.insert_review_run(
+        session,
+        workspace_id=workspace_id,
+        kind=kind,
+        period_key=period_key,
+        review_id=review_id,
+        version=version,
+        state_payload={
+            "review_id": str(review_id),
+            "user_id": str(owner_id),
+            "timezone": timezone,
+            "trigger": "schedule",
+            "allow_empty": True,
+            "options": {},
+            "snapshot_id": str(snapshot_id) if snapshot_id else None,
+            "attempts": {},
+        },
+        trace_id=current_request_id(),
+        trigger_type="schedule",
+    )
+    await insert_audit(
+        session,
+        workspace_id=workspace_id,
+        user_id=None,
+        action="review.scheduled",
+        target=str(review_id),
+        detail={"kind": kind, "period_key": period_key, "version": version},
+    )
+    await session.commit()
+    await set_rls_context(session, workspace_id, owner_id)
+    if inline:
+        task = asyncio.create_task(run_review(run["id"], workspace_id))
+        _tasks.add(task)
+        task.add_done_callback(_tasks.discard)
+    return {"admitted": True, "run_id": run["id"], "review_id": review_id, "version": version}
