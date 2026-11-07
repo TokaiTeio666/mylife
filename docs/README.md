@@ -20,3 +20,4 @@
 | [PHASE0-STATUS.md](./PHASE0-STATUS.md) | Phase 0 / M1 交付状态、AC/SEC 证据、阻塞项、下一阶段入口 |
 | [PHASE1-STATUS.md](./PHASE1-STATUS.md) | Phase 1 / M2 交付状态：导入、混合检索、文档预览与性能证据 |
 | [PHASE2-STATUS.md](./PHASE2-STATUS.md) | Phase 2 / M3 交付状态：ToolGateway、chat FSM、SSE、引用闭包、注入防护 |
+| [HANDOFF.md](./HANDOFF.md) | 会话交接：当前进度、恢复提示词、本机环境坑、清空上下文时机 |
