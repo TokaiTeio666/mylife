@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from datetime import date  # noqa: F401  (re-export for tool payloads)
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import Field, field_validator
 
+from mylife_contract.budget import Budget, BudgetUsage
 from mylife_contract.common import ApiModel, UtcDateTime
 
 
@@ -93,6 +94,7 @@ class ChatOptions(ApiModel):
     context_window_tokens: int | None = Field(default=None, ge=4000, le=200000)
     web_search_enabled: bool = False
     model_profile: str = "default"
+    budget: Budget | None = None
 
 
 class ChatTurnRequest(ApiModel):
@@ -145,9 +147,13 @@ class RunDetail(ApiModel):
     attempt_id: UUID | None
     retry_from_state: str | None
     snapshot_id: UUID | None
+    version: int | None = None
+    lease_expires_at: UtcDateTime | None = None
+    budget: BudgetUsage = Field(default_factory=BudgetUsage)
     degraded: bool = False
     degraded_reasons: list[str] = Field(default_factory=list)
     steps: list[RunStepView] = Field(default_factory=list)
     created_at: UtcDateTime
     started_at: UtcDateTime | None = None
     finished_at: UtcDateTime | None = None
+    error: dict[str, Any] | None = None

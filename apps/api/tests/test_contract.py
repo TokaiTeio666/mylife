@@ -158,6 +158,82 @@ def test_daily_sections_and_sentinels():
         assert key in SENTINELS
 
 
+def test_review_section_schemas_cover_all_sections():
+    from mylife_contract.constants import (
+        DAILY_SECTIONS,
+        SENTINELS,
+        WEEKLY_SECTIONS,
+        YEARLY_SECTIONS,
+    )
+    from mylife_contract.review import ITEM_SCHEMAS, SECTION_SCHEMAS
+
+    expected = {
+        "daily": [row[1] for row in DAILY_SECTIONS],
+        "weekly": [row[1] for row in WEEKLY_SECTIONS],
+        "yearly": [row[1] for row in YEARLY_SECTIONS],
+    }
+    for kind, keys in expected.items():
+        assert list(SECTION_SCHEMAS[kind]) == keys
+        for key in keys:
+            assert key in SENTINELS
+            # extra="forbid" 生效：未知键必须被拒绝
+            with pytest.raises(ValidationError):
+                SECTION_SCHEMAS[kind][key].model_validate({"unknown_field": 1})
+    assert set(ITEM_SCHEMAS) == {"error", "method", "action"}
+
+
+def test_budget_defaults_match_decision_5b():
+    from mylife_contract.budget import Budget, BudgetUsage
+    from mylife_contract.constants import DEFAULT_BUDGET_BY_KIND, REVISION_LIMIT
+
+    assert DEFAULT_BUDGET_BY_KIND["daily"] == {
+        "max_input_tokens": 100_000,
+        "max_output_tokens": 20_000,
+    }
+    assert DEFAULT_BUDGET_BY_KIND["weekly"]["max_input_tokens"] == 300_000
+    assert DEFAULT_BUDGET_BY_KIND["yearly"]["max_output_tokens"] == 200_000
+    assert REVISION_LIMIT == {"daily": 2, "weekly": 2, "yearly": 3}
+
+    budget = Budget(max_input_tokens=10, max_output_tokens=5)
+    assert budget.warn_ratio == 0.8 and budget.hard_stop_ratio == 1.0
+    usage = BudgetUsage()
+    assert usage.state == "ok" and usage.ratio == 0.0
+    with pytest.raises(ValidationError):
+        Budget(max_input_tokens=10, max_output_tokens=5, warn_ratio=1.0)
+
+
+def test_tool_contracts_extended():
+    from mylife_contract.tools import (
+        CreateReviewConfirmArgs,
+        CreateReviewPreview,
+        EstimatedTokens,
+        TaskItem,
+    )
+
+    confirm = CreateReviewConfirmArgs(confirmation_token="v1.1.abc")
+    assert confirm.confirmation_token == "v1.1.abc"
+    preview = CreateReviewPreview(
+        kind="daily",
+        period_key="2026-10-27",
+        title="t",
+        path="p",
+        estimated_evidence_count=1,
+        estimated_tokens=EstimatedTokens(input=10, output=2),
+    )
+    assert preview.estimated_tokens.input == 10
+    item = TaskItem(
+        id="0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+        text="x",
+        status="open",
+        first_seen="2026-10-27",
+        last_seen="2026-10-27",
+        done_date=None,
+        source_path=None,
+        line_number=None,
+    )
+    assert item.occurrence_count == 0 and item.days_open is None
+
+
 def test_utc_datetime_annotation():
     from pydantic import TypeAdapter
 

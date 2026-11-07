@@ -55,6 +55,56 @@ DEFAULT_LIMITS: Final[dict[str, object]] = {
 # --- 修订轮数上限（ARCHITECTURE §4.4）---
 REVISION_LIMIT: Final[dict[str, int]] = {"daily": 2, "weekly": 2, "yearly": 3}
 
+# --- 预算默认值（决策 5B；ARCHITECTURE §9.4 / API-CONTRACTS §4.4）---
+DEFAULT_BUDGET_BY_KIND: Final[dict[str, dict[str, int]]] = {
+    "daily": {"max_input_tokens": 100_000, "max_output_tokens": 20_000},
+    "weekly": {"max_input_tokens": 300_000, "max_output_tokens": 60_000},
+    "yearly": {"max_input_tokens": 1_000_000, "max_output_tokens": 200_000},
+}
+
+CHAT_DEFAULT_BUDGET: Final[dict[str, int]] = {
+    "max_input_tokens": 32_000,
+    "max_output_tokens": 4_000,
+}
+
+#: workspace 日配额 = 月配额 / 20（API-CONTRACTS §8.3）。
+WORKSPACE_DAILY_DIVISOR: Final = 20
+
+#: run 内按角色的规划配额（ARCHITECTURE §9.4；输出为硬上限）。
+ROLE_BUDGETS: Final[dict[str, dict[str, int]]] = {
+    "planner": {"max_input_tokens": 4_000, "max_output_tokens": 1_000},
+    "writer": {"max_input_tokens": 20_000, "max_output_tokens": 6_000},
+    "reviewer": {"max_input_tokens": 12_000, "max_output_tokens": 2_000},
+    "worker": {"max_input_tokens": 0, "max_output_tokens": 0},
+}
+
+#: learning_summary 四要素（AC-35）。
+LEARNING_SUMMARY_FIELDS: Final[tuple[str, ...]] = (
+    "topic",
+    "concept_or_method",
+    "output",
+    "open_questions",
+)
+
+#: 任务文本归一化的中文标点 → 半角映射（DATA-MODEL §7.3）。
+PUNCT_NORMALIZATION: Final[dict[str, str]] = {
+    "，": ",",
+    "。": ".",
+    "！": "!",
+    "？": "?",
+    "；": ";",
+    "：": ":",
+    "（": "(",
+    "）": ")",
+    "【": "[",
+    "】": "]",
+    "“": '"',
+    "”": '"',
+    "‘": "'",
+    "’": "'",
+    "、": ",",
+}
+
 # --- 登录限流（API-CONTRACTS §8.1）---
 LOGIN_MAX_FAILURES_PER_EMAIL_IP: Final = 5
 LOGIN_FAILURE_WINDOW_SECONDS: Final = 900

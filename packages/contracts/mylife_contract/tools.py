@@ -74,6 +74,8 @@ class TaskItem(ApiModel):
     done_date: date | None
     source_path: str | None
     line_number: int | None
+    occurrence_count: int = 0
+    days_open: int | None = None
 
 
 class ListTasksResult(ApiModel):
@@ -135,6 +137,12 @@ class CreateReviewArgs(ApiModel):
     kind: Literal["daily", "weekly", "yearly"]
     period_key: str = Field(min_length=4, max_length=20)
     timezone: str | None = Field(default=None, max_length=64)
+    confirmation_token: str | None = Field(default=None, max_length=4096)
+
+
+class EstimatedTokens(ApiModel):
+    input: int = Field(ge=0)
+    output: int = Field(ge=0)
 
 
 class CreateReviewPreview(ApiModel):
@@ -143,7 +151,16 @@ class CreateReviewPreview(ApiModel):
     title: str
     path: str
     estimated_evidence_count: int
-    estimated_tokens: int
+    estimated_tokens: EstimatedTokens
+
+
+class CreateReviewConfirmArgs(ApiModel):
+    confirmation_token: str = Field(min_length=1, max_length=4096)
+
+
+class CreateReviewConfirmResult(ApiModel):
+    confirmed: bool
+    confirmation_token: str
 
 
 class CreateReviewResult(ApiModel):
