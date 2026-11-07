@@ -13,6 +13,13 @@ x-api-env: &api-env
   MYLIFE_COOKIE_SECURE: ${MYLIFE_COOKIE_SECURE:-true}
   MYLIFE_WEB_ORIGIN: ${MYLIFE_WEB_ORIGIN:-http://localhost:3000}
   MYLIFE_PUBLIC_BASE_URL: ${MYLIFE_PUBLIC_BASE_URL:-http://localhost:8000}
+  MYLIFE_DATA_ROOT: /srv/mylife/data
+  MYLIFE_QUEUE_BACKEND: redis
+  MYLIFE_EMBEDDING_PROVIDER: ${MYLIFE_EMBEDDING_PROVIDER:-mock}
+  MYLIFE_EMBEDDING_BASE_URL: ${MYLIFE_EMBEDDING_BASE_URL:-}
+  MYLIFE_EMBEDDING_API_KEY: ${MYLIFE_EMBEDDING_API_KEY:-}
+  MYLIFE_EMBEDDING_MODEL: ${MYLIFE_EMBEDDING_MODEL:-BAAI/bge-m3}
+  MYLIFE_EMBEDDING_DIMENSION: ${MYLIFE_EMBEDDING_DIMENSION:-1024}
 
 services:
   postgres:
@@ -80,6 +87,8 @@ services:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
+      args:
+        PIP_INDEX_URL: ${MYLIFE_PYPI_INDEX:-https://pypi.org/simple}
     command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
     environment:
       <<: *api-env
@@ -94,6 +103,8 @@ services:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
+      args:
+        PIP_INDEX_URL: ${MYLIFE_PYPI_INDEX:-https://pypi.org/simple}
     restart: unless-stopped
     environment:
       <<: *api-env
@@ -107,7 +118,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    volumes:
+      - mylife_data:/srv/mylife/data
     networks: [edge, internal]
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+      args:
+        PIP_INDEX_URL: ${MYLIFE_PYPI_INDEX:-https://pypi.org/simple}
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - mylife_data:/srv/mylife/data
+    healthcheck:
+      test: ["CMD-SHELL", "uv run --no-sync celery -A mylife_worker.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks: [internal]
 
   web:
     build:
@@ -146,6 +183,7 @@ volumes:
   miniodata:
   caddydata:
   caddyconfig:
+  mylife_data:
 
 networks:
   edge:

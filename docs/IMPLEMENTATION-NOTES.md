@@ -35,6 +35,29 @@
 
 ---
 
+## 2A. Phase 1 实现偏差（2026-11-07）
+
+| # | 项目 | 现状 | 理由 / 后续 |
+|---|---|---|---|
+| P1-1 | ZIP 原件与快照存储 | 本地数据根（`MYLIFE_DATA_ROOT`）而非 MinIO | MinIO 镜像在本机不可达；DIRECTORY-CONSTRAINTS §3 已定义本地快照目录，Phase 2 再接 MinIO |
+| P1-2 | `documents.raw_hash` / `parser_version` / `tokenizer_version` | 新增列 | AC-12 要求同 commit 重同步“parser 调用增量 0”，必须在解析前判断原始文件是否变化 |
+| P1-3 | `document_chunks.line_start/line_end` | 新增列 | 搜索结果 `line_range` 与后续证据行号 |
+| P1-4 | `job_runs.progress_json/counters_json/failed_items_json/payload_json/parent_job_id/snapshot_id` | 新增列 | API-CONTRACTS §3.3 的进度、失败明细、重试链没有对应列 |
+| P1-5 | `source_snapshots.storage_path` | 新增列 | 资产代理需要定位该快照的解包目录 |
+| P1-6 | 导入任务执行 | Celery worker（`apps/worker`），API 只投递任务、不导入 worker 代码 | 保持依赖方向；`MYLIFE_QUEUE_BACKEND=off` 时任务保持 queued，供测试单独执行 |
+| P1-7 | Git 克隆 | `--depth 1` 仅用于网络源；本地 `file://` 源关闭浅克隆 | Windows 上 `file://` + 浅克隆出现 `invalid index-pack output` |
+| P1-8 | 向量路超时 | Postgres `statement_timeout=250ms` + `plan_cache_mode=force_custom_plan`，超时记 `degraded=vector_timeout` | 用 `asyncio.wait_for` 取消 in-flight 查询会把连接/事务置于不可用状态 |
+| P1-9 | 向量检索 SQL | 内层只按距离排序（HNSW 可用），外层再按 path/ordinal 稳定排序 | 附加排序键会让 planner 放弃 HNSW，退化为 80k 行全表距离计算 |
+| P1-10 | 资产存储路径 | 每个 job 使用 `snapshots/{job_id}` 短目录 | Windows MAX_PATH：`workspaces/{uuid}/snapshots/git-{conn}-{job}` 下 `.git/objects/...` 超长 |
+| P1-11 | 分块 ID | 修改文档时删除并重建 chunks（新 ID）；重命名文档保留 ID 与 embedding | AC-12 只要求重命名稳定；修改文档不保证 chunk ID 稳定 |
+| P1-12 | 复盘搜索 | `source_type=review` 返回空集合 | `review_search` 在 Phase 3 落地 |
+| P1-13 | 目录扫描 | 不递归子模块、不读 LFS（`GIT_LFS_SKIP_SMUDGE=1`） | 与 SEC-15 一致 |
+| P1-14 | 分词实现 | 中文片段用 jieba `cut_for_search`；ASCII/数字片段直接按字母数字切分 | jieba 处理 40KB 纯 ASCII（代码/哈希/日志）会显著变慢；直接切分对检索语义无影响，且 40KB 文档解析从百毫秒级降到毫秒级 |
+| P1-15 | 进度与批量性能 | 每 10 个文件提交一次进度；chunk 与 snapshot_documents 使用 executemany | 进度需对 API 可见；逐行往返在 40k chunk 时不可接受 |
+| P1-16 | 单 Workspace 单 Vault | 一次导入的 snapshot 视为该 workspace 的完整集合；未出现的文档会被删除 | 与“首版只支持单 Vault”一致；多 Vault 留二期（ARCHITECTURE §14） |
+
+---
+
 ## 3. 运行时与平台注意事项
 
 1. **Windows + async psycopg**：psycopg 异步模式不支持 `ProactorEventLoop`。

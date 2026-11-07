@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator
@@ -38,6 +39,19 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
     rate_limit_backend: Literal["redis", "memory", "off"] = "redis"
+    # 任务队列：redis（Celery）| off（测试/单机调试，任务保持 queued）
+    queue_backend: Literal["redis", "off"] = "redis"
+
+    # 数据根（ZIP 原件、快照、导出）
+    data_root: Path = Path("./data")
+    max_zip_bytes: int = 200 * 1024 * 1024
+
+    # Embedding（查询侧）
+    embedding_provider: str = "mock"
+    embedding_base_url: str | None = None
+    embedding_api_key: str | None = None
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_dimension: int = 1024
 
     secret_key: str = Field(default="dev-only-change-me-please-32-bytes-min", min_length=32)
     # 安全默认：生产必须为 true；本地 http 调试在 .env 中显式设为 false。

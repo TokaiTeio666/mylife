@@ -33,6 +33,12 @@ test:
 test-fast:
 	cd apps/api && uv run pytest -q -m "not db"
 
+bench-search:
+	MYLIFE_EMBEDDING_PROVIDER=mock uv run python scripts/bench_search.py
+
+bench-import:
+	uv run python scripts/bench_import.py
+
 lint:
 	cd apps/api && uv run ruff check .
 	cd apps/web && npm run lint

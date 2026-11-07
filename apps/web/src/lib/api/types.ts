@@ -115,6 +115,98 @@ export interface DocumentTree {
   truncated: boolean;
 }
 
+export interface DocumentLink {
+  target_path: string;
+  link_text: string | null;
+  resolved: boolean;
+  target_document_id: string | null;
+}
+
+export interface DocumentDetail {
+  id: string;
+  path: string;
+  title: string;
+  content: string | null;
+  content_html: string | null;
+  frontmatter: Record<string, unknown>;
+  tags: string[];
+  links: DocumentLink[];
+  backlinks: DocumentLink[];
+  content_hash: string;
+  size: number;
+  mtime: string;
+  occurred_on: string | null;
+  indexed_at: string;
+  source_type: "user" | "generated";
+  chunks: unknown[] | null;
+}
+
+export interface SearchResult {
+  source_type: "document" | "review";
+  document_id: string | null;
+  chunk_id: string | null;
+  review_id: string | null;
+  path: string;
+  title: string;
+  heading: string | null;
+  snippet: string;
+  snippet_html: string | null;
+  score: number;
+  matched_by: "lexical" | "vector" | "both";
+  rank_lexical: number | null;
+  rank_vector: number | null;
+  line_range: number[] | null;
+  occurred_on: string | null;
+}
+
+export interface SearchResponse {
+  items: SearchResult[];
+  total_estimated: number;
+  degraded: boolean;
+  degraded_reasons: string[];
+  took_ms: number;
+}
+
+export interface IngestJob {
+  id: string;
+  kind: string;
+  status: "queued" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
+  progress: {
+    total_files: number;
+    processed_files: number;
+    failed_files: number;
+    skipped_files: number;
+  };
+  snapshot_id: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface IngestJobDetail {
+  job: IngestJob;
+  counters: {
+    created: number;
+    updated: number;
+    unchanged: number;
+    skipped: number;
+    failed: number;
+  };
+  failed_items: Array<{
+    path: string;
+    line: number | null;
+    reason_code: string;
+    message: string;
+  }>;
+  snapshot: {
+    snapshot_id: string;
+    commit_sha: string | null;
+    doc_count: number;
+    as_of: string;
+    manifest_digest: string;
+  } | null;
+}
+
 export interface ApiErrorBody {
   code: string;
   message: string;

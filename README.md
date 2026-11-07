@@ -85,6 +85,18 @@ uv run pytest -q -m "not db"  # 仅契约测试
 `MYLIFE_TEST_DB_HOST` / `MYLIFE_TEST_DB_PORT` / `MYLIFE_TEST_ADMIN_URL` 覆盖）。
 无 PostgreSQL 时数据库用例自动跳过。
 
+## 已实现的 Phase 1 能力（M2）
+
+- Obsidian Vault ZIP 导入（200MB 上限、忽略规则、路径/符号链接/压缩比防护）
+- Git 仓库导入（HTTPS/SSH、SSRF 校验、hooks/submodule/LFS 禁用、分支切换同步）
+- Markdown 解析（frontmatter、标题层级、标签、wikilink、日期）、按标题分块
+- 增量索引（raw_hash 短路解析、content_hash 短路 embedding、重命名保留文档/块 ID）
+- 快照与变更历史（`source_snapshots` / `snapshot_documents` / `document_changes`）
+- 混合检索：jieba + tsvector 词法、pgvector HNSW 向量、标题/路径三路 RRF（k=60）
+- 文档详情/元数据/原文/资产代理，Markdown 服务端渲染 + nh3 清洗
+- 前端：文档树、文档阅读、搜索（过滤器/高亮/降级横幅）、ZIP 导入与进度
+- Celery worker（`q.ingest`）与数据卷；性能基准脚本（FX-13 / FX-14）
+
 ## 已实现的 Phase 0 能力
 
 - 邮箱 + 密码注册（邀请码一次性核销、并发安全）、登录、登出、退出所有设备

@@ -1,49 +1,25 @@
-"""凭据信封加密（SEC-18 / SECURITY-BOUNDARY §6、§9）。
+"""凭据信封加密的 API 适配层。
 
-设计：
-- KEK 由部署级 `MYLIFE_SECRET_KEY` 经 HKDF-SHA256 派生（不落库）；
-- 每个 (workspace, provider) 生成独立 DEK（AES-256-GCM）；
-- 落库格式：`MYL1` + key_version(1B) + wrap_nonce(12B) + wrapped_dek(48B)
-  + data_nonce(12B) + ciphertext；
-- AAD 绑定 `workspace_id|provider|key_version`，防止密文跨租户/跨用途搬运；
-- 解密只在内存中进行，任何异常只返回 `CredentialDecryptError`，不泄露细节。
+密钥派生与加解密实现在 `mylife_runtime.crypto`（worker 共用）；
+本模块只负责注入部署级 `MYLIFE_SECRET_KEY`。
 """
 
 from __future__ import annotations
 
-import os
-import struct
-
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from mylife_runtime.crypto import (
+    KEY_VERSION,
+    CredentialDecryptError,
+)
+from mylife_runtime.crypto import (
+    decrypt_credential as _decrypt,
+)
+from mylife_runtime.crypto import (
+    encrypt_credential as _encrypt,
+)
 
 from mylife_api.settings import settings
 
-_MAGIC = b"MYL1"
-_NONCE = 12
-_TAG = 16
-_WRAPPED_DEK = 32 + _TAG
-_KEY_VERSION = 1
-
-
-class CredentialDecryptError(Exception):
-    """无法解密：KEK 不匹配或密文被篡改。不得向调用方暴露底层原因。"""
-
-
-def _kek() -> bytes:
-    hkdf = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b"mylife-kek-v1",
-        info=b"mylife/provider-credentials",
-    )
-    return hkdf.derive(settings.secret_key.encode("utf-8"))
-
-
-def _aad(workspace_id: str, provider: str, key_version: int) -> bytes:
-    return f"{workspace_id}|{provider}|{key_version}".encode()
+__all__ = ["CredentialDecryptError", "decrypt_credential", "encrypt_credential"]
 
 
 def encrypt_credential(
@@ -51,60 +27,21 @@ def encrypt_credential(
     *,
     workspace_id: str,
     provider: str,
-    key_version: int = _KEY_VERSION,
+    key_version: int = KEY_VERSION,
 ) -> bytes:
-    """加密单个凭据；返回可直接写入 `provider_credentials.key_ciphertext` 的字节。"""
-    if not plaintext:
-        raise ValueError("credential must not be empty")
-    if len(plaintext.encode("utf-8")) > 8192:
-        raise ValueError("credential too large")
-
-    aad = _aad(workspace_id, provider, key_version)
-    kek = _kek()
-
-    dek = AESGCM.generate_key(bit_length=256)
-    wrap_nonce = os.urandom(_NONCE)
-    wrapped = AESGCM(kek).encrypt(wrap_nonce, dek, aad)
-
-    data_nonce = os.urandom(_NONCE)
-    ciphertext = AESGCM(dek).encrypt(data_nonce, plaintext.encode("utf-8"), aad)
-
-    return b"".join(
-        [
-            _MAGIC,
-            struct.pack("B", key_version),
-            wrap_nonce,
-            wrapped,
-            data_nonce,
-            ciphertext,
-        ]
+    return _encrypt(
+        plaintext,
+        secret_key=settings.secret_key,
+        workspace_id=workspace_id,
+        provider=provider,
+        key_version=key_version,
     )
 
 
-def decrypt_credential(
-    blob: bytes,
-    *,
-    workspace_id: str,
-    provider: str,
-) -> str:
-    """仅在内存中解密；失败统一抛 `CredentialDecryptError`。"""
-    try:
-        if not blob.startswith(_MAGIC):
-            raise CredentialDecryptError
-        key_version = blob[len(_MAGIC)]
-        offset = len(_MAGIC) + 1
-
-        wrap_nonce = blob[offset : offset + _NONCE]
-        offset += _NONCE
-        wrapped = blob[offset : offset + _WRAPPED_DEK]
-        offset += _WRAPPED_DEK
-        data_nonce = blob[offset : offset + _NONCE]
-        offset += _NONCE
-        ciphertext = blob[offset:]
-
-        aad = _aad(workspace_id, provider, key_version)
-        dek = AESGCM(_kek()).decrypt(wrap_nonce, wrapped, aad)
-        plaintext = AESGCM(dek).decrypt(data_nonce, ciphertext, aad)
-        return plaintext.decode("utf-8")
-    except (InvalidTag, IndexError, ValueError, UnicodeDecodeError) as exc:
-        raise CredentialDecryptError("credential cannot be decrypted") from exc
+def decrypt_credential(blob: bytes, *, workspace_id: str, provider: str) -> str:
+    return _decrypt(
+        blob,
+        secret_key=settings.secret_key,
+        workspace_id=workspace_id,
+        provider=provider,
+    )

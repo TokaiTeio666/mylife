@@ -40,7 +40,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: "/dashboard", label: copy.nav.dashboard, icon: LayoutDashboard, available: true },
   { href: "/documents", label: copy.nav.documents, icon: FolderTree, available: true },
-  { href: "/search", label: copy.nav.search, icon: Search, available: false },
+  { href: "/search", label: copy.nav.search, icon: Search, available: true },
   { href: "/chat", label: copy.nav.chat, icon: MessageSquare, available: false },
   { href: "/reviews", label: copy.nav.reviews, icon: CalendarCheck, available: false },
   { href: "/topics", label: copy.nav.topics, icon: Tags, available: false },

@@ -32,3 +32,52 @@ class DocumentTree(ApiModel):
     nodes: list[TreeNode]
     total_documents: int
     truncated: bool = False
+
+
+class DocumentLink(ApiModel):
+    target_path: str
+    link_text: str | None
+    resolved: bool
+    target_document_id: UUID | None
+
+
+class ChunkSummary(ApiModel):
+    chunk_id: UUID
+    heading: str | None
+    line_range: list[int] | None
+    token_count: int
+
+
+class DocumentDetail(ApiModel):
+    id: UUID
+    path: str
+    title: str
+    content: str | None
+    content_html: str | None
+    frontmatter: dict
+    tags: list[str]
+    links: list[DocumentLink]
+    backlinks: list[DocumentLink]
+    content_hash: str
+    size: int
+    mtime: UtcDateTime
+    occurred_on: date | None
+    indexed_at: UtcDateTime
+    source_type: SourceType
+    chunks: list[ChunkSummary] | None = None
+
+
+class DocumentMeta(ApiModel):
+    id: UUID
+    path: str
+    title: str
+    tags: list[str]
+    size: int
+    content_hash: str
+    occurred_on: date | None
+    mtime: UtcDateTime
+    indexed_at: UtcDateTime
+    source_type: SourceType
+    snapshot_id: UUID | None = None
+    chunk_count: int
+    link_count: int

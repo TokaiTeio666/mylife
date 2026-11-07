@@ -58,7 +58,9 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has("Content-Type")) {
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isFormData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   if (!SAFE_METHODS.has(method)) {
@@ -122,4 +124,32 @@ export const api = {
     apiFetch<import("./types").WorkspaceDetail>(`/workspaces/${id}`),
   documentTree: () =>
     apiFetch<import("./types").DocumentTree>("/documents/tree"),
+  documentByPath: (path: string) =>
+    apiFetch<import("./types").DocumentDetail>(
+      `/documents/by-path?path=${encodeURIComponent(path)}`,
+    ),
+  search: (params: Record<string, string | number | boolean | undefined>) => {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== "") search.set(key, String(value));
+    }
+    return apiFetch<import("./types").SearchResponse>(`/search?${search}`);
+  },
+  uploadZip: (file: File) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    form.append("mode", "managed");
+    form.append("reviews_root", "wiki/复盘");
+    return apiFetch<{ job: import("./types").IngestJob }>("/ingest/zip", {
+      method: "POST",
+      body: form,
+    });
+  },
+  jobDetail: (jobId: string) =>
+    apiFetch<import("./types").IngestJobDetail>(`/ingest/jobs/${jobId}`),
+  retryJob: (jobId: string) =>
+    apiFetch<import("./types").IngestJob>(`/ingest/jobs/${jobId}/retry`, {
+      method: "POST",
+      body: JSON.stringify({ only_failed: true }),
+    }),
 };

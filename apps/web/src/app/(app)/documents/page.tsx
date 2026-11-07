@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronRight, FileText, Folder, FolderOpen } from "lucide-react";
+import { ChevronRight, FileText, Folder, FolderOpen, Upload } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -65,11 +66,17 @@ function TreeBranch({
         }
         return (
           <li key={node.path}>
-            <span className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-small text-foreground/90">
+            <Link
+              href={`/documents/${node.path
+                .split("/")
+                .map(encodeURIComponent)
+                .join("/")}`}
+              className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-small text-foreground/90 hover:bg-surface-2"
+            >
               <span className="h-4 w-4 shrink-0" aria-hidden="true" />
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               <span className="truncate">{node.title ?? node.name}</span>
-            </span>
+            </Link>
           </li>
         );
       })}
@@ -105,11 +112,20 @@ export default function DocumentsPage() {
           <h1 className="text-h1 font-semibold tracking-tight">{copy.documents.title}</h1>
           <p className="text-small text-muted-foreground">{copy.documents.subtitle}</p>
         </div>
-        {tree.data ? (
-          <p className="text-caption text-muted-foreground">
-            {copy.documents.total.replace("{count}", String(tree.data.total_documents))}
-          </p>
-        ) : null}
+        <div className="flex items-center gap-3">
+          {tree.data ? (
+            <p className="text-caption text-muted-foreground">
+              {copy.documents.total.replace("{count}", String(tree.data.total_documents))}
+            </p>
+          ) : null}
+          <Link
+            href="/documents/import"
+            className="inline-flex h-8 items-center gap-2 rounded-md border border-border px-3 text-small hover:bg-surface-2"
+          >
+            <Upload className="h-4 w-4" aria-hidden="true" />
+            {copy.documents.import}
+          </Link>
+        </div>
       </header>
 
       {tree.isLoading ? (

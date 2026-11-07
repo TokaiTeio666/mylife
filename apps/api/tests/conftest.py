@@ -10,6 +10,7 @@ import asyncio
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # psycopg 的异步模式不支持 Windows 的 ProactorEventLoop。
@@ -29,9 +30,15 @@ APP_PASSWORD = os.environ.get("MYLIFE_APP_DB_PASSWORD", "change-me-app")
 os.environ.setdefault("MYLIFE_ENV", "test")
 os.environ.setdefault("MYLIFE_RATE_LIMIT_BACKEND", "memory")
 os.environ.setdefault("MYLIFE_COOKIE_SECURE", "true")
+os.environ.setdefault("MYLIFE_QUEUE_BACKEND", "off")
+os.environ.setdefault("MYLIFE_EMBEDDING_PROVIDER", "mock")
+os.environ.setdefault("MYLIFE_ALLOW_LOCAL_GIT", "true")
 os.environ["MYLIFE_DATABASE_URL"] = (
     f"postgresql+psycopg://mylife_app:{APP_PASSWORD}@{TEST_DB_HOST}:{TEST_DB_PORT}/{TEST_DB_NAME}"
 )
+
+_TEST_DATA_ROOT = tempfile.mkdtemp(prefix="mylife-test-data-")
+os.environ.setdefault("MYLIFE_DATA_ROOT", _TEST_DATA_ROOT)
 
 API_DIR = Path(__file__).resolve().parents[1]
 

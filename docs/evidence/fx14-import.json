@@ -1,0 +1,17 @@
+{
+  "zip_bytes": 200902802,
+  "documents_in_zip": 5000,
+  "documents_indexed": 5000,
+  "chunks": 5000,
+  "job_status": "succeeded",
+  "counters": {
+    "failed": 0,
+    "created": 5000,
+    "skipped": 0,
+    "updated": 0,
+    "unchanged": 0
+  },
+  "elapsed_seconds": 203.8,
+  "under_600s": true,
+  "embedding": "disabled"
+}

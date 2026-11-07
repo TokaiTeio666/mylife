@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
+import zipfile
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from mylife_api.ids import uuid7
 from mylife_api.security import hash_password
@@ -154,3 +156,34 @@ async def login(client, *, email: str, password: str = "correct-horse-9"):
 
 def row_count(conn, sql: str, params: tuple[Any, ...] = ()) -> int:
     return int(conn.execute(sql, params).fetchone()[0])
+
+
+def make_zip(files: dict[str, str | bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in files.items():
+            data = content.encode("utf-8") if isinstance(content, str) else content
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+async def upload_zip(client, *, data: bytes, filename: str = "vault.zip"):
+    token = await csrf(client)
+    return await client.post(
+        f"{API}/ingest/zip",
+        files={"file": (filename, data, "application/zip")},
+        data={"mode": "managed", "reviews_root": "wiki/复盘"},
+        headers=csrf_headers(token),
+    )
+
+
+async def run_ingest_job(job_id: str, workspace_id: str) -> None:
+    from mylife_worker.jobs import run_job
+
+    await run_job(UUID(job_id), UUID(workspace_id))
+
+
+async def job_detail(client, job_id: str) -> dict[str, Any]:
+    response = await client.get(f"{API}/ingest/jobs/{job_id}")
+    assert response.status_code == 200, response.text
+    return response.json()

@@ -1,0 +1,13 @@
+{
+  "samples": 45,
+  "degraded_responses": 0,
+  "p50_ms": 76.23,
+  "p95_ms": 104.15,
+  "p99_ms": 107.75,
+  "max_ms": 112.73,
+  "warmups_excluded": 5,
+  "p95_pass": true,
+  "docs": 10000,
+  "chunks": 80000,
+  "dataset_note": "synthetic; same terms in every document"
+}

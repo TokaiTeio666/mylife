@@ -13,7 +13,15 @@ from mylife_contract.constants import API_PREFIX
 from mylife_api.errors import install_error_handlers
 from mylife_api.middleware import install_middlewares
 from mylife_api.ratelimit import get_limiter
-from mylife_api.routers import admin, auth, documents, health, workspaces
+from mylife_api.routers import (
+    admin,
+    auth,
+    documents,
+    health,
+    ingest,
+    search,
+    workspaces,
+)
 from mylife_api.settings import settings
 
 logging.basicConfig(
@@ -57,6 +65,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(workspaces.router, prefix=API_PREFIX)
     app.include_router(documents.router, prefix=API_PREFIX)
+    app.include_router(ingest.router, prefix=API_PREFIX)
+    app.include_router(search.router, prefix=API_PREFIX)
     app.include_router(admin.router, prefix=API_PREFIX)
     return app
 

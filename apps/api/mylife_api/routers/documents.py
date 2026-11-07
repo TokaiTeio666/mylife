@@ -1,15 +1,25 @@
-"""documents 路由（API-CONTRACTS §3.4）。Phase 0 只实现目录树。"""
+"""documents 路由（API-CONTRACTS §3.4）。"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
-from mylife_contract.documents import DocumentTree, TreeNode
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from mylife_contract.documents import (
+    DocumentDetail,
+    DocumentMeta,
+    DocumentTree,
+    TreeNode,
+)
 from mylife_contract.errors import ErrorCode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mylife_api import repositories as repo
+from mylife_api import services_documents
 from mylife_api.deps import RunContext, get_db, get_run_context
 from mylife_api.errors import AppError
+from mylife_api.rendering import render_markdown
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -85,4 +95,87 @@ async def document_tree(
         nodes=nodes,
         total_documents=len(rows),
         truncated=truncated,
+    )
+
+
+@router.get("/by-path", response_model=DocumentDetail)
+async def get_by_path(
+    path: str = Query(min_length=1, max_length=1024),
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> DocumentDetail:
+    if ".." in path.split("/"):
+        raise AppError(ErrorCode.NOT_FOUND)
+    return await services_documents.get_by_path(
+        db, workspace_id=ctx.workspace_id, path=path
+    )
+
+
+@router.get("/{document_id}/meta", response_model=DocumentMeta)
+async def get_meta(
+    document_id: UUID,
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> DocumentMeta:
+    return await services_documents.get_meta(
+        db, workspace_id=ctx.workspace_id, document_id=document_id
+    )
+
+
+@router.get("/{document_id}/content")
+async def get_content(
+    document_id: UUID,
+    format: str = Query(default="markdown", pattern="^(markdown|html)$"),
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    detail = await services_documents.get_detail(
+        db, workspace_id=ctx.workspace_id, document_id=document_id, include={"content"}
+    )
+    if format == "html":
+        return HTMLResponse(
+            render_markdown(detail.content or "", document_id=str(document_id)),
+            headers={
+                "Content-Security-Policy": (
+                    "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
+                )
+            },
+        )
+    return PlainTextResponse(
+        detail.content or "", media_type="text/markdown; charset=utf-8"
+    )
+
+
+@router.get("/{document_id}/asset")
+async def get_asset(
+    document_id: UUID,
+    path: str = Query(min_length=1, max_length=1024),
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> FileResponse:
+    target, content_type = await services_documents.get_asset(
+        db, workspace_id=ctx.workspace_id, document_id=document_id, path=path
+    )
+    return FileResponse(
+        target,
+        media_type=content_type,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "sandbox",
+        },
+    )
+
+
+@router.get("/{document_id}", response_model=DocumentDetail)
+async def get_document(
+    document_id: UUID,
+    include: str = Query(default="meta,content,links"),
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> DocumentDetail:
+    include_set = {item.strip() for item in include.split(",") if item.strip()}
+    if not include_set.issubset({"meta", "content", "links", "chunks"}):
+        raise AppError(ErrorCode.VALIDATION_ERROR, details={"field": "include"})
+    return await services_documents.get_detail(
+        db, workspace_id=ctx.workspace_id, document_id=document_id, include=include_set
     )
