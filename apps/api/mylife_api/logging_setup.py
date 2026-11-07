@@ -102,6 +102,13 @@ def configure_logging(level: str = "INFO", service: str = "mylife-api") -> None:
     root.addHandler(handler)
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
+    # uvicorn 的 logger 默认 `propagate=False` 且自带格式，需要显式接管，
+    # 否则访问日志不是结构化 JSON（AC-60 要求每行都含固定字段）。
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "celery"):
+        logger = logging.getLogger(name)
+        logger.handlers.clear()
+        logger.propagate = True
+
 
 def bind_run_context(*, trace_id: str, workspace_id: str, run_id: str) -> None:
     trace_id_ctx.set(trace_id or "")

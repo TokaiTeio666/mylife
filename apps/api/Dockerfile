@@ -22,6 +22,7 @@ COPY packages/contracts packages/contracts
 COPY packages/knowledge-runtime packages/knowledge-runtime
 COPY packages/retrieval packages/retrieval
 COPY packages/agent packages/agent
+COPY packages/delivery packages/delivery
 COPY apps/api apps/api
 
 RUN uv sync --no-dev --package mylife-api
