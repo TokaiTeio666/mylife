@@ -362,7 +362,12 @@ async def test_fx12_concurrent_admission(client, admin_conn, client_factory):
     await wait_for_run(uuid.UUID(workspace_a), uuid.UUID(run_a))
     await wait_for_run(uuid.UUID(workspace_b), uuid.UUID(run_b))
 
+    # 报告不写随机 run_id，保证同一代码重跑字节级一致。
     _report(
         "fx12-concurrent",
-        {"workspace_a_run": run_a, "workspace_b_run": run_b, "conflicts_each": 9},
+        {
+            "created_per_workspace": 1,
+            "conflicts_per_workspace": 9,
+            "cross_workspace_isolated": run_a != run_b,
+        },
     )

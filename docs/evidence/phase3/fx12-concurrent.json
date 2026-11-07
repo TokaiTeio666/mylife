@@ -1,5 +1,5 @@
 {
-  "workspace_a_run": "01a1b60d-d74b-72da-9cd7-5b65167ea777",
-  "workspace_b_run": "01a1b60d-d758-7564-aaf2-5784fdadc068",
-  "conflicts_each": 9
+  "created_per_workspace": 1,
+  "conflicts_per_workspace": 9,
+  "cross_workspace_isolated": true
 }
