@@ -16,6 +16,7 @@ from mylife_api.ratelimit import get_limiter
 from mylife_api.routers import (
     admin,
     auth,
+    chat,
     documents,
     health,
     ingest,
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(documents.router, prefix=API_PREFIX)
     app.include_router(ingest.router, prefix=API_PREFIX)
     app.include_router(search.router, prefix=API_PREFIX)
+    app.include_router(chat.router, prefix=API_PREFIX)
     app.include_router(admin.router, prefix=API_PREFIX)
     return app
 

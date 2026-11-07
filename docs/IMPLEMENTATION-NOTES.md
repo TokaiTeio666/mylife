@@ -58,6 +58,23 @@
 
 ---
 
+## 2B. Phase 2 实现偏差（2026-11-07）
+
+| # | 项目 | 现状 | 理由 / 后续 |
+|---|---|---|---|
+| P2-1 | `agent_runs.finished_at` | 新增列 | DATA-MODEL §4.1 无该列，但 API 的 `RunDetail` 需要终态时间 |
+| P2-2 | `messages.usage_json` | 新增列 | `Message.usage` 契约需要持久化 token/模型/耗时 |
+| P2-3 | `conversations.deleted_at` | 新增列 | §3.6.4 要求软删除，原表无该列 |
+| P2-4 | chat 执行位置 | API 进程内 `asyncio` 任务（不是 Celery） | chat 是低延迟交互，跨进程会失去 token 流；持久化事件仍写 `run_events`，重启后可回放 |
+| P2-5 | token 流传输 | 进程内总线（`runbus`） | 多副本部署时 token 不跨进程；客户端以最终 `messages` 为准 |
+| P2-6 | `create_review` | 只实现 preview（HMAC token，10 分钟） | confirm/enqueue 依赖 Phase 3 的 `POST /reviews` |
+| P2-7 | `get_review` 的 sections/entries | 返回空数组 | 结构化复盘数据在 Phase 3 写入 |
+| P2-8 | 事件归档 | 未实现 | 保留期与归档任务随运维阶段补充 |
+| P2-9 | 注入检测 | 8 类模式（覆盖 FX-05） | 检测命中即剔除证据并写事件，不静默过滤 |
+| P2-10 | 引用编号 | 按首次出现重排为 1..k | 与正文 `[n]` 保持一致，且不保留悬空引用 |
+
+---
+
 ## 3. 运行时与平台注意事项
 
 1. **Windows + async psycopg**：psycopg 异步模式不支持 `ProactorEventLoop`。

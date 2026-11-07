@@ -44,7 +44,7 @@ jobs:
       - run: cp .env.example .env
       # 顶层 compose 的 migrate 服务先跑一次，确保生产迁移路径可用
       - run: uv sync --all-packages
-      - run: uv run ruff check packages/contracts packages/knowledge-runtime packages/retrieval apps/api apps/worker
+      - run: uv run ruff check packages/contracts packages/knowledge-runtime packages/retrieval packages/agent apps/api apps/worker
       - name: Alembic 迁移可执行（生产路径）
         working-directory: apps/api
         env:
@@ -61,6 +61,7 @@ jobs:
         env:
           MYLIFE_QUEUE_BACKEND: "off"
           MYLIFE_EMBEDDING_PROVIDER: mock
+          MYLIFE_LLM_PROVIDER: mock
           MYLIFE_ALLOW_LOCAL_GIT: "true"
         run: uv run pytest -q
 

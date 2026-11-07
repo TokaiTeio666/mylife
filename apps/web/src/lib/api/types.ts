@@ -183,6 +183,75 @@ export interface IngestJob {
   finished_at: string | null;
 }
 
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_preview: string;
+}
+
+export interface Reference {
+  index: number;
+  document_id: string;
+  chunk_id: string;
+  path: string;
+  title: string;
+  heading: string | null;
+  line_range: number[] | null;
+  snippet: string;
+}
+
+export interface ToolEvent {
+  seq: number;
+  tool_name: string;
+  args_digest: string;
+  args_summary: string;
+  status: "ok" | "error" | "timeout" | "skipped";
+  latency_ms: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  status: "drafting" | "complete" | "partial" | "cancelled";
+  references: Reference[];
+  tool_events: ToolEvent[];
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    model: string;
+    latency_ms: number;
+  } | null;
+  run_id: string | null;
+  created_at: string;
+}
+
+export interface ChatTurnResponse {
+  run_id: string;
+  message_id: string;
+  stream: { events_url: string; epoch: number; after: number };
+}
+
+export interface RunDetail {
+  run_id: string;
+  kind: string;
+  state: string;
+  conversation_id: string | null;
+  steps: Array<{
+    seq: number;
+    role: string;
+    tool_name: string | null;
+    status: string;
+    model: string | null;
+    tokens: number;
+    latency_ms: number | null;
+  }>;
+}
+
 export interface IngestJobDetail {
   job: IngestJob;
   counters: {

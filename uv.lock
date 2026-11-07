@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "mylife",
+    "mylife-agent",
     "mylife-api",
     "mylife-contract",
     "mylife-retrieval",
@@ -799,6 +800,21 @@ version = "0.1.0"
 source = { virtual = "." }
 
 [[package]]
+name = "mylife-agent"
+version = "0.1.0"
+source = { editable = "packages/agent" }
+dependencies = [
+    { name = "httpx" },
+    { name = "mylife-contract" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "mylife-contract", editable = "packages/contracts" },
+]
+
+[[package]]
 name = "mylife-api"
 version = "0.1.0"
 source = { editable = "apps/api" }
@@ -810,6 +826,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "markdown-it-py" },
+    { name = "mylife-agent" },
     { name = "mylife-contract" },
     { name = "mylife-retrieval" },
     { name = "mylife-runtime" },
@@ -839,6 +856,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=43,<47" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "markdown-it-py", specifier = ">=3,<4" },
+    { name = "mylife-agent", editable = "packages/agent" },
     { name = "mylife-contract", editable = "packages/contracts" },
     { name = "mylife-retrieval", editable = "packages/retrieval" },
     { name = "mylife-runtime", editable = "packages/knowledge-runtime" },

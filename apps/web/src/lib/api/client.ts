@@ -152,4 +152,35 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ only_failed: true }),
     }),
+  listConversations: () =>
+    apiFetch<{ items: import("./types").ConversationSummary[] }>("/conversations"),
+  createConversation: (title?: string) =>
+    apiFetch<import("./types").ConversationSummary>("/conversations", {
+      method: "POST",
+      body: JSON.stringify(title ? { title } : {}),
+    }),
+  getConversation: (id: string) =>
+    apiFetch<import("./types").ConversationSummary>(`/conversations/${id}`),
+  renameConversation: (id: string, title: string) =>
+    apiFetch<import("./types").ConversationSummary>(`/conversations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    }),
+  deleteConversation: (id: string) =>
+    apiFetch<void>(`/conversations/${id}`, { method: "DELETE" }),
+  listMessages: (id: string) =>
+    apiFetch<{ items: import("./types").ChatMessage[] }>(
+      `/conversations/${id}/messages`,
+    ),
+  sendTurn: (id: string, body: { client_turn_id: string; message: string }) =>
+    apiFetch<import("./types").ChatTurnResponse>(`/conversations/${id}/turns`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getRun: (runId: string) =>
+    apiFetch<import("./types").RunDetail>(`/runs/${runId}`),
+  cancelRun: (runId: string) =>
+    apiFetch<{ run_id: string; state: string }>(`/runs/${runId}/cancel`, {
+      method: "POST",
+    }),
 };

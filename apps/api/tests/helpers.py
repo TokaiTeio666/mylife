@@ -187,3 +187,50 @@ async def job_detail(client, job_id: str) -> dict[str, Any]:
     response = await client.get(f"{API}/ingest/jobs/{job_id}")
     assert response.status_code == 200, response.text
     return response.json()
+
+
+async def prepare_workspace_with_docs(
+    client,
+    admin_conn,
+    *,
+    email: str,
+    files: dict[str, str | bytes] | None = None,
+) -> tuple[str, str]:
+    """注册用户并导入一个 Vault；返回 (workspace_id, user_id)。"""
+    code = f"INV-{uuid4().hex[:10].upper()}"
+    insert_invite(admin_conn, code, expires_in_days=30)
+    registered = await register(client, invite_code=code, email=email)
+    assert registered.status_code == 201, registered.text
+    body = registered.json()
+    workspace_id = body["workspace"]["id"]
+    user_id = body["user"]["id"]
+    if files:
+        upload = await upload_zip(client, data=make_zip(files))
+        assert upload.status_code == 202, upload.text
+        job_id = upload.json()["job"]["id"]
+        await run_ingest_job(job_id, workspace_id)
+        detail = await job_detail(client, job_id)
+        assert detail["job"]["status"] in {"succeeded", "partial"}, detail
+    return workspace_id, user_id
+
+
+async def start_turn(
+    client,
+    conversation_id: str,
+    *,
+    message: str,
+    turn_id: str | None = None,
+    **options,
+):
+    token = await csrf(client)
+    body: dict[str, Any] = {
+        "client_turn_id": turn_id or str(uuid4()),
+        "message": message,
+    }
+    if options:
+        body["options"] = options
+    return await client.post(
+        f"{API}/conversations/{conversation_id}/turns",
+        json=body,
+        headers=csrf_headers(token),
+    )

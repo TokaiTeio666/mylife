@@ -85,6 +85,17 @@ uv run pytest -q -m "not db"  # 仅契约测试
 `MYLIFE_TEST_DB_HOST` / `MYLIFE_TEST_DB_PORT` / `MYLIFE_TEST_ADMIN_URL` 覆盖）。
 无 PostgreSQL 时数据库用例自动跳过。
 
+## 已实现的 Phase 2 能力（M3）
+
+- ToolGateway 六工具（`search_notes` / `read_note` / `list_tasks` / `get_review` / `get_stats` / `create_review` preview），入参 `extra=forbid` 且拒绝 `workspace_id`
+- chat 精简 FSM：`created → retrieving → drafting → verifying → succeeded/failed/cancelled`
+- SSE 事件流（`run.state` / 工具轨迹 / `chat.citation` / `token` / `chat.done` / `heartbeat`），`run_events` 回放 + cursor/epoch
+- 引用闭包：只保留可解析的 `[n]`，无证据返回“没有找到相关记录”哨兵
+- 提示注入防护（8 类模式）+ 证据定界符中和
+- 会话 CRUD、软删除、多轮上下文、`client_turn_id` 幂等、会话内串行
+- 用量计量（`usage_events`）与每 workspace/用户限流
+- 前端：会话列表、流式对话、引用卡片、工具轨迹折叠
+
 ## 已实现的 Phase 1 能力（M2）
 
 - Obsidian Vault ZIP 导入（200MB 上限、忽略规则、路径/符号链接/压缩比防护）

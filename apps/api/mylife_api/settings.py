@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     data_root: Path = Path("./data")
     max_zip_bytes: int = 200 * 1024 * 1024
 
+    # LLM（chat 精简分支）
+    llm_provider: str = "mock"
+    llm_base_url: str | None = None
+    llm_api_key: str | None = None
+    llm_model: str = "deepseek-chat"
+
     # Embedding（查询侧）
     embedding_provider: str = "mock"
     embedding_base_url: str | None = None

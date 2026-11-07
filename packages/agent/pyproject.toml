@@ -1,0 +1,16 @@
+[project]
+name = "mylife-agent"
+version = "0.1.0"
+description = "mylife Agent：chat 提供方、提示词、注入检测、引用闭包（纯逻辑，无 IO/DB）"
+requires-python = ">=3.12"
+dependencies = ["mylife-contract", "httpx>=0.28,<1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+mylife-contract = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mylife_agent"]
