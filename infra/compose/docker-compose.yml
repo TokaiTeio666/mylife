@@ -24,6 +24,12 @@ x-api-env: &api-env
   MYLIFE_LLM_BASE_URL: ${MYLIFE_LLM_BASE_URL:-}
   MYLIFE_LLM_API_KEY: ${MYLIFE_LLM_API_KEY:-}
   MYLIFE_LLM_MODEL: ${MYLIFE_LLM_MODEL:-deepseek-chat}
+  MYLIFE_ALLOW_LOCAL_GIT: ${MYLIFE_ALLOW_LOCAL_GIT:-false}
+  MYLIFE_DISPATCHER_ENABLED: ${MYLIFE_DISPATCHER_ENABLED:-true}
+  MYLIFE_DISPATCHER_INTERVAL_SECONDS: ${MYLIFE_DISPATCHER_INTERVAL_SECONDS:-60}
+  MYLIFE_REVIEW_SWEEPER: ${MYLIFE_REVIEW_SWEEPER:-true}
+  MYLIFE_REVIEW_SWEEPER_INTERVAL_SECONDS: ${MYLIFE_REVIEW_SWEEPER_INTERVAL_SECONDS:-15}
+  MYLIFE_DELETION_COOLDOWN_DAYS: ${MYLIFE_DELETION_COOLDOWN_DAYS:-30}
 
 services:
   postgres:
@@ -125,6 +131,27 @@ services:
     volumes:
       - mylife_data:/srv/mylife/data
     networks: [edge, internal]
+
+  dispatcher:
+    # 单副本：DB 驱动调度 + 租约回收 + 删除冷却 purge（ARCHITECTURE §11）。
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      args:
+        PIP_INDEX_URL: ${MYLIFE_PYPI_INDEX:-https://pypi.org/simple}
+    command: ["uv", "run", "--no-sync", "python", "-m", "mylife_api.dispatcher"]
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+      MYLIFE_REVIEW_SWEEPER: "false"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - mylife_data:/srv/mylife/data
+    networks: [internal]
 
   worker:
     build:
