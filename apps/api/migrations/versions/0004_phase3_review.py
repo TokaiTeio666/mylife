@@ -76,6 +76,34 @@ STATEMENTS: list[str] = [
     "CREATE INDEX idx_usage_run ON usage_events (workspace_id, run_id, created_at)",
     "ALTER TABLE documents ADD COLUMN parse_warnings jsonb NOT NULL DEFAULT '[]'::jsonb",
     "ALTER TABLE git_connections ADD COLUMN webhook_secret_ciphertext bytea",
+    # ------------------------------------------------------------ webhook 解析
+    # 匿名 webhook 无法携带租户上下文；用只读 SECURITY DEFINER 函数暴露
+    # 定位连接所需的两列。函数归 BYPASSRLS 的专用角色所有，应用角色只拿 EXECUTE。
+    """
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mylife_webhook') THEN
+        CREATE ROLE mylife_webhook NOLOGIN BYPASSRLS;
+      END IF;
+    END $$;
+    """,
+    """
+    CREATE OR REPLACE FUNCTION webhook_connection_lookup(
+      p_provider text, p_repo text
+    ) RETURNS TABLE (workspace_id uuid, webhook_secret_ciphertext bytea)
+    LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+      SELECT gc.workspace_id, gc.webhook_secret_ciphertext
+      FROM git_connections gc
+      WHERE gc.provider = p_provider AND gc.repo_full_name = p_repo
+      ORDER BY gc.created_at ASC
+      LIMIT 1
+    $$
+    """,
+    "ALTER FUNCTION webhook_connection_lookup(text, text) OWNER TO mylife_webhook",
+    "GRANT USAGE ON SCHEMA public TO mylife_webhook",
+    "GRANT SELECT ON git_connections TO mylife_webhook",
+    "REVOKE ALL ON FUNCTION webhook_connection_lookup(text, text) FROM PUBLIC",
+    "GRANT EXECUTE ON FUNCTION webhook_connection_lookup(text, text) TO mylife_app",
     # ------------------------------------------------------------ evidence_items
     """
     CREATE TABLE evidence_items (
@@ -333,6 +361,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP FUNCTION IF EXISTS webhook_connection_lookup(text, text)")
     for table in reversed(NEW_TENANT_TABLES):
         op.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
     op.execute("ALTER TABLE git_connections DROP COLUMN IF EXISTS webhook_secret_ciphertext")

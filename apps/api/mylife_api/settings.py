@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     embedding_dimension: int = 1024
 
     secret_key: str = Field(default="dev-only-change-me-please-32-bytes-min", min_length=32)
+    # Git webhook 验签密钥（SEC-16）；未按连接配置时的兜底。
+    webhook_secret: str | None = None
     # 安全默认：生产必须为 true；本地 http 调试在 .env 中显式设为 false。
     cookie_secure: bool = True
     session_ttl_days: int = 30
