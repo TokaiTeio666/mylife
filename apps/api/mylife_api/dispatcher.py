@@ -281,21 +281,30 @@ async def tick(session: AsyncSession) -> dict[str, Any]:
 
 
 async def run_once() -> dict[str, Any]:
+    """获取会话级 advisory lock 后执行一轮；锁持有在独立连接上。
+
+    `pg_try_advisory_lock` 是会话级的：若与业务事务共用连接，rollback 或
+    连接归还池后锁可能残留。这里用专用连接持锁，tick 在独立事务中执行。
+    """
+    from mylife_api.db import get_engine
+
+    engine = get_engine()
     factory = get_session_factory()
-    async with factory() as session:
-        locked = await session.execute(
+    async with engine.connect() as lock_conn:
+        locked = await lock_conn.execute(
             text("SELECT pg_try_advisory_lock(hashtext(:name))"), {"name": LOCK_NAME}
         )
         if not locked.scalar_one():
             _log("dispatch.lock_busy")
             return {"locked": False}
         try:
-            return await tick(session)
+            async with factory() as session:
+                return await tick(session)
         finally:
-            await session.execute(
+            await lock_conn.execute(
                 text("SELECT pg_advisory_unlock(hashtext(:name))"), {"name": LOCK_NAME}
             )
-            await session.commit()
+            await lock_conn.commit()
 
 
 async def run_forever() -> None:
