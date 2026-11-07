@@ -160,7 +160,9 @@ class ReviewRunner:
     async def _snapshot(self, session: AsyncSession) -> None:
         snapshot = await repo.latest_snapshot(session, workspace_id=self.workspace_id)
         if snapshot is None:
-            self.degraded_reasons.append("missing")
+            # 空 workspace 没有快照是合法空日；只有“有证据却无快照”才算降级，
+            # 该判定推迟到取证之后（见 `_retrieve`）。
+            self.payload["snapshot_missing"] = True
         else:
             self.payload["snapshot_id"] = str(snapshot["id"])
             self.payload["storage_path"] = snapshot.get("storage_path")
@@ -260,6 +262,9 @@ class ReviewRunner:
             )
 
         snapshot_id = self.payload.get("snapshot_id")
+        if collector.items and not snapshot_id:
+            # 有证据但无冻结快照：G3 无法复算，标记降级。
+            self.degraded_reasons.append("missing")
         if snapshot_id and collector.items:
             await repo.insert_evidence(
                 session,
