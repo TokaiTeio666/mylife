@@ -28,6 +28,11 @@ from mylife_worker.markdown import (
     json_default,
     parse_document,
 )
+from mylife_worker.task_ledger import (
+    delete_document_occurrences,
+    rebuild_tasks,
+    sync_document_occurrences,
+)
 
 
 @dataclass(slots=True)
@@ -46,6 +51,9 @@ class IngestOutcome:
             "unchanged": 0,
             "skipped": 0,
             "failed": 0,
+            "task_occurrences": 0,
+            "tasks_skipped_no_date": 0,
+            "date_conflicts": 0,
         }
     )
     failures: list[dict[str, Any]] = field(default_factory=list)
@@ -106,11 +114,13 @@ async def _insert_document(
             INSERT INTO documents (
               id, workspace_id, path, title, content, frontmatter_json,
               content_hash, raw_hash, size, mtime, indexed_at, tags, extension,
-              search_text, occurred_on, source_type, parser_version, tokenizer_version
+              search_text, occurred_on, source_type, parser_version, tokenizer_version,
+              parse_warnings
             ) VALUES (
               :id, :ws, :path, :title, :content, CAST(:frontmatter AS jsonb),
               :content_hash, :raw_hash, :size, :mtime, :indexed_at, :tags, :extension,
-              :search_text, :occurred_on, 'user', :parser_version, :tokenizer_version
+              :search_text, :occurred_on, 'user', :parser_version, :tokenizer_version,
+              CAST(:parse_warnings AS jsonb)
             )
             ON CONFLICT (workspace_id, path) DO UPDATE SET
               title = EXCLUDED.title,
@@ -126,7 +136,8 @@ async def _insert_document(
               search_text = EXCLUDED.search_text,
               occurred_on = EXCLUDED.occurred_on,
               parser_version = EXCLUDED.parser_version,
-              tokenizer_version = EXCLUDED.tokenizer_version
+              tokenizer_version = EXCLUDED.tokenizer_version,
+              parse_warnings = EXCLUDED.parse_warnings
             """
         ),
         {
@@ -149,6 +160,9 @@ async def _insert_document(
             "occurred_on": parsed.occurred_on,
             "parser_version": parsed.parser_version,
             "tokenizer_version": parsed.tokenizer_version,
+            "parse_warnings": json.dumps(
+                parsed.parse_warnings, ensure_ascii=False, default=json_default
+            ),
         },
     )
 
@@ -450,6 +464,21 @@ async def ingest_files(
             commit_sha=commit_sha,
         )
 
+        # Todo 台账：重导入 delete+reinsert（AC-32）。
+        if parsed.occurred_on is None and parsed.task_occurrences:
+            outcome.counters["tasks_skipped_no_date"] += 1
+        written = await sync_document_occurrences(
+            session,
+            workspace_id=workspace_id,
+            document_id=document_id,
+            occurred_on=parsed.occurred_on,
+            occurrences=parsed.task_occurrences,
+        )
+        outcome.counters["task_occurrences"] += written
+        for warning in parsed.parse_warnings:
+            if warning.get("code") == "DATE_SOURCE_CONFLICT":
+                outcome.counters["date_conflicts"] += 1
+
         if job_id is not None and (processed % 10 == 0 or processed == total):
             await _update_progress(
                 session,
@@ -465,6 +494,10 @@ async def ingest_files(
     for _path, row in remaining.items():
         if row["id"] in reused_ids:
             continue
+        # 先删 occurrence 再删文档（task_occurrences.document_id 无外键）。
+        await delete_document_occurrences(
+            session, workspace_id=workspace_id, document_id=row["id"]
+        )
         await session.execute(text("DELETE FROM documents WHERE id = :id"), {"id": row["id"]})
         await _record_change(
             session,
@@ -475,6 +508,9 @@ async def ingest_files(
             commit_sha=commit_sha,
         )
         outcome.counters["updated"] += 1
+
+    # 台账重建：tasks 完全由 occurrence 派生（AC-32）。
+    await rebuild_tasks(session, workspace_id=workspace_id)
 
     snapshot_id = await _insert_snapshot(
         session,

@@ -48,6 +48,9 @@ class IngestCounters(ApiModel):
     unchanged: int = 0
     skipped: int = 0
     failed: int = 0
+    task_occurrences: int = 0
+    tasks_skipped_no_date: int = 0
+    date_conflicts: int = 0
 
 
 class SnapshotSummary(ApiModel):

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from mylife_agent.task_ledger import extract_occurrences
 from mylife_retrieval.tokenizer import TOKENIZER_VERSION, build_search_text
 
 PARSER_VERSION = f"mylife-parser-1:{TOKENIZER_VERSION}"
@@ -55,6 +56,13 @@ class LinkData:
 
 
 @dataclass(slots=True)
+class TaskOccurrenceData:
+    line_number: int
+    checked: bool
+    text: str
+
+
+@dataclass(slots=True)
 class ParsedDocument:
     path: str
     title: str
@@ -69,6 +77,10 @@ class ParsedDocument:
     parser_version: str = PARSER_VERSION
     tokenizer_version: str = TOKENIZER_VERSION
     extra: dict[str, Any] = field(default_factory=dict)
+    body_start_line: int = 1
+    date_source: str | None = None
+    parse_warnings: list[dict[str, Any]] = field(default_factory=list)
+    task_occurrences: list[TaskOccurrenceData] = field(default_factory=list)
 
 
 def normalize_body(text: str) -> str:
@@ -177,33 +189,126 @@ def _parse_date_value(value: Any) -> date | None:
 
 
 def derive_occurred_on(frontmatter: dict[str, Any], path: str) -> date | None:
-    for key in ("date", "created", "occurred_on", "created_at"):
-        if key in frontmatter:
-            parsed = _parse_date_value(frontmatter[key])
-            if parsed:
-                return parsed
+    """兼容包装：只返回日期（AC-31/AC-34）。"""
+    resolved, _warnings = resolve_occurred_on(frontmatter, path)
+    return resolved
 
-    for segment in path.split("/"):
-        match = _FULL_DATE.search(segment)
+
+def resolve_occurred_on(
+    frontmatter: dict[str, Any], path: str
+) -> tuple[date | None, list[dict[str, Any]]]:
+    """按优先级解析业务日期，并返回日期来源冲突/非法候选的 warning。
+
+    优先级（AC-34 / PHASE3-SPEC §6.6）：
+    frontmatter 显式日期 > 目录完整日期 > 文件名完整日期 > 文件名短日期 + 年份目录。
+    不使用 mtime / ingest 时间。
+    """
+    warnings: list[dict[str, Any]] = []
+    candidates: list[tuple[str, date]] = []
+
+    for key in ("date", "occurred_on", "created", "created_at"):
+        if key not in frontmatter:
+            continue
+        parsed = _parse_date_value(frontmatter[key])
+        if parsed:
+            candidates.append((f"frontmatter.{key}", parsed))
+        else:
+            warnings.append(
+                {
+                    "code": "DATE_INVALID",
+                    "field": f"frontmatter.{key}",
+                    "value": str(frontmatter.get(key))[:120],
+                }
+            )
+
+    segments = path.split("/")
+    directory_segments = segments[:-1]
+    for segment in reversed(directory_segments):
+        match = _FULL_DATE.fullmatch(segment)
+        if not match:
+            continue
+        year, month, day = (int(part) for part in match.groups())
+        try:
+            candidates.append((f"directory:{segment}", date(year, month, day)))
+        except ValueError:
+            warnings.append({"code": "DATE_INVALID", "value": segment[:120]})
+        break
+
+    name = Path(path).stem
+    full = _FULL_DATE.fullmatch(name)
+    if full:
+        year, month, day = (int(part) for part in full.groups())
+        try:
+            candidates.append((f"filename:{name}", date(year, month, day)))
+        except ValueError:
+            warnings.append({"code": "DATE_INVALID", "value": name[:120]})
+    else:
+        short = _SHORT_DATE.match(name)
+        if short:
+            year: int | None = None
+            for segment in reversed(directory_segments):
+                if _YEAR.match(segment):
+                    year = int(segment)
+                    break
+                # 目录段是完整日期时，也提供年份（如 `日记/2026-10-28/10.27.md`）
+                full_segment = _FULL_DATE.fullmatch(segment)
+                if full_segment:
+                    year = int(full_segment.group(1))
+                    break
+            if year is None:
+                warnings.append({"code": "DATE_YEAR_MISSING", "path": path})
+            else:
+                try:
+                    candidates.append(
+                        (
+                            f"filename:{name}",
+                            date(year, int(short.group(1)), int(short.group(2))),
+                        )
+                    )
+                except ValueError:
+                    warnings.append({"code": "DATE_INVALID", "value": name[:120]})
+
+    if not candidates:
+        return None, warnings
+
+    chosen_source, chosen_date = candidates[0]
+    for source, value in candidates[1:]:
+        if value != chosen_date:
+            warnings.append(
+                {
+                    "code": "DATE_SOURCE_CONFLICT",
+                    "chosen_source": chosen_source,
+                    "chosen_date": chosen_date.isoformat(),
+                    "ignored_source": source,
+                    "ignored_date": value.isoformat(),
+                }
+            )
+    return chosen_date, warnings
+
+
+def _date_source(
+    frontmatter: dict[str, Any], path: str, occurred_on: date | None
+) -> str | None:
+    """返回选中日期的来源标签（便于 AC-34 排障与 warning 对照）。"""
+    if occurred_on is None:
+        return None
+    for key in ("date", "occurred_on", "created", "created_at"):
+        if key in frontmatter and _parse_date_value(frontmatter[key]) == occurred_on:
+            return f"frontmatter.{key}"
+    segments = path.split("/")[:-1]
+    for segment in reversed(segments):
+        match = _FULL_DATE.fullmatch(segment)
         if match:
             year, month, day = (int(part) for part in match.groups())
             try:
-                return date(year, month, day)
+                if date(year, month, day) == occurred_on:
+                    return f"directory:{segment}"
             except ValueError:
-                return None
-
+                break
+            break
     name = Path(path).stem
-    short = _SHORT_DATE.match(name)
-    if short:
-        year = next(
-            (int(seg) for seg in path.split("/") if _YEAR.match(seg)),
-            None,
-        )
-        if year:
-            try:
-                return date(year, int(short.group(1)), int(short.group(2)))
-            except ValueError:
-                return None
+    if _FULL_DATE.fullmatch(name) or _SHORT_DATE.match(name):
+        return f"filename:{name}"
     return None
 
 
@@ -291,7 +396,8 @@ def parse_document(path: str, text: str, *, parser_version: str = PARSER_VERSION
         title = Path(path).stem
 
     tags = _normalize_tags(frontmatter.get("tags") or frontmatter.get("tag"))
-    occurred_on = derive_occurred_on(frontmatter, path)
+    occurred_on, parse_warnings = resolve_occurred_on(frontmatter, path)
+    date_source = _date_source(frontmatter, path, occurred_on)
 
     links: list[LinkData] = []
     seen: set[tuple[str, str | None]] = set()
@@ -320,6 +426,17 @@ def parse_document(path: str, text: str, *, parser_version: str = PARSER_VERSION
         search_text=search_text,
         parser_version=parser_version,
         extra={"h1_titles": h1_titles},
+        body_start_line=body_start_line,
+        date_source=date_source,
+        parse_warnings=parse_warnings,
+        task_occurrences=[
+            TaskOccurrenceData(
+                line_number=item.line_number, checked=item.checked, text=item.text
+            )
+            for item in extract_occurrences(
+                body_lines, body_start_line=body_start_line
+            )
+        ],
     )
 
 

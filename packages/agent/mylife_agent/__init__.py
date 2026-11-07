@@ -25,9 +25,18 @@ from mylife_agent.prompt import (
     plan_tool_calls,
     should_read_note,
 )
+from mylife_agent.task_ledger import (
+    CHECKBOX_RE,
+    TaskOccurrence,
+    display_text,
+    extract_occurrences,
+    normalize_task_text,
+    task_key,
+)
 
 __all__ = [
     "CHAT_NO_EVIDENCE",
+    "CHECKBOX_RE",
     "SYSTEM_PROMPT",
     "CitationClosure",
     "EvidenceQuote",
@@ -39,12 +48,17 @@ __all__ = [
     "LLMUsage",
     "MockLLMProvider",
     "OpenAICompatibleProvider",
+    "TaskOccurrence",
     "build_evidence_block",
     "build_llm_provider",
     "build_messages",
     "close_citations",
+    "display_text",
+    "extract_occurrences",
     "find_citation_indexes",
+    "normalize_task_text",
     "plan_tool_calls",
     "scan_injections",
     "should_read_note",
+    "task_key",
 ]
