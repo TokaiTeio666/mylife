@@ -400,10 +400,28 @@ async def create_turn(
 async def get_run_detail(
     session: AsyncSession, *, workspace_id: UUID, run_id: UUID
 ) -> RunDetail:
+    from mylife_agent.budget import budget_for_kind
+
+    from mylife_api import services_budget
+
     run = await repo.get_run(session, workspace_id=workspace_id, run_id=run_id)
     if run is None:
         raise AppError(ErrorCode.NOT_FOUND)
     steps = await repo.list_steps(session, run_id)
+    budget_kind = "chat" if run["kind"] == "chat" else run["kind"]
+    budget = budget_for_kind(budget_kind)
+    usage = await services_budget.run_budget_usage(
+        session, workspace_id=workspace_id, run_id=run_id, budget=budget
+    )
+    payload = run.get("state_payload") or {}
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    reasons = list(payload.get("degraded_reasons") or [])
+    if usage.state == "warn" and "budget_warn" not in reasons:
+        reasons.append("budget_warn")
+    error = None
+    if run["state"] == "failed":
+        error = {"code": ErrorCode.INTERNAL_ERROR.value, "state": run["state"]}
     return RunDetail(
         run_id=run["id"],
         kind=run["kind"],
@@ -413,8 +431,11 @@ async def get_run_detail(
         attempt_id=run.get("attempt_id"),
         retry_from_state=run.get("retry_from_state"),
         snapshot_id=run.get("snapshot_id"),
-        degraded=False,
-        degraded_reasons=[],
+        version=run.get("version"),
+        lease_expires_at=run.get("lease_expires_at"),
+        budget=usage,
+        degraded=bool(reasons),
+        degraded_reasons=reasons,
         steps=[
             RunStepView(
                 seq=step["seq"],
@@ -429,7 +450,8 @@ async def get_run_detail(
         ],
         created_at=run["created_at"],
         started_at=run.get("updated_at"),
-        finished_at=None,
+        finished_at=run.get("finished_at"),
+        error=error,
     )
 
 

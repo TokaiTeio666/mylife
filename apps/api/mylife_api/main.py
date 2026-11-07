@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -11,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mylife_contract.constants import API_PREFIX
 
 from mylife_api.errors import install_error_handlers
+from mylife_api.logging_setup import configure_logging  # noqa: E402
 from mylife_api.middleware import install_middlewares
 from mylife_api.ratelimit import get_limiter
 from mylife_api.routers import (
@@ -27,10 +27,7 @@ from mylife_api.routers import (
 )
 from mylife_api.settings import settings
 
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format='{"ts":"%(asctime)s","level":"%(levelname)s","service":"%(name)s","event":"%(message)s"}',
-)
+configure_logging(settings.log_level, "mylife-api")
 
 
 @asynccontextmanager

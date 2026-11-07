@@ -300,7 +300,8 @@ async def get_run(
         text(
             "SELECT id, workspace_id, kind, conversation_id, client_turn_id, state, "
             "       state_payload, attempt_id, retry_from_state, snapshot_id, "
-            "       created_at, updated_at FROM agent_runs "
+            "       review_id, version, lease_expires_at, created_at, updated_at, "
+            "       finished_at FROM agent_runs "
             "WHERE workspace_id = :ws AND id = :id"
         ),
         {"ws": workspace_id, "id": run_id},
@@ -491,23 +492,34 @@ async def insert_usage(
     completion_tokens: int,
     latency_ms: int,
     degraded: bool = False,
+    run_id: UUID | None = None,
+    attempt_id: UUID | None = None,
+    kind: str = "chat",
+    role: str | None = None,
+    cost: float = 0.0,
 ) -> None:
     await session.execute(
         text(
             "INSERT INTO usage_events "
             "(id, workspace_id, user_id, kind, model, prompt_tokens, completion_tokens, "
-            " latency_ms, degraded) "
-            "VALUES (:id, :ws, :uid, 'chat', :model, :prompt, :completion, :latency, :degraded)"
+            " latency_ms, degraded, run_id, attempt_id, role, cost) "
+            "VALUES (:id, :ws, :uid, :kind, :model, :prompt, :completion, "
+            "        :latency, :degraded, :run, :attempt, :role, :cost)"
         ),
         {
             "id": uuid7(),
             "ws": workspace_id,
             "uid": user_id,
+            "kind": kind,
             "model": model,
             "prompt": prompt_tokens,
             "completion": completion_tokens,
             "latency": latency_ms,
             "degraded": degraded,
+            "run": run_id,
+            "attempt": attempt_id,
+            "role": role,
+            "cost": cost,
         },
     )
 
@@ -608,17 +620,29 @@ async def get_review_for_tool(
 
 
 async def metrics_snapshot(
-    session: AsyncSession, *, workspace_id: UUID
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    from_ts: Any | None = None,
+    to_ts: Any | None = None,
 ) -> dict[str, Any]:
+    conditions = ["workspace_id = :ws"]
+    params: dict[str, Any] = {"ws": workspace_id}
+    if from_ts is not None:
+        conditions.append("created_at >= :from_ts")
+        params["from_ts"] = from_ts
+    if to_ts is not None:
+        conditions.append("created_at < :to_ts")
+        params["to_ts"] = to_ts
     usage = await session.execute(
         text(
             "SELECT COALESCE(sum(prompt_tokens),0) AS prompt, "
             "       COALESCE(sum(completion_tokens),0) AS completion, "
             "       count(*) AS calls, "
             "       count(*) FILTER (WHERE degraded) AS degraded "
-            "FROM usage_events WHERE workspace_id = :ws"
+            "FROM usage_events WHERE " + " AND ".join(conditions)
         ),
-        {"ws": workspace_id},
+        params,
     )
     row = usage.one()
     reviews = await session.execute(
