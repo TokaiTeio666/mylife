@@ -5,12 +5,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
-import hmac
 import json
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -18,6 +18,8 @@ from mylife_contract.common import is_valid_period_key
 from mylife_contract.errors import ErrorCode
 from mylife_contract.tools import (
     CreateReviewArgs,
+    CreateReviewConfirmArgs,
+    CreateReviewConfirmResult,
     CreateReviewPreview,
     CreateReviewResult,
     EstimatedTokens,
@@ -41,7 +43,6 @@ from mylife_api import repo_chat as repo
 from mylife_api import repo_phase1 as repo1
 from mylife_api import services_search
 from mylife_api.errors import AppError
-from mylife_api.settings import settings
 
 TOOL_TIMEOUT_SECONDS = 10.0
 SEARCH_TIMEOUT_SECONDS = 15.0
@@ -56,6 +57,7 @@ class ToolContext:
     role: str = "owner"
     deadline_ms: int = 60_000
     trace_id: str = ""
+    run_kind: str = "chat"
 
 
 @dataclass(slots=True)
@@ -290,8 +292,10 @@ async def create_review_preview(
     evidence_count = 0
     if args.kind == "daily":
         row = await session.execute(
-            _text("SELECT count(*) FROM documents WHERE workspace_id = :ws "
-                  "AND occurred_on = CAST(:period AS date)"),
+            _text(
+                "SELECT count(*) FROM documents WHERE workspace_id = :ws "
+                "AND occurred_on = CAST(:period AS date)"
+            ),
             {"ws": ctx.workspace_id, "period": args.period_key},
         )
         evidence_count += int(row.scalar_one())
@@ -311,15 +315,34 @@ async def create_review_preview(
     )
     blocked = "ACTIVE_RUN_EXISTS" if active.first() is not None else None
 
-    expires_at = datetime.now(UTC) + timedelta(minutes=10)
-    expires_ts = int(expires_at.timestamp())
-    payload = (
-        f"{ctx.workspace_id}|{ctx.user_id}|{args.kind}|{args.period_key}|{expires_ts}"
+    from mylife_agent.budget import budget_for_kind
+
+    budget = budget_for_kind(args.kind)
+    estimated_input = max(1, evidence_count * 300)
+    estimated_output = max(1, evidence_count * 60)
+    if (
+        estimated_input > budget.max_input_tokens
+        or estimated_output > budget.max_output_tokens
+    ):
+        blocked = blocked or "BUDGET_EXCEEDED"
+
+    from mylife_api import confirmations
+
+    token, expires_at = confirmations.issue_token(
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        kind=args.kind,
+        period_key=args.period_key,
     )
-    signature = hmac.new(
-        settings.secret_key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
-    token = f"v1.{int(expires_at.timestamp())}.{signature}"
+    await confirmations.store_token(
+        session,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        kind=args.kind,
+        period_key=args.period_key,
+        token=token,
+        expires_at=expires_at,
+    )
 
     result = CreateReviewResult(
         preview=CreateReviewPreview(
@@ -329,8 +352,8 @@ async def create_review_preview(
             path=path,
             estimated_evidence_count=evidence_count,
             estimated_tokens=EstimatedTokens(
-                input=max(1, evidence_count * 300),
-                output=max(1, evidence_count * 60),
+                input=estimated_input,
+                output=estimated_output,
             ),
         ),
         confirmation_token=token,
@@ -338,6 +361,69 @@ async def create_review_preview(
         blocked_reason=blocked,
     )
     return result, f"preview {args.kind} {args.period_key} evidence={evidence_count}"
+
+
+async def create_review_confirm(
+    session: AsyncSession, ctx: ToolContext, args: CreateReviewConfirmArgs
+) -> tuple[CreateReviewConfirmResult, str]:
+    """confirm：校验签名/TTL/未消费，标记已消费但**不入队**（AC-25）。"""
+    from mylife_api import confirmations
+
+    try:
+        verify = confirmations.verify_token
+        _ = verify  # 保留导入便于测试替身
+        rows = await session.execute(
+            _text(
+                "SELECT kind, period_key FROM review_confirmations "
+                "WHERE token_hash = :hash AND workspace_id = :ws AND user_id = :uid"
+            ),
+            {
+                "hash": confirmations.token_hash(args.confirmation_token),
+                "ws": ctx.workspace_id,
+                "uid": ctx.user_id,
+            },
+        )
+        row = rows.first()
+        if row is None:
+            raise ToolError(
+                ErrorCode.TOOL_ARGS_INVALID, details={"reason": "TOKEN_UNKNOWN"}
+            )
+        await confirmations.consume_token(
+            session,
+            token=args.confirmation_token,
+            workspace_id=ctx.workspace_id,
+            user_id=ctx.user_id,
+            kind=row.kind,
+            period_key=row.period_key,
+        )
+    except confirmations.TokenError as exc:
+        raise ToolError(
+            ErrorCode.TOOL_ARGS_INVALID, details={"reason": exc.reason}
+        ) from exc
+
+    return (
+        CreateReviewConfirmResult(
+            confirmed=True, confirmation_token="consumed"
+        ),
+        "confirmed",
+    )
+
+
+async def _audit_tool_denied(
+    session: AsyncSession, ctx: ToolContext, tool_name: str
+) -> None:
+    """拒绝写工具时写审计（不静默）。"""
+    from mylife_api.repositories import insert_audit
+
+    with contextlib.suppress(Exception):
+        await insert_audit(
+            session,
+            workspace_id=ctx.workspace_id,
+            user_id=ctx.user_id,
+            action="review.tool_denied",
+            target=str(ctx.run_id),
+            detail={"tool": tool_name, "run_kind": ctx.run_kind},
+        )
 
 
 def _text(sql: str):
@@ -353,6 +439,7 @@ TOOL_ARG_MODELS: dict[str, type] = {
     "get_review": GetReviewArgs,
     "get_stats": GetStatsArgs,
     "create_review": CreateReviewArgs,
+    "create_review_confirm": CreateReviewConfirmArgs,
 }
 
 TOOL_HANDLERS = {
@@ -362,7 +449,14 @@ TOOL_HANDLERS = {
     "get_review": get_review,
     "get_stats": get_stats,
     "create_review": create_review_preview,
+    "create_review_confirm": create_review_confirm,
 }
+
+#: 只读工具白名单（chat L2 可用；review run 内禁止 create_review）。
+READ_ONLY_TOOLS = frozenset(
+    {"search_notes", "read_note", "list_tasks", "get_review", "get_stats"}
+)
+WRITE_TOOLS = frozenset({"create_review", "create_review_confirm"})
 
 
 async def execute_tool(
@@ -393,6 +487,20 @@ async def execute_tool(
             result_digest=_digest(None),
             latency_ms=0,
             error_code=ErrorCode.TOOL_ARGS_INVALID.value,
+        )
+
+    # review run 内禁止递归创建 review（ARCHITECTURE §3.5）。
+    if tool_name in WRITE_TOOLS and ctx.run_kind != "chat":
+        await _audit_tool_denied(session, ctx, tool_name)
+        return ToolExecution(
+            tool_name=tool_name,
+            status="error",
+            result=None,
+            summary="write tools are only allowed in chat runs",
+            args_digest=args_digest,
+            result_digest=_digest(None),
+            latency_ms=0,
+            error_code=ErrorCode.TOOL_NOT_ALLOWED.value,
         )
 
     try:

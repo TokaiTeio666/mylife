@@ -274,6 +274,7 @@ class ChatRunner:
             run_id=self.run_id,
             role="owner",
             trace_id=run.get("trace_id") or "",
+            run_kind="chat",
         )
 
         calls = plan_tool_calls(self.question, top_k=top_k)

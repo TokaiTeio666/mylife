@@ -139,6 +139,29 @@ async def create_review(
     await services_budget.enforce_review_quota(session, workspace_id=workspace_id, user_id=user_id)
     _validate_period(payload, timezone=timezone, now=datetime.now(UTC))
 
+    # AC-25：带 confirmation_token 时必须已 confirm 且未被复用（D6 裁决）。
+    if payload.confirmation_token:
+        from mylife_api import confirmations
+
+        try:
+            consumed = await confirmations.is_consumed(
+                session,
+                token=payload.confirmation_token,
+                workspace_id=workspace_id,
+                user_id=user_id,
+                kind=payload.kind,
+                period_key=payload.period_key,
+            )
+        except confirmations.TokenError as exc:
+            raise AppError(
+                ErrorCode.VALIDATION_ERROR, details={"reason": exc.reason}
+            ) from exc
+        if not consumed:
+            raise AppError(
+                ErrorCode.VALIDATION_ERROR,
+                details={"reason": "CONFIRMATION_REQUIRED"},
+            )
+
     await repo.lock_period(
         session, workspace_id=workspace_id, kind=payload.kind, period_key=payload.period_key
     )
