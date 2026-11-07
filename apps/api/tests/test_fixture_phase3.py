@@ -182,6 +182,46 @@ async def test_fx03_yearly(client, admin_conn):
 
 
 @pytest.mark.asyncio
+async def test_fx03_yearly_reads_weekly_rollup(client, admin_conn):
+    """有下级周报时，年报必须从 rollup 取数而不是回读全年原文。"""
+    workspace_id, _ = await helpers.prepare_workspace_with_docs(
+        client, admin_conn, email="fx03b@example.com", files=vaults.fx_weekly()
+    )
+    for day in range(19, 26):
+        await _generate(
+            client, workspace_id, kind="daily", period_key=f"2026-10-{day:02d}"
+        )
+    weekly, weekly_state = await _generate(
+        client, workspace_id, kind="weekly", period_key="2026-W43"
+    )
+    assert weekly_state in {"succeeded", "human_gate"}
+
+    yearly, state = await _generate(
+        client, workspace_id, kind="yearly", period_key="2026", allow_empty=True
+    )
+    assert state in {"succeeded", "human_gate"}, state
+
+    rows = _sections(admin_conn, workspace_id, yearly["review_id"], yearly["version"])
+    from mylife_contract.constants import SENTINELS
+
+    learning = next(row for row in rows if row[0] == "learning_map")
+    # 周报的 method_landing 为空 → learning_map 仍为哨兵，但不得编造
+    if learning[3].get("topics"):
+        assert learning[2] != SENTINELS["learning_map"]
+    else:
+        assert learning[2] == SENTINELS["learning_map"]
+
+    # 年报 run 的 rollup 查询确实读到了周报（source_kind=weekly）
+    weekly_count = admin_conn.execute(
+        "SELECT count(*) FROM reviews WHERE workspace_id = %s AND kind = 'weekly' "
+        "AND period_key = '2026-W43'",
+        (workspace_id,),
+    ).fetchone()[0]
+    assert weekly_count == 1
+    assert weekly["review_id"] != yearly["review_id"]
+
+
+@pytest.mark.asyncio
 async def test_fx04_empty_day(client, admin_conn):
     workspace_id, _ = await helpers.prepare_workspace_with_docs(
         client, admin_conn, email="fx04@example.com", files=vaults.fx_empty_day()

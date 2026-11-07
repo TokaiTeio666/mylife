@@ -763,36 +763,63 @@ def _method_landing(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _learning_map(sections: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """年报学习地图只读下级 rollup：weekly 的 `method_landing`。
+
+    若存在 daily 形态的 `learning_summary`（用于兼容单元测试），同样并入。
+    """
     topics: list[str] = []
     concepts: list[str] = []
     outputs: list[str] = []
     weeks: list[str] = []
+
+    def _push(target: list[str], value: Any) -> None:
+        text_value = str(value).strip()
+        if text_value and text_value not in target:
+            target.append(text_value)
+
     for section in sections:
-        if section.get("section_key") != "learning_summary":
-            continue
+        key = section.get("section_key")
         structured = section.get("structured") or {}
-        if structured.get("topic"):
-            topics.append(str(structured["topic"]))
-        if structured.get("concept_or_method"):
-            concepts.append(str(structured["concept_or_method"]))
-        if structured.get("output"):
-            outputs.append(str(structured["output"]))
+        if key == "method_landing":
+            for item in structured.get("items", []):
+                _push(topics, item.get("method"))
+                _push(concepts, item.get("verification_status"))
+            period_key = section.get("period_key")
+            if isinstance(period_key, str) and period_key.startswith("20"):
+                _push(weeks, period_key)
+        elif key == "learning_summary":
+            _push(topics, structured.get("topic"))
+            _push(concepts, structured.get("concept_or_method"))
+            _push(outputs, structured.get("output"))
     return {"topics": topics, "concepts": concepts, "outputs": outputs, "related_weeks": weeks}
 
 
 def _timeline(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """事件线：优先 daily 的 `journal_events`；年报从 weekly 行动项回填。"""
     rows: list[dict[str, Any]] = []
     for section in sections:
-        if section.get("section_key") != "journal_events":
-            continue
-        for item in (section.get("structured") or {}).get("items", []):
-            rows.append(
-                {
-                    "date": item.get("date") or section.get("period_key"),
-                    "event": item.get("event", ""),
-                    "result": item.get("result", ""),
-                }
-            )
+        key = section.get("section_key")
+        structured = section.get("structured") or {}
+        if key == "journal_events":
+            for item in structured.get("items", []):
+                rows.append(
+                    {
+                        "date": item.get("date") or section.get("period_key"),
+                        "event": item.get("event", ""),
+                        "result": item.get("result", ""),
+                    }
+                )
+        elif key == "next_week_actions":
+            period_key = section.get("period_key")
+            for item in structured.get("items", []):
+                if period_key:
+                    rows.append(
+                        {
+                            "date": period_key,
+                            "event": item.get("text", ""),
+                            "result": item.get("verification", ""),
+                        }
+                    )
     return [row for row in rows if row["date"]]
 
 
