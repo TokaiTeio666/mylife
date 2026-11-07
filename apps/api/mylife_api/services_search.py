@@ -236,9 +236,21 @@ async def search(
     if len(tokens) > 64:
         raise AppError(ErrorCode.SEARCH_TOO_MANY_TERMS)
     if source_type == "review":
-        # 复盘索引在 Phase 3 落地；Phase 1 返回空集合而非报错。
+        items = await _review_route(
+            session,
+            workspace_id=workspace_id,
+            query=query,
+            top_k=top_k,
+            path_prefix=path_prefix,
+            date_from=date_from,
+            date_to=date_to,
+        )
         return SearchResponse(
-            items=[], total_estimated=0, degraded=False, degraded_reasons=[], took_ms=0
+            items=items,
+            total_estimated=len(items),
+            degraded=False,
+            degraded_reasons=[],
+            took_ms=int((time.perf_counter() - started) * 1000),
         )
 
     where, params = _filters(
@@ -340,14 +352,116 @@ async def search(
 
     results.sort(key=lambda pair: pair[0])
     items = [result for _, result in results[:top_k]]
+
+    if source_type == "both":
+        # 复盘与笔记独立索引；按归一化分数合并（AC-48）。
+        review_items = await _review_route(
+            session,
+            workspace_id=workspace_id,
+            query=query,
+            top_k=top_k,
+            path_prefix=path_prefix,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        merged = [(item.score, item.path, item) for item in items]
+        merged.extend((item.score, item.path, item) for item in review_items)
+        merged.sort(key=lambda row: (-row[0], row[1]))
+        items = [row[2] for row in merged[:top_k]]
+
     took_ms = int((time.perf_counter() - started) * 1000)
     return SearchResponse(
         items=items,
-        total_estimated=len(fused),
+        total_estimated=len(fused) + (len(items) if source_type == "both" else 0),
         degraded=bool(degraded_reasons),
         degraded_reasons=degraded_reasons,
         took_ms=took_ms,
     )
+
+
+def _review_result(row: dict[str, Any], *, query: str, rank: float) -> SearchResult:
+    text_value = row.get("search_text") or ""
+    snippet = text_value[:200]
+    return SearchResult(
+        source_type="review",
+        document_id=None,
+        chunk_id=None,
+        review_id=row["review_id"],
+        path=row["path"],
+        title=row["title"],
+        heading=None,
+        snippet=snippet,
+        snippet_html=None,
+        score=round(float(rank), 6),
+        matched_by="lexical",
+        rank_lexical=None,
+        rank_vector=None,
+        line_range=None,
+        occurred_on=row.get("occurred_on"),
+    )
+
+
+async def _review_route(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    query: str,
+    top_k: int,
+    path_prefix: str | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> list[SearchResult]:
+    """`review_search` 词法检索（AC-48）；只返回 current 版本。"""
+    from mylife_retrieval.tokenizer import build_tsquery
+
+    from mylife_api.repositories import get_settings
+
+    ts_query, _ = build_tsquery(query)
+    conditions = ["rs.workspace_id = :ws", "rs.is_current"]
+    params: dict[str, Any] = {"ws": workspace_id, "limit": top_k}
+    # `to_tsvector('simple', ...)` 不切分中文；中文查询走 ILIKE 子串匹配。
+    if ts_query:
+        conditions.append(
+            "(rs.tsv @@ to_tsquery('simple', :tsq) OR rs.search_text ILIKE :like)"
+        )
+        params["tsq"] = ts_query
+        params["like"] = f"%{query}%"
+    else:
+        conditions.append("rs.search_text ILIKE :like")
+        params["like"] = f"%{query}%"
+    if path_prefix:
+        prefix = path_prefix.rstrip("/")
+        if prefix.startswith("data/reviews"):
+            settings_row = await get_settings(session, workspace_id) or {}
+            root = settings_row.get("reviews_root") or "wiki/复盘"
+            prefix = f"{root.rstrip('/')}/{prefix[len('data/reviews'):].lstrip('/')}".rstrip("/")
+        conditions.append("rs.path LIKE :prefix")
+        params["prefix"] = f"{prefix}%"
+    if date_from is not None:
+        conditions.append("rs.occurred_on >= :date_from")
+        params["date_from"] = date_from
+    if date_to is not None:
+        conditions.append("rs.occurred_on <= :date_to")
+        params["date_to"] = date_to
+    rank_sql = (
+        "ts_rank(rs.tsv, to_tsquery('simple', :tsq))"
+        if ts_query
+        else "CASE WHEN rs.title ILIKE :like THEN 1.0 ELSE 0.5 END"
+    )
+    result = await session.execute(
+        text(
+            "SELECT rs.review_id, rs.path, rs.title, rs.search_text, rs.occurred_on, "
+            f"       {rank_sql} AS rank "
+            "FROM review_search rs WHERE "
+            + " AND ".join(conditions)
+            + " ORDER BY rank DESC, rs.path ASC LIMIT :limit"
+        ),
+        params,
+    )
+    return [
+        _review_result(dict(row._mapping), query=query, rank=row.rank)
+        for row in result
+    ]
 
 
 async def suggest(
