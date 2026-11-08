@@ -851,7 +851,32 @@ async def get_delivery_detail(
 
         raise AppError(ErrorCode.DELIVERY_NOT_FOUND)
     manifest_data = row.get("manifest_json") or {}
-    manifest = DeliveryManifest.model_validate(manifest_data)
+    if not manifest_data:
+        # 历史/异常行没有 manifest：返回最小占位而不是 500。
+        review = await repo_review.get_review(
+            session, workspace_id=workspace_id, review_id=row["review_id"]
+        )
+        manifest = DeliveryManifest(
+            branch=row.get("branch") or "",
+            targets=[
+                {
+                    "kind": "object_store",
+                    "path": (review or {}).get("git_path") or "review.md",
+                    "content_hash": row.get("content_hash") or "",
+                    "mode": "update_allowed",
+                }
+            ],
+            commit_message="",
+            pr=None,
+            review_row={
+                "review_id": row["review_id"],
+                "version": int(row["version"]),
+                "content_hash": row.get("content_hash") or "",
+                "git_path": (review or {}).get("git_path") or "",
+            },
+        )
+    else:
+        manifest = DeliveryManifest.model_validate(manifest_data)
     diff = DeliveryDiffSummary.model_validate(row.get("diff_summary_json") or {})
     return DeliveryDetail(
         delivery=_record(row), manifest=manifest, diff_summary=diff
