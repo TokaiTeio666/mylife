@@ -189,13 +189,13 @@ async def test_blue_green_dimension_switch_and_rollback(client, admin_conn):
     assert admin_conn.execute("SELECT count(*) FROM document_chunks").fetchone()[0] == previous_rows
 
     # FX-11 证据：`no_alter_column_type` 由真实源码扫描得出，不是硬编码。
-    migrations = Path(__file__).resolve().parents[1] / "migrations" / "versions"
+    migrations = Path(__file__).resolve().parents[1] / "migrations" / "versions"  # noqa: ASYNC240
     alter_hits = [
         path.name
         for path in migrations.glob("*.py")
         if "ALTER COLUMN embedding" in path.read_text(encoding="utf-8")
         or "ALTER TABLE document_chunks ALTER COLUMN" in path.read_text(encoding="utf-8")
-    ]
+    ]  # noqa: ASYNC240 - 扫描的是仓内迁移源码，量小且不在请求路径上
     assert alter_hits == [], f"禁止原地改维：{alter_hits}"
 
     EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)

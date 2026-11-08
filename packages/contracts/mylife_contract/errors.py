@@ -162,7 +162,9 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.AUTH_SESSION_EXPIRED: ErrorSpec(ErrorCode.AUTH_SESSION_EXPIRED, 401, True, "登录状态已过期"),
     ErrorCode.AUTH_SESSION_REVOKED: ErrorSpec(ErrorCode.AUTH_SESSION_REVOKED, 401, False, "登录状态已失效"),
     ErrorCode.AUTH_CSRF_INVALID: ErrorSpec(ErrorCode.AUTH_CSRF_INVALID, 403, True, "请求校验失败，请重试"),
-    ErrorCode.AUTH_ACCOUNT_DISABLED: ErrorSpec(ErrorCode.AUTH_ACCOUNT_DISABLED, 403, False, "账号已被禁用，请联系管理员"),
+    # AC-54 明确要求“禁用账号后该用户登录 401”；API §2.3 表格写 403，
+    # 以验收条款为准（PHASE5-SPEC D33）。已登录会话被禁用后同样返回 401。
+    ErrorCode.AUTH_ACCOUNT_DISABLED: ErrorSpec(ErrorCode.AUTH_ACCOUNT_DISABLED, 401, False, "账号已被禁用，请联系管理员"),
     ErrorCode.AUTH_ACCOUNT_LOCKED: ErrorSpec(ErrorCode.AUTH_ACCOUNT_LOCKED, 429, True, "尝试次数过多，请稍后再试"),
     ErrorCode.AUTH_EMAIL_EXISTS: ErrorSpec(ErrorCode.AUTH_EMAIL_EXISTS, 409, False, "该邮箱已注册"),
     ErrorCode.AUTH_WEAK_PASSWORD: ErrorSpec(ErrorCode.AUTH_WEAK_PASSWORD, 422, False, "密码需为 8 到 128 个字符"),

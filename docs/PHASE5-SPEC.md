@@ -86,6 +86,8 @@
 | D30 | FX-11 的“旧表延迟删除” | DATA-MODEL §7 | 切换后写 `retire_at=now()+7d`；dispatcher 到期 `DROP TABLE IF EXISTS document_chunks_v{n}`，删除前把行数/哈希写入 `outbox_events(payload)` 作为快照清单 |
 | D31 | 编辑重评审的 G4 断链 | Phase 4 遗留缺陷 | `repo_review.list_entries` 补 `source_date`/`evidence_id`；`_edited_sections` 补 `sentinel_used`（由 `content_md == SENTINELS[key]` 派生）；作为 C2 的前置修复 |
 | D32 | 管理端是否可读正文 | SEC-30 | **不可**；`/admin/*` 响应只含计数与聚合；新增负向测试 |
+| D33 | `AUTH_ACCOUNT_DISABLED` 的 HTTP 状态 | API §2.3 写 403，AC-54 要求登录 401 | **取 AC-54：401**；已登录会话被禁用后同样 401；错误码不变 |
+| D34 | 管理端响应携带 `workspace_id` | API §1.4 禁止入参出现该字段 | 仅**响应模型**允许（`allow_workspace_field`）；请求模型仍 `extra=forbid`（SEC-08） |
 
 ---
 

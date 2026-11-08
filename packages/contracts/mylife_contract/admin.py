@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import Field
@@ -95,6 +95,9 @@ class AdminWorkspaceListResponse(ApiModel):
 class AdminAuditLog(ApiModel):
     """审计条目（只含元数据；`detail` 已脱敏，不含正文与密钥）。"""
 
+    # 响应模型，允许携带 workspace_id（请求模型禁止，SEC-08）。
+    allow_workspace_field: ClassVar[bool] = True
+
     id: UUID
     workspace_id: UUID | None = None
     user_id: UUID | None = None
@@ -128,6 +131,8 @@ class AdminSystemConfigUpdate(ApiModel):
 
 
 class AdminUsageWorkspace(ApiModel):
+    allow_workspace_field: ClassVar[bool] = True
+
     workspace_id: UUID
     workspace_name: str | None = None
     prompt_tokens: int = 0

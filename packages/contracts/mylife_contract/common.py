@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, date, datetime
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Any, ClassVar, Final, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -29,9 +29,16 @@ class ApiModel(BaseModel):
 
     - `extra="forbid"`：未知字段直接 422（含 `workspace_id`）。
     - 响应中的可空字段必须显式输出 `null`，不得省略键（§1.2）。
+
+    纯响应模型可能合法地携带 `workspace_id`（例如管理端的审计条目）。
+    这类模型把 `allow_workspace_field` 置为 True；**请求模型不得这么做**
+    （SEC-08，`test_contract.py` 覆盖）。
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    #: 仅供响应模型覆盖：允许出现 `workspace_id` 字段本身。
+    allow_workspace_field: ClassVar[bool] = False
 
     @model_validator(mode="before")
     @classmethod
@@ -40,6 +47,8 @@ class ApiModel(BaseModel):
 
         对 dict 输入检查键；对非 dict 输入（如模型实例）跳过。
         """
+        if cls.allow_workspace_field:
+            return data
         if isinstance(data, dict) and FORBIDDEN_WORKSPACE_FIELD in data:
             raise ValueError(WORKSPACE_ID_NOT_ALLOWED)
         return data

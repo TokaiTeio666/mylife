@@ -164,7 +164,7 @@ def upgrade() -> None:
     op.execute("GRANT USAGE ON SCHEMA public TO mylife_admin")
     op.execute(
         "GRANT SELECT ON users, workspaces, workspace_members, audit_logs, "
-        "usage_events, reviews, documents TO mylife_admin"
+        "usage_events, reviews, documents, deletion_requests TO mylife_admin"
     )
     # 管理端跨租户只读：只暴露元数据列，绝不返回正文（SEC-30）。
     op.execute(
@@ -247,6 +247,31 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        CREATE OR REPLACE FUNCTION admin_get_workspace(p_id uuid)
+        RETURNS TABLE (
+          id uuid, name text, slug text, owner_id uuid, plan text,
+          created_at timestamptz, documents bigint, reviews bigint,
+          tokens_month bigint, deletion_state text
+        )
+        LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+          SELECT w.id, w.name, w.slug, w.owner_id, w.plan, w.created_at,
+                 (SELECT count(*) FROM documents d WHERE d.workspace_id = w.id),
+                 (SELECT count(*) FROM reviews r WHERE r.workspace_id = w.id),
+                 COALESCE((
+                   SELECT sum(ue.prompt_tokens + ue.completion_tokens)
+                   FROM usage_events ue
+                   WHERE ue.workspace_id = w.id
+                     AND ue.created_at >= date_trunc('month', now())
+                 ), 0),
+                 (SELECT dr.state FROM deletion_requests dr
+                  WHERE dr.workspace_id = w.id
+                  ORDER BY dr.created_at DESC LIMIT 1)
+          FROM workspaces w WHERE w.id = p_id
+        $$
+        """
+    )
+    op.execute(
+        """
         CREATE OR REPLACE FUNCTION admin_list_audit_logs(
           p_limit int, p_offset int, p_action text DEFAULT NULL,
           p_workspace uuid DEFAULT NULL,
@@ -312,6 +337,7 @@ def upgrade() -> None:
         "admin_count_users(text,text)",
         "admin_list_workspaces(int,int,text)",
         "admin_count_workspaces(text)",
+        "admin_get_workspace(uuid)",
         "admin_list_audit_logs(int,int,text,uuid,timestamptz,timestamptz)",
         "admin_count_audit_logs(text,uuid,timestamptz,timestamptz)",
         "admin_usage_totals(timestamptz,timestamptz)",
@@ -462,6 +488,7 @@ def downgrade() -> None:
         "admin_usage_totals(timestamptz,timestamptz)",
         "admin_count_audit_logs(text,uuid,timestamptz,timestamptz)",
         "admin_list_audit_logs(int,int,text,uuid,timestamptz,timestamptz)",
+        "admin_get_workspace(uuid)",
         "admin_count_workspaces(text)",
         "admin_list_workspaces(int,int,text)",
         "admin_count_users(text,text)",
