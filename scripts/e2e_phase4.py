@@ -79,7 +79,6 @@ def main(invite: str) -> int:
         )
         assert registered.status_code == 201, registered.text
         workspace_id = registered.json()["workspace"]["id"]
-        report["workspace_id"] = workspace_id
         report["steps"].append({"step": "register", "status": registered.status_code})
 
         token = csrf(client)
@@ -120,7 +119,7 @@ def main(invite: str) -> int:
             if state in {"succeeded", "failed", "needs_human", "cancelled", "security_abort"}:
                 break
             time.sleep(1)
-        report["steps"].append({"step": "review", "run_id": run_id, "state": state})
+        report["steps"].append({"step": "review", "state": state})
         assert state == "succeeded", run
 
         review = client.get(f"{BASE}/reviews/{review_id}").json()
@@ -135,7 +134,6 @@ def main(invite: str) -> int:
         assert deliveries, "delivery record missing"
         delivery = deliveries[0]
         report["delivery"] = {
-            "id": delivery["id"],
             "target": delivery["target"],
             "status": delivery["status"],
             "degraded": delivery["degraded"],

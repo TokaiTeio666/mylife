@@ -10,11 +10,9 @@
     },
     {
       "step": "review",
-      "run_id": "01a1b8d3-1a73-75cd-9690-a9419f736a80",
       "state": "succeeded"
     }
   ],
-  "workspace_id": "01a1b8d3-1610-7aac-bbb7-c69c79014749",
   "review": {
     "version": 1,
     "sections": [
@@ -29,7 +27,6 @@
     "degraded": false
   },
   "delivery": {
-    "id": "28498ebf-c00d-5346-b183-006c1df9c678",
     "target": "object_store",
     "status": "committed",
     "degraded": false,
