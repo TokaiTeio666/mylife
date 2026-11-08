@@ -88,6 +88,7 @@ async def dispatch_schedules(session: AsyncSession) -> list[dict[str, Any]]:
             continue
 
         await _set_context(session, workspace_id)
+        row_outcomes: list[dict[str, Any]] = []
         skip_reason = "catchup_window_exceeded" if exceeded else None
         if exceeded:
             _log(
@@ -130,6 +131,7 @@ async def dispatch_schedules(session: AsyncSession) -> list[dict[str, Any]]:
                 )
                 admitted = {"admitted": False, "reason": type(exc).__name__}
             outcomes.append(admitted)
+            row_outcomes.append(admitted)
             _log(
                 "dispatch.admit",
                 workspace_id=str(workspace_id),
@@ -139,20 +141,39 @@ async def dispatch_schedules(session: AsyncSession) -> list[dict[str, Any]]:
                 reason=admitted.get("reason"),
                 run_id=str(admitted.get("run_id")) if admitted.get("run_id") else None,
             )
-        next_at = next_run_at(kind, row["local_time"], tz, now)
-        await session.execute(
-            text(
-                "UPDATE workspace_schedules SET next_run_at = :next_at, "
-                "  last_skip_reason = :reason "
-                "WHERE workspace_id = :ws AND kind = :kind"
-            ),
-            {
-                "next_at": next_at,
-                "reason": skip_reason,
-                "ws": workspace_id,
-                "kind": kind,
-            },
+        # 并发/暂时失败不推进 next_run_at，留待下一 tick 重试；
+        # 已成功或“同 period 已有活跃 run/已成功”才推进。
+        # `active`（同 period 已有活跃 run）与 `concurrency` 都是暂时状态，
+        # 下一 tick 仍需处理该到期点，因此不推进 next_run_at。
+        retry_later = any(
+            not item.get("admitted")
+            and item.get("reason") in {"active", "concurrency", "exception"}
+            for item in row_outcomes
         )
+        if retry_later:
+            # 保留 next_run_at，只记录本次跳过原因；下一 tick 继续处理。
+            await session.execute(
+                text(
+                    "UPDATE workspace_schedules SET last_skip_reason = :reason "
+                    "WHERE workspace_id = :ws AND kind = :kind"
+                ),
+                {"reason": skip_reason, "ws": workspace_id, "kind": kind},
+            )
+        else:
+            next_at = next_run_at(kind, row["local_time"], tz, now)
+            await session.execute(
+                text(
+                    "UPDATE workspace_schedules SET next_run_at = :next_at, "
+                    "  last_skip_reason = :reason "
+                    "WHERE workspace_id = :ws AND kind = :kind"
+                ),
+                {
+                    "next_at": next_at,
+                    "reason": skip_reason,
+                    "ws": workspace_id,
+                    "kind": kind,
+                },
+            )
         await session.commit()
     return outcomes
 
