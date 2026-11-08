@@ -942,6 +942,11 @@ async def admit_scheduled_review(
     await repo.lock_period(
         session, workspace_id=workspace_id, kind=kind, period_key=period_key
     )
+    # 定时触发不重复生成已成功的周期（手动触发才允许 version+1）。
+    if await repo.period_succeeded(
+        session, workspace_id=workspace_id, kind=kind, period_key=period_key
+    ):
+        return {"admitted": False, "reason": "period_already_succeeded"}
     active = await repo.find_active_review_run(
         session, workspace_id=workspace_id, kind=kind, period_key=period_key
     )
