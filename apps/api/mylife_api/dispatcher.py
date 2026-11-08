@@ -283,6 +283,31 @@ async def _purge_deletions(session: AsyncSession) -> int:
         return 0
 
 
+async def _expire_exports(session: AsyncSession) -> int:
+    from mylife_api import services_export
+
+    return await services_export.purge_expired_exports(session)
+
+
+async def _fail_stale_ingest_jobs(session: AsyncSession) -> int:
+    """AC-59：worker 被 kill -9 时 job_runs 会停在 running；30 分钟后置 failed。"""
+    rows = await session.execute(text("SELECT * FROM dispatch_stale_ingest_jobs(50)"))
+    count = 0
+    for row in rows:
+        result = await session.execute(
+            text(
+                "UPDATE job_runs SET status = 'failed', "
+                "  error = 'INGEST_STALE_RUNNING', finished_at = now() "
+                "WHERE id = :id AND status = 'running'"
+            ),
+            {"id": row.id},
+        )
+        if result.rowcount:
+            count += 1
+    await session.commit()
+    return count
+
+
 async def tick(session: AsyncSession) -> dict[str, Any]:
     """执行一轮调度；调用方保证 advisory lock 已持有。"""
     from mylife_api import services_lease
@@ -294,6 +319,8 @@ async def tick(session: AsyncSession) -> dict[str, Any]:
     reclaimed = await services_lease.sweep_expired_leases(session)
     purged = await _purge_deletions(session)
     relayed = await relay_outbox(session)
+    expired_exports = await _expire_exports(session)
+    stale_jobs = await _fail_stale_ingest_jobs(session)
     await session.commit()
     return {
         "scheduled": len(outcomes),
@@ -302,6 +329,8 @@ async def tick(session: AsyncSession) -> dict[str, Any]:
         "reclaimed": reclaimed,
         "purged": purged,
         "outbox": relayed,
+        "expired_exports": expired_exports,
+        "stale_jobs": stale_jobs,
     }
 
 

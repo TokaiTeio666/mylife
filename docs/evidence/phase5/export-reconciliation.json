@@ -1,0 +1,17 @@
+{
+  "manifest_entries": 7,
+  "documents_in_db": 2,
+  "documents_in_zip": 2,
+  "reviews_in_db": 1,
+  "reviews_in_zip": 1,
+  "count_difference": 0,
+  "sha256_all_match": true,
+  "categories": [
+    "audit",
+    "conversations",
+    "documents",
+    "reviews",
+    "settings",
+    "usage"
+  ]
+}
