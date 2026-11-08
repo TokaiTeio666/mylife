@@ -436,16 +436,28 @@ async def insert_audit(
     """审计写入与业务同事务（API-CONTRACTS §1.13）。
 
     `detail` 由调用方保证不含密钥与正文（SEC-19）；此处再做一次长度裁剪。
+    调用方未显式传 `ip` 时取请求上下文里的客户端 IP（AC-07 要求该字段齐全）。
     """
+    from mylife_api.context import current_client_ip
+
     safe_detail = dict(detail or {})
     for key, value in list(safe_detail.items()):
         if isinstance(value, str) and len(value) > 200:
             safe_detail[key] = value[:200] + "…"
+    resolved_ip = ip if ip is not None else current_client_ip()
+    if resolved_ip is not None:
+        # 非法值（例如代理传来的主机名）不写 inet 列，避免 22P02 中断审计。
+        import ipaddress
+
+        try:
+            ipaddress.ip_address(resolved_ip)
+        except ValueError:
+            resolved_ip = None
     await session.execute(
         text(
             "INSERT INTO audit_logs (id, workspace_id, user_id, action, target, detail, ip) "
             "VALUES (gen_random_uuid(), :ws, :uid, :action, :target, "
-            "        CAST(:detail AS jsonb), :ip)"
+            "        CAST(:detail AS jsonb), CAST(:ip AS inet))"
         ),
         {
             "ws": workspace_id,
@@ -453,7 +465,7 @@ async def insert_audit(
             "action": action,
             "target": target,
             "detail": json.dumps(safe_detail, ensure_ascii=False),
-            "ip": ip,
+            "ip": resolved_ip,
         },
     )
 

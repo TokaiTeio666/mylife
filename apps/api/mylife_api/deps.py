@@ -47,6 +47,8 @@ class RunContext:
     session_id: UUID
     request_id: str
     is_platform_admin: bool = False
+    #: 客户端 IP，供 AC-07 的审计字段使用。
+    ip: str | None = None
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
@@ -174,6 +176,7 @@ async def get_run_context(
         session_id=auth.session_id,
         request_id=current_request_id(),
         is_platform_admin=bool(auth.user.get("is_platform_admin", False)),
+        ip=client_ip(request) if request is not None else None,
     )
 
 

@@ -465,25 +465,62 @@ async def get_usage(
     from_ts: datetime,
     to_ts: datetime,
     group_by: str,
+    user_id: UUID | None = None,
+    role: str = "owner",
 ) -> dict[str, Any]:
-    condition = "workspace_id = :ws AND created_at >= :from_ts AND created_at < :to_ts"
-    params = {"ws": workspace_id, "from_ts": from_ts, "to_ts": to_ts}
+    schedule = await repositories.get_settings(session, workspace_id) or {}
+    timezone = schedule.get("timezone") or "Asia/Shanghai"
+
+    # AC-53：成员只看本人用量，owner/admin 看全 workspace（API §3.9.10）。
+    include_all = role in {"owner", "admin"}
+    user_clause = "" if include_all else " AND user_id = :uid"
+    condition = (
+        "workspace_id = :ws AND created_at >= :from_ts AND created_at < :to_ts"
+        + user_clause
+    )
+    params: dict[str, Any] = {
+        "ws": workspace_id,
+        "from_ts": from_ts,
+        "to_ts": to_ts,
+    }
+    if not include_all:
+        params["uid"] = user_id
+
     totals_result = await session.execute(
         text(
             "SELECT COALESCE(sum(prompt_tokens),0) AS prompt, "
             "       COALESCE(sum(completion_tokens),0) AS completion, "
-            "       count(*) AS calls, COALESCE(sum(cost),0) AS cost, "
-            "       count(*) FILTER (WHERE kind = 'review') AS review_runs "
+            "       count(*) AS calls, COALESCE(sum(cost),0) AS cost "
             "FROM usage_events WHERE " + condition
         ),
         params,
     )
     totals = totals_result.one()
+
+    # `review_runs` 必须来自 agent_runs 的成功数——复盘链路不写 usage_events
+    # （PHASE5-SPEC D10），用 usage_events.kind='review' 会恒为 0。
+    # 复盘产物归 workspace 所有（`reviews` 无 user_id），因此该计数始终是
+    # workspace 级；成员的 token/calls 仍按本人过滤。
+    review_runs = (
+        await session.execute(
+            text(
+                "SELECT count(*) FROM agent_runs WHERE workspace_id = :ws "
+                "AND kind IN ('daily','weekly','yearly') AND state = 'succeeded' "
+                "AND created_at >= :from_ts AND created_at < :to_ts"
+            ),
+            {"ws": workspace_id, "from_ts": from_ts, "to_ts": to_ts},
+        )
+    ).scalar_one()
+
     bucket_sql = {
-        "day": "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')",
+        # 按 workspace 时区分桶，与预算窗口同源（D13）。
+        "day": "to_char(created_at AT TIME ZONE :tz, 'YYYY-MM-DD')",
         "kind": "kind",
         "model": "model",
     }[group_by]
+    series_params = {**params}
+    if group_by == "day":
+        series_params["tz"] = timezone
     series_result = await session.execute(
         text(
             f"SELECT {bucket_sql} AS bucket, "
@@ -491,10 +528,8 @@ async def get_usage(
             "       COALESCE(sum(completion_tokens),0) AS completion, count(*) AS calls "
             "FROM usage_events WHERE " + condition + " GROUP BY 1 ORDER BY 1"
         ),
-        params,
+        series_params,
     )
-    schedule = await repositories.get_settings(session, workspace_id) or {}
-    timezone = schedule.get("timezone") or "Asia/Shanghai"
     daily_budget = services_budget.workspace_limits("workspace_daily")
     monthly_budget = services_budget.workspace_limits("workspace_monthly")
     day_start, day_end = services_budget.workspace_window(
@@ -527,7 +562,7 @@ async def get_usage(
             "prompt_tokens": int(totals.prompt),
             "completion_tokens": int(totals.completion),
             "calls": int(totals.calls),
-            "review_runs": int(totals.review_runs),
+            "review_runs": int(review_runs),
             "cost": round(float(totals.cost), 4),
         },
         "series": [

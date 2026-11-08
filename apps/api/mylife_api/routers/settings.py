@@ -228,6 +228,8 @@ async def get_usage(
         from_ts=from_ts,
         to_ts=to_ts,
         group_by=group_by,
+        user_id=ctx.user_id,
+        role=ctx.role,
     )
     return UsageResponse(**data)
 

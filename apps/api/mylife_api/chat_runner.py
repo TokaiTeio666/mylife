@@ -676,6 +676,19 @@ class ChatRunner:
                 tool_events=self.tool_events,
                 usage=usage,
             )
+        # 失败的回合也可能已消耗 provider token；不计量会让 AC-53 对账
+        # 与供应商账单永久不一致（PHASE5-SPEC D11）。
+        if usage is not None and self.user_id is not None:
+            await repo.insert_usage(
+                session,
+                workspace_id=self.workspace_id,
+                user_id=self.user_id,
+                model=usage.get("model", "unknown"),
+                prompt_tokens=int(usage.get("prompt_tokens", 0)),
+                completion_tokens=int(usage.get("completion_tokens", 0)),
+                latency_ms=int(usage.get("latency_ms", 0)),
+                degraded=True,
+            )
         await session.commit()
         await set_rls_context(session, self.workspace_id, self.user_id)
         await self._set_state(session, run, "failed", finished=True)

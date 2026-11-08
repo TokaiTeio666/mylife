@@ -23,12 +23,22 @@ from starlette.datastructures import Headers, MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from mylife_api.context import request_id_ctx
+from mylife_api.context import client_ip_ctx, request_id_ctx
 from mylife_api.errors import error_payload
 from mylife_api.ids import request_id as new_request_id
 from mylife_api.security import SAFE_METHODS, csrf_matches
 
 CSRF_EXEMPT_PREFIXES = ("/api/v1/webhooks/",)
+
+
+def _client_ip(scope: Scope) -> str | None:
+    """与 `deps.client_ip` 同口径：优先 X-Forwarded-For 首段。"""
+    headers = Headers(scope=scope)
+    forwarded = headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip() or None
+    client = scope.get("client")
+    return client[0] if client else None
 
 
 class RequestIdMiddleware:
@@ -45,6 +55,7 @@ class RequestIdMiddleware:
         incoming = Headers(scope=scope).get(HEADER_REQUEST_ID)
         rid = incoming if incoming and incoming.startswith("req_") else new_request_id()
         token = request_id_ctx.set(rid)
+        ip_token = client_ip_ctx.set(_client_ip(scope))
 
         async def send_with_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
@@ -57,6 +68,7 @@ class RequestIdMiddleware:
             await self.app(scope, receive, send_with_headers)
         finally:
             request_id_ctx.reset(token)
+            client_ip_ctx.reset(ip_token)
 
 
 class CsrfMiddleware(BaseHTTPMiddleware):
