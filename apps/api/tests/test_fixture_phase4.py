@@ -9,7 +9,6 @@ import json
 import os
 import subprocess
 import uuid
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -329,19 +328,21 @@ async def test_fx08_pr_delivery(client, admin_conn, tmp_path):
         ):
             assert heading in pr["body"]
 
+        # 报告必须可复现：只保留 trailer 的键名与长度，不写随机 id/sha。
+        trailer_keys = [
+            line.split(":", 1)[0]
+            for line in message.splitlines()
+            if line.startswith(("Run-Id:", "Review-Id:", "Version:", "Workspace:"))
+        ]
         _report(
             "fx08-pr-delivery",
             {
                 "daily": {
                     "branch": daily_row[0],
-                    "commit_sha": daily_row[1],
+                    "commit_sha_len": len(daily_row[1] or ""),
                     "pr_number": daily_row[2],
                     "status": daily_row[3],
-                    "trailers": [
-                        line
-                        for line in message.splitlines()
-                        if line.startswith(("Run-Id:", "Review-Id:", "Version:", "Workspace:"))
-                    ],
+                    "trailers": trailer_keys,
                 },
                 "weekly_state": weekly_state,
                 "pr_count": len(stub.pulls),
@@ -428,8 +429,6 @@ async def test_fx09_restart_and_lease_sweeper(client, admin_conn):
             "schedule_next_run_missing": missing,
             "duplicate_products": 1,
             "epoch_rebuild_required": True,
-            "generated_at": datetime.now(UTC).isoformat(),
             "note": "完整 kill -9/断网演练属 Phase 5 AC-59 签收",
-            "extra": {"timedelta": str(timedelta(seconds=0))},
         },
     )
