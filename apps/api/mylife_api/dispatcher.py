@@ -70,7 +70,9 @@ async def dispatch_schedules(session: AsyncSession) -> list[dict[str, Any]]:
         kind = row["kind"]
         tz = row["timezone"]
         now = datetime.now(UTC)
-        since = row["next_run_at"] or now
+        due_at = row["next_run_at"]
+        # `next_run_at` 本身是“应运行时刻”，必须计入本次扫描（见 missed_occurrences）。
+        since = due_at or now
         try:
             occurrences, exceeded = missed_occurrences(
                 kind=kind,
@@ -79,6 +81,7 @@ async def dispatch_schedules(session: AsyncSession) -> list[dict[str, Any]]:
                 since=since,
                 now=now,
                 catchup_days=int(row["catchup_days"]),
+                due_at=due_at,
             )
         except Exception:  # noqa: BLE001 - 单行失败不拖垮 tick
             logger.exception("schedule compute failed ws=%s kind=%s", workspace_id, kind)

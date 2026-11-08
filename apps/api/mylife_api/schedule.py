@@ -91,12 +91,22 @@ def missed_occurrences(
     since: datetime,
     now: datetime,
     catchup_days: int,
+    due_at: datetime | None = None,
 ) -> tuple[list[datetime], bool]:
-    """返回窗口内最近 `catchup_days` 个应运行时刻（oldest→newest）与超窗标志。"""
+    """返回窗口内最近 `catchup_days` 个应运行时刻（oldest→newest）与超窗标志。
+
+    `due_at` 是调度行里已经到期但尚未处理的时刻；它本身必须计入结果
+    （`next_run_at` 只返回严格晚于 `since` 的时刻，会漏掉边界）。
+    """
     since = since if since.tzinfo else since.replace(tzinfo=UTC)
     now = now if now.tzinfo else now.replace(tzinfo=UTC)
     occurrences: list[datetime] = []
     cursor = since
+    if due_at is not None:
+        due_at = due_at if due_at.tzinfo else due_at.replace(tzinfo=UTC)
+        if due_at <= now:
+            occurrences.append(due_at)
+            cursor = max(cursor, due_at)
     # 防御：即使停机很久也最多迭代 400 次（每天一次约一年）。
     for _ in range(400):
         candidate = next_run_at(kind, at, tz, cursor)
