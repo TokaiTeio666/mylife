@@ -1,7 +1,7 @@
 SHELL := /bin/sh
 COMPOSE := docker compose -f infra/compose/docker-compose.yml --env-file .env
 
-.PHONY: help up down logs migrate test test-fast lint fmt api web upgrade
+.PHONY: help up down logs migrate test test-fast lint fmt api web upgrade backup restore-drill ac59
 
 help:
 	@echo "mylife Phase 0 targets:"
@@ -12,7 +12,10 @@ help:
 	@echo "  make test     - 运行后端测试（需要 PostgreSQL）"
 	@echo "  make test-fast- 只跑不依赖数据库的单元测试"
 	@echo "  make lint     - ruff + tsc"
-	@echo "  make upgrade  - 拉取新镜像并滚动重启（Phase 5 完整实现）"
+	@echo "  make upgrade  - 拉取新镜像并滚动重启"
+	@echo "  make backup    - pg_dump 备份（AC-61）"
+	@echo "  make restore-drill - 备份恢复演练并写证据（AC-61）"
+	@echo "  make ac59      - 容器重启/断网演练（AC-59）"
 
 up:
 	$(COMPOSE) up -d --build
@@ -54,3 +57,12 @@ web:
 
 upgrade:
 	$(COMPOSE) pull && $(COMPOSE) up -d --build
+
+backup:
+	sh scripts/backup_pg.sh
+
+restore-drill:
+	uv run python scripts/restore_drill.py
+
+ac59:
+	uv run python scripts/e2e_ac59.py

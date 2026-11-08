@@ -1,0 +1,21 @@
+{
+  "executed_at": "2026-11-08T09:24:36.893401+00:00",
+  "restart_policies": {
+    "api": "unless-stopped",
+    "caddy": "unless-stopped",
+    "createbuckets": "no",
+    "dispatcher": "unless-stopped",
+    "migrate": "no",
+    "minio": "unless-stopped",
+    "postgres": "unless-stopped",
+    "redis": "unless-stopped",
+    "web": "unless-stopped",
+    "worker": "unless-stopped"
+  },
+  "restart_policy_violations": [],
+  "worker_recovered": true,
+  "worker_recovery_seconds": 2.9,
+  "worker_recovered_within_limit": true,
+  "readyz_during_redis_pause": "200",
+  "passed": true
+}

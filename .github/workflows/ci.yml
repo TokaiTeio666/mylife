@@ -82,3 +82,44 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run build
+
+  security:
+    name: 供应链扫描（SEC-29：pip-audit + npm audit + SBOM）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      # 已知高危依赖直接阻断；SBOM 作为构建产物的清单留档。
+      # 需要豁免时把 CVE/GHSA 写进 scripts/audit-ignore.txt 并在 PR 里说明原因。
+      - name: pip-audit（阻断）
+        run: |
+          uv pip install pip-audit cyclonedx-bom
+          uv export --format requirements-txt --no-hashes -o requirements.txt
+          IGNORES=""
+          if [ -f scripts/audit-ignore.txt ]; then
+            while read -r id; do
+              [ -n "$id" ] && IGNORES="$IGNORES --ignore-vuln $id"
+            done < scripts/audit-ignore.txt
+          fi
+          uv run pip-audit --desc -r requirements.txt $IGNORES
+          uv run cyclonedx-py environment -o sbom-python.cdx.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: npm audit（high 阻断）
+        working-directory: apps/web
+        run: npm ci && npm audit --audit-level=high
+      - name: SBOM（Node）
+        working-directory: apps/web
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file ../../sbom-node.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom-python.cdx.json
+            sbom-node.cdx.json
