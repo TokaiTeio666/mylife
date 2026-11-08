@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mylife_api import services_webhooks
-from mylife_api.deps import get_db
+from mylife_api.deps import RunContext, get_db, get_run_context
 from mylife_api.errors import AppError
 from mylife_api.repositories import insert_audit
 from mylife_api.settings import settings
@@ -156,9 +156,12 @@ async def receive_git_webhook(
 @router.get("/deliveries")
 async def list_webhook_deliveries(
     limit: int = 20,
+    ctx: RunContext = Depends(get_run_context),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """排障用：仅 owner（路由层由 CSRF 与成员校验覆盖）。"""
+    """排障用：仅 owner/admin；RLS 限制为当前 workspace。"""
+    if ctx.role not in {"owner", "admin"}:
+        raise AppError(ErrorCode.FORBIDDEN)
     if limit < 1 or limit > 100:
         raise AppError(ErrorCode.VALIDATION_ERROR, details={"field": "limit"})
     result = await db.execute(
