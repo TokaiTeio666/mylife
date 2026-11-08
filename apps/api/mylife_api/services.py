@@ -77,6 +77,7 @@ def _user_model(row: dict[str, Any]) -> User:
         display_name=row["display_name"],
         status=row["status"],
         created_at=row["created_at"],
+        is_platform_admin=bool(row.get("is_platform_admin", False)),
     )
 
 
@@ -364,11 +365,15 @@ async def me(db: AsyncSession, *, user_id: UUID, active_workspace_id: UUID) -> M
     if user_row is None:
         raise AppError(ErrorCode.NOT_FOUND)
     role = active["role"]
+    capabilities = list(CAPABILITIES_BY_ROLE.get(role, ()))
+    # `admin` 是平台级能力，与 workspace 角色正交（AC-54）。
+    if bool(user_row.get("is_platform_admin", False)) and "admin" not in capabilities:
+        capabilities.append("admin")
     return MeResponse(
         user=_user_model(user_row),
         workspaces=[_workspace_model(r, r["role"]) for r in rows],
         active_workspace_id=active_workspace_id,
-        capabilities=list(CAPABILITIES_BY_ROLE.get(role, ())),
+        capabilities=capabilities,
         limits=_limits(),
     )
 

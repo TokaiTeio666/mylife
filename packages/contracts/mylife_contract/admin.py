@@ -1,11 +1,12 @@
-"""管理后台契约（API-CONTRACTS.md §3.10）。Phase 0 仅先落地邀请码创建/查询。
+"""管理后台契约（API-CONTRACTS.md §3.10；AC-54 / SEC-30）。
 
 约束：所有 admin 端点双重校验（用户 `platform_admin` + 会话有效），每次操作写 `audit_logs`；
-管理员不进入用户 Workspace 业务数据面（SEC-30）。
+管理员不进入用户 Workspace 业务数据面——**本模块没有任何承载正文的模型**（SEC-30）。
 """
 
 from __future__ import annotations
 
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import Field
@@ -75,3 +76,66 @@ class AdminWorkspace(ApiModel):
     created_at: UtcDateTime
     counts: AdminWorkspaceCounts
     deletion_state: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Phase 5：用户 / Workspace / 审计 / 系统配置 / 用量（AC-54）
+# ---------------------------------------------------------------------------
+
+
+class AdminUserDisableRequest(ApiModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class AdminWorkspaceListResponse(ApiModel):
+    items: list[AdminWorkspace]
+    next_cursor: str | None = None
+
+
+class AdminAuditLog(ApiModel):
+    """审计条目（只含元数据；`detail` 已脱敏，不含正文与密钥）。"""
+
+    id: UUID
+    workspace_id: UUID | None = None
+    user_id: UUID | None = None
+    action: str
+    target: str | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+    ip: str | None = None
+    created_at: UtcDateTime
+
+
+class AdminAuditLogList(ApiModel):
+    items: list[AdminAuditLog]
+    next_cursor: str | None = None
+
+
+class AdminSystemConfigItem(ApiModel):
+    key: str
+    value: Any = None
+    #: 由环境变量锁定，`PUT` 会被拒绝（ADMIN_SYSTEM_CONFIG_LOCKED）。
+    locked: bool = False
+    source: Literal["env", "db", "default"] = "default"
+
+
+class AdminSystemConfigList(ApiModel):
+    items: list[AdminSystemConfigItem]
+
+
+class AdminSystemConfigUpdate(ApiModel):
+    key: str = Field(min_length=1, max_length=100)
+    value: Any = None
+
+
+class AdminUsageWorkspace(ApiModel):
+    workspace_id: UUID
+    workspace_name: str | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    calls: int = 0
+    cost: float = 0.0
+
+
+class AdminUsageResponse(ApiModel):
+    totals: AdminUsageWorkspace | None = None
+    items: list[AdminUsageWorkspace] = Field(default_factory=list)

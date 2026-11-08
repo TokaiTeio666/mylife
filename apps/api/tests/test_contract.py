@@ -241,3 +241,110 @@ def test_utc_datetime_annotation():
     assert adapter.dump_json(datetime(2026, 11, 6, 1, 0, tzinfo=UTC)).decode() == (
         '"2026-11-06T01:00:00Z"'
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 契约（AC-49/AC-50/AC-54/AC-55）
+# ---------------------------------------------------------------------------
+
+
+def test_phase5_models_forbid_extra_fields():
+    """所有新请求模型都必须拒绝未知字段（含 workspace_id）。"""
+    from mylife_contract.admin import (
+        AdminSystemConfigUpdate,
+        AdminUserDisableRequest,
+    )
+    from mylife_contract.deletions import DeletionCreate
+    from mylife_contract.exports import ExportCreate
+    from mylife_contract.settings import (
+        EmbeddingProfileCreate,
+        EmbeddingTestRequest,
+        LlmTestRequest,
+        LlmUpdate,
+    )
+
+    cases = [
+        (LlmUpdate, {"provider": "deepseek", "base_url": "https://x", "model": "m"}),
+        (LlmTestRequest, {"provider": "deepseek", "base_url": "https://x", "model": "m"}),
+        (EmbeddingProfileCreate, {"provider": "mock", "model": "m", "dimension": 768}),
+        (EmbeddingTestRequest, {"provider": "mock", "model": "m"}),
+        (ExportCreate, {}),
+        (AdminUserDisableRequest, {"reason": "spam"}),
+        (AdminSystemConfigUpdate, {"key": "k", "value": 1}),
+        (DeletionCreate, {"confirm_text": "x"}),
+    ]
+    for model, payload in cases:
+        model(**payload)
+        with pytest.raises(ValidationError):
+            model(**payload, workspace_id="00000000-0000-0000-0000-000000000000")
+        with pytest.raises(ValidationError):
+            model(**payload, unknown_field=1)
+
+
+def test_export_create_defaults_and_duplicates():
+    from mylife_contract.exports import EXPORT_INCLUDE_KEYS, ExportCreate
+
+    default = ExportCreate()
+    assert default.scope == "workspace" and default.format == "zip"
+    assert set(default.include) <= set(EXPORT_INCLUDE_KEYS)
+    with pytest.raises(ValidationError):
+        ExportCreate(include=["documents", "documents"])
+    with pytest.raises(ValidationError):
+        ExportCreate(include=[])
+    with pytest.raises(ValidationError):
+        ExportCreate(include=["nope"])
+
+
+def test_deletion_request_has_cancellable_until():
+    from mylife_contract.deletions import DeletionNotice, DeletionRequest
+
+    request = DeletionRequest(
+        deletion_id="0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+        scope="workspace",
+        state="cooling",
+        purge_at="2026-12-06T01:00:00Z",
+        cancellable_until="2026-12-06T01:00:00Z",
+        requested_at="2026-11-06T01:00:00Z",
+        requested_by="0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a6b",
+        notice=DeletionNotice(notice="n"),
+    )
+    assert request.cancellable_until == request.purge_at
+    assert DeletionRequest.model_fields["cancellable_until"].is_required()
+
+
+def test_phase5_enums_match_docs():
+    from mylife_contract.enums import ExportStatus, ProviderCredentialStatus, ReembedStatus
+
+    assert [item.value for item in ExportStatus] == [
+        "queued",
+        "running",
+        "ready",
+        "failed",
+        "expired",
+    ]
+    assert [item.value for item in ProviderCredentialStatus] == [
+        "valid",
+        "invalid",
+        "untested",
+        "missing",
+    ]
+    assert [item.value for item in ReembedStatus] == [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+    ]
+
+
+def test_ac07_audit_families_cover_five_categories():
+    from mylife_contract.constants import AUDIT_AC07_FAMILIES
+
+    assert len(AUDIT_AC07_FAMILIES) == 5
+    assert set(AUDIT_AC07_FAMILIES) == {
+        "login",
+        "import",
+        "deletion",
+        "config",
+        "review",
+    }
+    assert all(actions for actions in AUDIT_AC07_FAMILIES.values())

@@ -253,3 +253,41 @@ DELETION_NOTICE: Final[dict[str, object]] = {
         "mylife 不承诺从 Git 历史抹除，仅保证 mylife 侧数据删除。"
     ),
 }
+
+
+# --- Phase 5 审计五类（AC-07；PHASE5-SPEC D18）---
+#: AC-07 要求“恰好 5 类 action 各至少 1 行”；族内任一 action 命中即算该类。
+AUDIT_AC07_FAMILIES: Final[dict[str, tuple[str, ...]]] = {
+    "login": ("user.login",),
+    "import": ("ingest.started",),
+    "deletion": ("deletion.requested",),
+    "config": (
+        "settings.llm.updated",
+        "settings.embedding.updated",
+        "settings.schedule.updated",
+        "settings.git.updated",
+        "settings.retrieval.updated",
+        "admin.system_config.updated",
+    ),
+    "review": ("review.created",),
+}
+
+# --- Phase 5 导出（AC-55 / AC-64；PHASE5-SPEC §6）---
+#: 导出包保留期（天）；到期由 dispatcher 置 `expired` 并删除文件。
+EXPORT_TTL_DAYS: Final = 7
+#: 每 workspace 每日导出次数上限（API-CONTRACTS §8.1）。
+EXPORT_DAILY_LIMIT: Final = 3
+#: 导出包内的固定文件名。
+EXPORT_MANIFEST_NAME: Final = "manifest.json"
+EXPORT_SETTINGS_NAME: Final = "settings.json"
+EXPORT_USAGE_NAME: Final = "usage.csv"
+EXPORT_AUDIT_NAME: Final = "audit.jsonl"
+
+# --- Phase 5 蓝绿换维（AC-50；PHASE5-SPEC D8/D9）---
+#: 自动切换阈值；AC-50 的证据断言使用 1.0。
+EMBEDDING_COVERAGE_THRESHOLD: Final = 0.995
+#: 旧 chunk 表在切换后的保留期（天）。
+EMBEDDING_RETIRE_DAYS: Final = 7
+
+# --- Phase 5 法务页（AC-64；PHASE5-SPEC D21）---
+LEGAL_SLUGS: Final[tuple[str, ...]] = ("privacy", "terms")

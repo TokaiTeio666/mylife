@@ -41,6 +41,8 @@ def _model(row: dict[str, Any]) -> DeletionRequest:
         scope=row["scope"],
         state=row["state"],
         purge_at=row["purge_at"],
+        # 冷却期内可撤销；截止时间与 purge_at 相同（PHASE5-SPEC D17）。
+        cancellable_until=row["purge_at"],
         requested_at=row["created_at"],
         requested_by=row["requested_by"],
         can_cancel=row["state"] == "cooling",

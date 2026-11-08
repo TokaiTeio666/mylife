@@ -19,13 +19,18 @@ from mylife_contract.enums import Plan, UserStatus, WorkspaceRole
 
 
 class User(ApiModel):
-    """用户公开模型（§3.1.1）。"""
+    """用户公开模型（§3.1.1）。
+
+    `is_platform_admin` 供前端决定是否展示 `/admin` 入口（AC-54）；它只是
+    可见性提示，服务端仍独立校验（前端不作为安全边界）。
+    """
 
     id: UUID
     email: str
     display_name: str
     status: UserStatus
     created_at: UtcDateTime
+    is_platform_admin: bool = False
 
 
 class Workspace(ApiModel):

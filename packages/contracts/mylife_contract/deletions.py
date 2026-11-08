@@ -1,7 +1,7 @@
-"""删除冷却契约（API-CONTRACTS §3.11.4–§3.11.7；SEC-27）。
+"""删除冷却契约（API-CONTRACTS §3.11.4–§3.11.7；SEC-27 / AC-55 / AC-64）。
 
-Phase 4 只实现 SEC-27 所需子集：requested → cooling → purged / cancelled。
-导出 ZIP 与完整的撤销演练属 Phase 5（PHASE4-SPEC D17/D20）。
+状态机：requested → cooling → purged / cancelled。Phase 5 补齐 `cancellable_until`
+与“先导出”前置（PHASE5-SPEC D15/D17）。
 """
 
 from __future__ import annotations
@@ -27,6 +27,8 @@ class DeletionCreate(ApiModel):
     scope: DeletionScope = "workspace"
     confirm_text: str = Field(min_length=1, max_length=200)
     reason: str | None = Field(default=None, max_length=500)
+    #: 跳过“先导出”前置检查；owner 显式承担后果（PHASE5-SPEC D15）。
+    skip_export: bool = False
 
 
 class DeletionRequest(ApiModel):
@@ -34,6 +36,8 @@ class DeletionRequest(ApiModel):
     scope: DeletionScope
     state: DeletionState
     purge_at: UtcDateTime
+    #: 可撤销截止时间；当前等于 `purge_at`（PHASE5-SPEC D17）。
+    cancellable_until: UtcDateTime
     requested_at: UtcDateTime
     requested_by: UUID
     can_cancel: bool = False

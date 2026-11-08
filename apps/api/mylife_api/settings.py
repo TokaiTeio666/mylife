@@ -56,6 +56,18 @@ class Settings(BaseSettings):
     # 删除冷却天数（SEC-27；测试可调小）。
     deletion_cooldown_days: int = 30
 
+    # 导出（AC-55）：保留期与每日次数上限。
+    export_ttl_days: int = 7
+    export_daily_limit: int = 3
+    # 备份目录（AC-61）；相对路径按仓库根解析。
+    backup_dir: Path = Path("./data/backups")
+
+    # 蓝绿换维（AC-50）：覆盖率阈值与旧表保留期。
+    embedding_coverage_threshold: float = 0.995
+    embedding_retire_days: int = 7
+    # 允许用 http:// 访问的私有 provider 主机（逗号分隔，PHASE5-SPEC D26）。
+    allowed_private_provider_hosts: str = ""
+
     # LLM（chat 精简分支）
     llm_provider: str = "mock"
     llm_base_url: str | None = None

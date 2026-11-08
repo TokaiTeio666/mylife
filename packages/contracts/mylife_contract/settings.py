@@ -1,4 +1,4 @@
-"""设置契约（API-CONTRACTS §3.9.7–§3.9.11；AC-51/AC-52）。"""
+"""设置契约（API-CONTRACTS §3.9.1–§3.9.11；AC-49/AC-50/AC-51/AC-52/AC-53）。"""
 
 from __future__ import annotations
 
@@ -139,3 +139,116 @@ class RetrievalUpdate(ApiModel):
     retrieval_top_k: int = Field(default=20, ge=1, le=50)
     context_window_tokens: int = Field(default=32_000, ge=8_000, le=128_000)
     web_search_enabled: bool = False
+
+
+# ---------------------------------------------------------------------------
+# LLM（API-CONTRACTS §3.9.1–§3.9.3；AC-49）
+# ---------------------------------------------------------------------------
+
+LlmProviderName = Literal["deepseek", "openai_compatible", "mock"]
+CredentialStatus = Literal["valid", "invalid", "untested", "missing"]
+
+
+class LlmSettings(ApiModel):
+    """明文 API Key 永不出现在响应里。"""
+
+    provider: LlmProviderName | None = None
+    base_url: str | None = None
+    model: str | None = None
+    model_profile: str = "default"
+    credential_status: CredentialStatus = "missing"
+    last_tested_at: UtcDateTime | None = None
+    supports_json_mode: bool = False
+
+
+class LlmUpdate(ApiModel):
+    provider: LlmProviderName
+    base_url: str = Field(min_length=1, max_length=2048)
+    model: str = Field(min_length=1, max_length=200)
+    # 省略 = 保持现有密钥（API §3.9.2）。
+    api_key: str | None = Field(default=None, max_length=4096)
+    test_before_save: bool = True
+
+
+class LlmTestRequest(ApiModel):
+    provider: LlmProviderName
+    base_url: str = Field(min_length=1, max_length=2048)
+    model: str = Field(min_length=1, max_length=200)
+    api_key: str | None = Field(default=None, max_length=4096)
+
+
+class ProviderTestError(ApiModel):
+    code: str
+    message: str
+
+
+class LlmTestResult(ApiModel):
+    ok: bool
+    latency_ms: int = 0
+    model_echo: str | None = None
+    error: ProviderTestError | None = None
+
+
+# ---------------------------------------------------------------------------
+# Embedding（API-CONTRACTS §3.9.4–§3.9.6；AC-50）
+# ---------------------------------------------------------------------------
+
+EmbeddingStatus = Literal["active", "building", "retired"]
+
+
+class EmbeddingProfile(ApiModel):
+    id: UUID
+    provider: str
+    model: str
+    dimension: int
+    index_name: str
+    status: EmbeddingStatus
+    created_at: UtcDateTime
+    # 已 embedding 的 chunk 占比；building 阶段用于校验（API §3.9.4）。
+    coverage: float = 0.0
+    chunk_table: str | None = None
+    activated_at: UtcDateTime | None = None
+    retire_at: UtcDateTime | None = None
+
+
+class ReembedProgress(ApiModel):
+    job_id: UUID
+    status: Literal["queued", "running", "succeeded", "failed"]
+    processed_chunks: int = 0
+    total_chunks: int = 0
+    error: str | None = None
+
+
+class EmbeddingSettings(ApiModel):
+    active_profile: EmbeddingProfile | None = None
+    profiles: list[EmbeddingProfile] = Field(default_factory=list)
+    credential_status: CredentialStatus = "missing"
+    last_tested_at: UtcDateTime | None = None
+    # 后台 re-embed 任务的进度（PHASE5-SPEC §4.3）。
+    reembed: ReembedProgress | None = None
+
+
+class EmbeddingProfileCreate(ApiModel):
+    provider: Literal["openai", "mock"]
+    model: str = Field(min_length=1, max_length=200)
+    dimension: int = Field(ge=256, le=3072)
+    api_key: str | None = Field(default=None, max_length=4096)
+    confirm: bool = False
+
+
+class EmbeddingProfileCreated(ApiModel):
+    profile: EmbeddingProfile
+    job_id: UUID
+
+
+class EmbeddingTestRequest(ApiModel):
+    provider: Literal["openai", "mock"]
+    model: str = Field(min_length=1, max_length=200)
+    api_key: str | None = Field(default=None, max_length=4096)
+
+
+class EmbeddingTestResult(ApiModel):
+    ok: bool
+    dimension_observed: int | None = None
+    latency_ms: int = 0
+    error: ProviderTestError | None = None

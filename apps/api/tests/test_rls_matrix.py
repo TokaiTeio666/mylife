@@ -45,6 +45,8 @@ TENANT_TABLES = [
     "outbox_events",
     "deletion_requests",
     "export_jobs",
+    "embedding_profiles",
+    "embedding_reembed_jobs",
 ]
 
 
@@ -187,6 +189,18 @@ def _insert_tenant_rows(conn, helpers, *, user_b: str, ws_b: str) -> None:
         "INSERT INTO export_jobs (id, workspace_id, requested_by) "
         "VALUES (%s, %s, %s)",
         (uuid7(), ws_b, user_b),
+    )
+    profile_b = uuid7()
+    conn.execute(
+        "INSERT INTO embedding_profiles "
+        "(id, workspace_id, provider, model, dimension, index_name, chunk_table) "
+        "VALUES (%s, %s, 'mock', 'mock-hash-v1', 1024, 'idx_b', 'document_chunks')",
+        (profile_b, ws_b),
+    )
+    conn.execute(
+        "INSERT INTO embedding_reembed_jobs (id, workspace_id, profile_id) "
+        "VALUES (%s, %s, %s)",
+        (uuid7(), ws_b, profile_b),
     )
     conv_b = uuid7()
     conn.execute(

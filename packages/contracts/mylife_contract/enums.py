@@ -155,3 +155,32 @@ class DegradedReason(StrEnum):
     CURSOR_EXPIRED = "cursor_expired"
     BUDGET_WARN = "budget_warn"
     TOPIC_NEEDS_CONFIRM = "topic_needs_confirm"
+
+
+class ExportStatus(StrEnum):
+    """导出任务状态（API-CONTRACTS §3.11.2；PHASE5-SPEC D3）。
+
+    DB 历史值 `succeeded` 在服务层映射为 `ready`，读取端只需认识本枚举。
+    """
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    READY = "ready"
+    FAILED = "failed"
+    EXPIRED = "expired"
+
+
+class ProviderCredentialStatus(StrEnum):
+    """凭据状态（API-CONTRACTS §3.9.1）；DB 值见 PHASE5-SPEC D6。"""
+
+    VALID = "valid"
+    INVALID = "invalid"
+    UNTESTED = "untested"
+    MISSING = "missing"
+
+
+class ReembedStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
