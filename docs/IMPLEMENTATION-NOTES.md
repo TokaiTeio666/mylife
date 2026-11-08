@@ -145,6 +145,28 @@
 
 ---
 
+## 2E. Phase 5 实现偏差（2026-11-08）
+
+> 完整设计冲突裁决见 `docs/PHASE5-SPEC.md §1`（D1–D34）；此处汇总落地的实现偏差。
+
+| # | 项目 | 现状 | 理由 / 后续 |
+|---|---|---|---|
+| P5-1 | 导出下载方式 | `GET /exports/{id}/download` 直传 `200 application/zip`（不走 MinIO 302 预签名） | 本机无 MinIO，仓库不引入额外 S3 SDK；与 `GET /deliveries/{id}/download` 同构（D1/D2） |
+| P5-2 | `export_jobs.status` | DB CHECK 允许 `ready` 与 `succeeded`，服务层写 `ready` 并兼容读取历史 `succeeded` | 对齐 DATA-MODEL §4.24 与 API §3.11.2（D3） |
+| P5-3 | 管理端跨租户只读 | `mylife_admin`（`NOLOGIN BYPASSRLS`）持有 `admin_*` `SECURITY DEFINER` 函数，只投影元数据列 | FORCE RLS 下普通 SELECT 恒 0 行；`mylife_app` 保持 `NOBYPASSRLS`（D4/SEC-30） |
+| P5-4 | 系统配置 `platform_settings` | 新增非租户表（无 `workspace_id`）；环境变量锁定的键以 `source=env, locked=true` 合成且拒绝 PUT | API §3.10 要求逐键 `{key,value,locked,source}`（D5） |
+| P5-5 | `provider_credentials` 扩展 | 新增 `provider_name`、`base_url`、`model`、`model_profile`；`provider` 列区分 `llm`/`embedding` 用途 | 原表只有 `provider` 单列，无法同时表达用途与厂商名（D6/D7） |
+| P5-6 | 蓝绿换维 DDL 权限 | `mylife_migrator` 持有 `create_chunk_table(text,int)` 与 `retire_chunk_table(text)` `SECURITY DEFINER` 函数 | `mylife_app` 在 `public` 上无 `CREATE/DROP` 权限；新表显式补 `ENABLE + FORCE RLS` 与租户策略（D8/D30） |
+| P5-7 | 换维切换阈值与块 ID | 覆盖率达 `1.0` 才切换；re-embed 保留原 `chunk.id` | AC-50 硬门要求 100%；保留 `id` 使历史 `evidence_items` 与对话引用不断链（D9） |
+| P5-8 | `review_runs` 用量口径 | `GET /settings/usage` 的 `review_runs` 由 `agent_runs(state='succeeded')` 派生 | 确定性装配器不写 `usage_events(kind='review')`，直接查 `usage_events` 恒为 0（D10） |
+| P5-9 | 冷却期写冻结状态码 | `get_run_context` 对非安全方法抛出 `ErrorCode.DELETE_IN_COOLING`（HTTP `409`） | 复用契约错误码表的 `DELETE_IN_COOLING -> 409`（D14） |
+| P5-10 | 删除前置导出 | 无 7 天内 `ready` 导出时返回 `409 CONFLICT (EXPORT_REQUIRED)`；仅 owner 可传 `skip_export=true` 跳过并记审计 | 兼顾 AC-55“先导出”保护与空库/测试账户注销需求（D15/D16） |
+| P5-11 | 禁用账号状态码 | 被禁用账号登录与存量会话请求均返回 `401 AUTH_ACCOUNT_DISABLED` | 以 AC-54 为准（D33） |
+| P5-12 | SVG 资产代理清洗 | `GET /documents/{id}/asset` 对 `.svg` 剥离 `<script>`/`<foreignObject>`/`on*`/`javascript:` 并加 `Content-Security-Policy: sandbox` + `nosniff` | 严格满足 SEC-21“代理 + sanitize；不执行” |
+| P5-13 | 数据根备份 | `scripts/backup_data.sh` 对 `MYLIFE_DATA_ROOT/workspaces` 归档加密，清单标 `minio: not_applicable` | 与本地存储降级路径一致，不伪造 MinIO 对象计数（D22/D23） |
+
+---
+
 ## 3. 运行时与平台注意事项
 
 1. **Windows + async psycopg**：psycopg 异步模式不支持 `ProactorEventLoop`。
@@ -192,6 +214,10 @@
 | 交付路径白名单（禁止 `..`/绝对路径） | `mylife_delivery.git_ops.validate_relative_path` |
 | 永不 force push（rebase 重试 2 次后保留分支） | `mylife_delivery.git_ops.GitRepo.push` |
 | 删除冷却与 Git 历史保留告知 | `mylife_api/services_deletion`、`DELETION_NOTICE` |
+| 管理端最小权限只读投影（SEC-30） | 迁移 `0011` `admin_*` 函数（`mylife_admin`）+ `services_admin` |
+| SVG 资产清洗与沙箱头（SEC-21） | `routers/documents.py::_sanitize_svg` + `Content-Security-Policy: sandbox` |
+| 备份加密与校验（SEC-28） | `scripts/backup_pg.sh`、`scripts/backup_data.sh`（`age`/`openssl` + SHA-256 + 0700/0600） |
+| 供应链漏洞阻断与 SBOM（SEC-29） | `.github/workflows/ci.yml`（`pip-audit` + `npm audit` + CycloneDX） |
 
 ---
 
@@ -211,4 +237,5 @@
 | 版本 | 日期 | 变更 |
 |---|---|---|
 | v0.1 | 2026-11-07 | Phase 0 初版：记录 6 项文档冲突裁决、8 项范围裁剪、5 条运行时注意事项 |
-| v0.4 | 2026-11-08 | Phase 4：新增 §2D（30 项实现偏差）、安全实现要点补充 |
+| v0.4 | 2026-11-08 | Phase 4：新增 §2D（33 项实现偏差）、安全实现要点补充 |
+| v0.5 | 2026-11-08 | Phase 5：新增 §2E（13 项实现偏差）、SEC-21/28/29/30 安全落点补充 |

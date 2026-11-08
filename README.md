@@ -1,10 +1,10 @@
 # mylife
 
-多用户、多端访问的个人知识库 SaaS。当前进度：**Phase 4 / M4.5–M5（Git 交付、专题页、调度、仪表盘）**。
+多用户、多端访问的个人知识库 SaaS。当前进度：**MVP Phase 0–5 全量交付签收（M1–M6）**。
 
-> 需求与设计基线见 [`docs/`](./docs/README.md)。实现与文档的偏差、证据与剩余工作见
+> 需求与设计基线见 [`docs/`](./docs/README.md)。实现与文档的偏差、验收证据见
 > [`docs/IMPLEMENTATION-NOTES.md`](./docs/IMPLEMENTATION-NOTES.md) 与
-> [`docs/PHASE4-STATUS.md`](./docs/PHASE4-STATUS.md)。
+> [`docs/PHASE5-STATUS.md`](./docs/PHASE5-STATUS.md)。
 
 ## 技术栈
 
@@ -19,15 +19,18 @@
 
 ```text
 apps/api            FastAPI：路由域 + service + repositories + migrations + dispatcher
-apps/web            Next.js：登录/注册/布局壳/仪表盘/文档/搜索/对话/复盘/专题/设置
+apps/web            Next.js：登录/注册/仪表盘/文档/搜索/对话/复盘/专题/设置/管理后台/法务页/PWA
 apps/worker         Celery：导入与索引
 packages/contracts  单一事实源：Pydantic v2 契约、枚举、错误码、常量
+packages/knowledge-runtime 路径白名单、哈希与知识库运行时原语
+packages/retrieval  分词、Embedding 提供方与混合检索组件
+packages/agent      复盘门禁（G0–G9）、章节装配与提示注入检测
+packages/delivery   Git 分支/PR/trailer 交付与专题页确定性合并
 infra/compose       docker-compose.yml + 本地 dev override
-infra/postgres     角色初始化脚本
+infra/postgres      角色初始化脚本
 infra/caddy         Caddyfile
-tests               契约 / 数据库集成测试位于 apps/api/tests
-scripts             边界检查等运维脚本
-docs                需求、架构、决策、规范
+scripts             边界/i18n 检查、备份恢复演练、容器故障演练与性能基准脚本
+docs                需求、架构、决策、规范与各阶段验收证据
 ```
 
 ## 快速开始（本地）
@@ -74,17 +77,38 @@ Caddy 自动签发 HTTPS。
 > Windows 注意：psycopg 的异步模式不支持 ProactorEventLoop。本机直接运行 API 时请使用
 > `PYTHONASYNCIODEBUG=0` + Selector 事件循环，或直接在 Docker 中运行 API（推荐）。
 
-## 测试
+## 测试与运维演练
 
 ```bash
 cd apps/api
-uv run pytest -q            # 契约 + 数据库集成（需 PostgreSQL）
-uv run pytest -q -m "not db"  # 仅契约测试
+uv run pytest -q              # 全量契约 + 数据库集成（298 passed, 1 skipped）
+uv run pytest -q -m fixture   # Golden fixtures（FX-01..FX-12）
+uv run pytest -q -m "not db"  # 仅无数据库单元/契约测试
+cd ../..
+
+make backup                   # PostgreSQL + 数据根加密备份（AC-61 / SEC-28）
+make restore-drill            # 备份恢复到临时库并核对计数与哈希（AC-61）
+make ac59                     # 容器 kill -9 / Redis 暂停恢复演练（AC-59）
 ```
 
 数据库测试默认连接 `localhost:25432/mylife_test`（可用
 `MYLIFE_TEST_DB_HOST` / `MYLIFE_TEST_DB_PORT` / `MYLIFE_TEST_ADMIN_URL` 覆盖）。
 无 PostgreSQL 时数据库用例自动跳过。
+
+## 已实现的 Phase 5 能力（M6）
+
+- 管理后台（`/admin/*`）：用户查询与禁用/启用（即时吊销会话）、Workspace 统计、邀请码生成与撤销、脱敏审计日志、系统配置与跨租户聚合用量（`mylife_admin` 最小权限函数，零正文暴露）
+- LLM 与 Embedding 设置：API Key 信封加密存储、保存前连接探测、BGE-M3 等模型蓝绿换维（动态建 `document_chunks_v{dim}` + HNSW + FORCE RLS、100% 覆盖率原子切换、一键回滚、7 天快照退役）
+- 数据导出与删除收口：全类别 ZIP 导出与 `manifest.json` SHA-256 对账、删除前导出软前置、30 天冷却期全局写冻结与随时撤销、到期 39 张业务表及动态向量表 0 残留清除、账户级跨库注销、Git 历史保留边界显式告知
+- 审计与用量对账：登录/导入/删除/配置/复盘五类审计全覆盖，按 Workspace 时区聚合用量与成员级隔离
+- 备份、恢复与供应链安全：`backup_pg.sh` / `backup_data.sh`（`age`/`openssl` 加密、7d/30d 两档保留）、`restore_drill.py`（RTO ≤4h / RPO ≤24h）、CI `pip-audit` + `npm audit` + CycloneDX SBOM、SEC-01…SEC-30 全集通过
+- 前端多端与合规：1440/768/390 无横向溢出响应式、PWA manifest 与离线壳 Service Worker、`zh-CN`/`en-US` 语言切换、匿名可访问 `/privacy` 与 `/terms`
+
+## 已实现的 Phase 3–4 能力（M4–M5）
+
+- 复盘状态机（daily 7 章 / weekly 4 章 / yearly 5 章）、Todo 复选框台账与顺延统计、确定性门禁 G0–G9、80% 告警 / 100% 硬停预算守卫、`create_review` 预览确认协议、人工编辑重评审与版本回滚
+- Git 分支/commit trailer/PR 交付与可选 daily 自动合并、对象存储 ZIP 降级交付、错误清单/正确方法论/行动清单三专题 `mylife:auto` 区间合并（保留人工备注与冲突并列）
+- 单副本 `dispatcher`（时区/DST/补算窗口调度、定时 Git 同步、过期租约回收、outbox 重投、导出过期与僵死任务清理）、仪表盘与复盘日历、笔记+复盘混合检索
 
 ## 已实现的 Phase 2 能力（M3）
 

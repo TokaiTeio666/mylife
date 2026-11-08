@@ -24,4 +24,6 @@
 | [PHASE3-STATUS.md](./PHASE3-STATUS.md) | Phase 3 / M4 交付状态：复盘运行时、门禁、预算、确认协议、专题、webhook |
 | [PHASE4-SPEC.md](./PHASE4-SPEC.md) | Phase 4 施工规格：交付、专题重渲染、调度、仪表盘、SEC-27 与 D1–D43 裁决 |
 | [PHASE4-STATUS.md](./PHASE4-STATUS.md) | Phase 4 / M4.5–M5 交付状态：Git 交付、专题页、dispatcher、仪表盘、删除冷却 |
+| [PHASE5-SPEC.md](./PHASE5-SPEC.md) | Phase 5 施工规格：管理后台、导出/删除、LLM/Embedding 蓝绿换维、备份恢复与 D1–D34 裁决 |
+| [PHASE5-STATUS.md](./PHASE5-STATUS.md) | Phase 5 / M6 最终交付签收：AC/SEC-01..30 全集对照、FX-01..14 回归与演练证据 |
 | [HANDOFF.md](./HANDOFF.md) | 会话交接：当前进度、恢复提示词、本机环境坑、清空上下文时机 |

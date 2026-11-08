@@ -14,21 +14,20 @@
 | Phase 2 / M3（ToolGateway、chat、SSE、引用） | `f1c0025` | `PHASE2-STATUS.md` |
 | Phase 3 / M4（复盘 FSM、章节契约、Todo 台账、G0–G9） | 见 `git log`（C1–C14） | `PHASE3-STATUS.md`、`PHASE3-SPEC.md` |
 | Phase 4 / M4.5–M5（Git 交付、专题页、调度、仪表盘） | 见 `git log`（C1–C12 + 修复） | `PHASE4-STATUS.md`、`PHASE4-SPEC.md` |
+| Phase 5 / M6（管理后台、导出/删除收口、蓝绿换维、备份恢复、PWA/i18n/法务、SEC 全集签收） | 见 `git log`（Phase 5 C1–C13） | `PHASE5-STATUS.md`、`PHASE5-SPEC.md` |
 
-测试基线：`cd apps/api && uv run pytest -q` → **249 passed, 1 skipped**。
-前端：`cd apps/web && npx tsc --noEmit && npm run lint && npm run build`。
+测试基线：`cd apps/api && uv run pytest -q` → **298 passed, 1 skipped**（Golden fixtures `uv run pytest -q -m fixture` → **11 passed**）。
+前端与静态门禁：`cd apps/web && npx tsc --noEmit && npm run lint && npm run build`；根目录 `uv run python scripts/check_boundaries.py && uv run python scripts/check_i18n.py`。
 
 ---
 
 ## 2. 恢复会话的提示词（复制即用）
 
 ```text
-继续 mylife 项目。先读 docs/HANDOFF.md，再读 docs/PHASE4-STATUS.md §8/§10
-与 docs/IMPLEMENTATION-NOTES.md §2D。当前要做 Phase 5：
-管理后台与审计收口、导出 ZIP 与删除撤销、LLM/Embedding 设置与蓝绿换维、
-备份恢复演练、AC-59 全量签收。
-门禁：AC-07、AC-49、AC-50、AC-53、AC-54、AC-55、AC-57、AC-59、AC-61…AC-64；
-SEC-01…SEC-30 全集；FX-11 + 全量回归。
+继续 mylife 项目。先读 docs/HANDOFF.md，再读 docs/PHASE5-STATUS.md
+与 docs/IMPLEMENTATION-NOTES.md §2E。MVP Phase 0–5 已全部交付签收
+（298 passed, 1 skipped；SEC-01..30 全集 PASS）。接下来可按需求推进
+生产环境部署（接入真实 DeepSeek/BGE-M3/GitHub App/可达 MinIO 镜像）或二期增强。
 ```
 
 按阶段推进时，把“当前要做 Phase 5”替换成目标阶段即可。
