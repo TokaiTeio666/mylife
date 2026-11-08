@@ -210,15 +210,29 @@ class _PermServer:
 
 
 def _make_bare(tmp_path: Path) -> Path:
+    import os
     import subprocess
 
+    env = dict(os.environ)
+    env.update(
+        {
+            "GIT_AUTHOR_NAME": "Test",
+            "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "Test",
+            "GIT_COMMITTER_EMAIL": "test@example.com",
+        }
+    )
     work = tmp_path / "work"
     work.mkdir()
     subprocess.run(["git", "init", "-b", "main", str(work)], check=True, capture_output=True)
     (work / "README.md").write_text("# out\n", encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=work, check=True, capture_output=True)
     subprocess.run(
-        ["git", "commit", "-m", "init"], cwd=work, check=True, capture_output=True
+        ["git", "commit", "-m", "init"],
+        cwd=work,
+        env=env,
+        check=True,
+        capture_output=True,
     )
     remote = tmp_path / "remote.git"
     subprocess.run(
