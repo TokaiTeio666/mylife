@@ -627,7 +627,7 @@ async def _edited_sections(
     kind: str,
     edited_content_md: str,
 ) -> list[dict[str, Any]]:
-    from mylife_contract.constants import SECTION_ORDINALS
+    from mylife_contract.constants import SECTION_ORDINALS, SENTINELS
 
     existing_rows = await repo.list_sections(
         session, workspace_id=workspace_id, review_id=review_id, version=version
@@ -640,8 +640,13 @@ async def _edited_sections(
         if part is None and len(parts) >= ordinal:
             part = parts[ordinal - 1]
         content = "\n".join(part["lines"]).strip() if part is not None else ""
+        stored_content = (existing.get(key) or {}).get("content_md") or ""
         if not content:
-            content = (existing.get(key) or {}).get("content_md") or ""
+            content = stored_content
+        # `review_sections` 没有 sentinel 列；按“编辑后正文是否逐字等于哨兵”还原，
+        # 否则重评审会把哨兵章节当成普通章节，G2 校验空 structured、G7 判违规
+        # （PHASE5-SPEC D31）。
+        sentinel = SENTINELS.get(key)
         result.append(
             {
                 "section_key": key,
@@ -649,6 +654,7 @@ async def _edited_sections(
                 "title": title,
                 "content_md": content,
                 "structured": (existing.get(key) or {}).get("structured_json") or {},
+                "sentinel_used": bool(sentinel) and content.strip() == sentinel,
             }
         )
     return result

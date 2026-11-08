@@ -466,8 +466,11 @@ async def list_entries(
 ) -> list[dict[str, Any]]:
     result = await session.execute(
         text(
+            # `source_date`/`evidence_id` 必须返回：编辑重评审的 G4 直接依赖它们，
+            # 缺列会让每个错误/方法论条目被判为不可追溯（PHASE5-SPEC D31）。
             "SELECT section_key, item_type, canonical_key, fields_json, source_path, "
-            "       line_start, line_end, confidence FROM review_entries "
+            "       line_start, line_end, evidence_id, source_date, confidence "
+            "FROM review_entries "
             "WHERE workspace_id = :ws AND review_id = :review AND version = :version "
             "ORDER BY section_key, canonical_key"
         ),
