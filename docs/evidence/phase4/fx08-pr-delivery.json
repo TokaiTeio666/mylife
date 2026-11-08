@@ -1,14 +1,14 @@
 {
   "daily": {
     "branch": "review/daily/2026-10-27",
-    "commit_sha": "1c1028b6551051034ef46251c2ce11b336187cce",
+    "commit_sha": "382b2d9878f510012f7f1ca1953ef626d484eb14",
     "pr_number": 1,
     "status": "pr_open",
     "trailers": [
-      "Run-Id: 01a1b6bd-d84d-73e5-8953-5bfb09d915a2",
-      "Review-Id: 01a1b6bd-d84b-74d0-a7b9-6e4f12d47ef5",
+      "Run-Id: 01a1b8cb-4b1f-7193-8036-eb6404386eb4",
+      "Review-Id: 01a1b8cb-4b1d-775b-b5a4-4627f81baf15",
       "Version: 1",
-      "Workspace: 01a1b6bd-d5c5-7191-9da2-4c46995643f9"
+      "Workspace: 01a1b8cb-48c0-7405-935f-24e903021321"
     ]
   },
   "weekly_state": "succeeded",

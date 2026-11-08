@@ -197,18 +197,32 @@ async def insert_default_settings(session: AsyncSession, workspace_id: UUID) -> 
 
 
 async def insert_default_schedules(session: AsyncSession, workspace_id: UUID) -> None:
-    await session.execute(
-        text(
-            """
-            INSERT INTO workspace_schedules (workspace_id, kind, local_time, timezone)
-            VALUES (:ws, 'daily', '01:00', 'Asia/Shanghai'),
-                   (:ws, 'weekly', '01:30', 'Asia/Shanghai'),
-                   (:ws, 'yearly', '02:00', 'Asia/Shanghai')
-            ON CONFLICT (workspace_id, kind) DO NOTHING
-            """
-        ),
-        {"ws": workspace_id},
+    # 创建即计算 next_run_at，避免首个 dispatcher tick 前调度不可见（AC-51）。
+    from datetime import UTC, datetime, time
+
+    from mylife_api.schedule import next_run_at
+
+    now = datetime.now(UTC)
+    defaults = (
+        ("daily", time(1, 0)),
+        ("weekly", time(1, 30)),
+        ("yearly", time(2, 0)),
     )
+    for kind, local_time in defaults:
+        await session.execute(
+            text(
+                "INSERT INTO workspace_schedules "
+                "(workspace_id, kind, local_time, timezone, next_run_at) "
+                "VALUES (:ws, :kind, :time, 'Asia/Shanghai', :next_at) "
+                "ON CONFLICT (workspace_id, kind) DO NOTHING"
+            ),
+            {
+                "ws": workspace_id,
+                "kind": kind,
+                "time": local_time,
+                "next_at": next_run_at(kind, local_time, "Asia/Shanghai", now),
+            },
+        )
 
 
 async def list_user_workspaces(

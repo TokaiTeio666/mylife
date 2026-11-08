@@ -33,7 +33,13 @@ LOCK_NAME = "mylife-dispatch"
 
 
 def _log(event: str, **fields: Any) -> None:
-    logger.info(json.dumps({"event": event, **fields}, ensure_ascii=False, default=str))
+    # 结构化字段放进 extra，由 JsonFormatter 平铺为独立键（NFR-5）。
+    safe = {
+        key: value
+        for key, value in fields.items()
+        if key not in {"content", "quote", "message", "token", "secret", "password"}
+    }
+    logger.info("", extra={"event": event, **safe})
 
 
 async def _set_context(session: AsyncSession, workspace_id: Any) -> None:

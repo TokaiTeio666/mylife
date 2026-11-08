@@ -197,7 +197,7 @@ async def create_zip_job(
         detail={"kind": "zip", "zip_sha256": sha},
         ip=ip,
     )
-    enqueue_ingest("zip", str(row["id"]), str(workspace_id))
+    enqueue_ingest("zip", str(row["id"]), str(workspace_id), session=session)
     return _job_model(row)
 
 
@@ -248,7 +248,7 @@ async def create_git_connection(
         ip=ip,
     )
     if payload.initial_sync:
-        enqueue_ingest("git", str(job_row["id"]), str(workspace_id))
+        enqueue_ingest("git", str(job_row["id"]), str(workspace_id), session=session)
     return job_row, _connection_model(connection)
 
 
@@ -288,7 +288,7 @@ async def create_sync_job(
         detail={"kind": "sync", "connection_id": str(connection_id)},
         ip=ip,
     )
-    enqueue_ingest("git", str(row["id"]), str(workspace_id))
+    enqueue_ingest("git", str(row["id"]), str(workspace_id), session=session)
     return _job_model(row)
 
 
@@ -330,7 +330,12 @@ async def retry_job(
         detail={"parent_job_id": str(original["id"]), "only_failed": only_failed},
         ip=ip,
     )
-    enqueue_ingest("zip" if payload.get("zip_path") else "git", str(row["id"]), str(workspace_id))
+    enqueue_ingest(
+        "zip" if payload.get("zip_path") else "git",
+        str(row["id"]),
+        str(workspace_id),
+        session=session,
+    )
     return _job_model(row)
 
 
@@ -419,7 +424,7 @@ async def create_scheduled_sync(
         target=str(row["id"]),
         detail={"connection_id": str(connection_id)},
     )
-    enqueue_ingest("git", str(row["id"]), str(workspace_id))
+    enqueue_ingest("git", str(row["id"]), str(workspace_id), session=session)
     await session.execute(
         text(
             "UPDATE git_connections SET last_sync_at = now(), last_sync_status = 'ok', "

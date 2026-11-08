@@ -1,0 +1,91 @@
+{
+  "steps": [
+    {
+      "step": "register",
+      "status": 201
+    },
+    {
+      "step": "ingest",
+      "status": "succeeded"
+    },
+    {
+      "step": "review",
+      "run_id": "01a1b8bb-b9f3-73e3-ac38-46b37b1ec7ae",
+      "state": "succeeded"
+    }
+  ],
+  "workspace_id": "01a1b8bb-b589-7cd9-8144-01ef6101f53b",
+  "review": {
+    "version": 1,
+    "sections": [
+      "today_tasks",
+      "learning_summary",
+      "journal_events",
+      "mistakes",
+      "methods",
+      "tomorrow_actions",
+      "one_line_summary"
+    ],
+    "degraded": false,
+    "delivery_status": null
+  },
+  "delivery": {
+    "id": "0e3edb58-6bac-5dff-8eeb-fb88c8c30adc",
+    "target": "object_store",
+    "status": "committed",
+    "degraded": false,
+    "manifest_paths": [
+      "每日复盘/2026/2026-10-27.md",
+      "专题/错误清单.md",
+      "专题/正确方法论.md",
+      "专题/行动清单.md",
+      "索引.md"
+    ],
+    "download_status": 200
+  },
+  "topics": [
+    {
+      "topic": "错误清单",
+      "open_count": 0
+    },
+    {
+      "topic": "正确方法论",
+      "open_count": 0
+    },
+    {
+      "topic": "行动清单",
+      "open_count": 0
+    }
+  ],
+  "topics_pending": 1,
+  "topics_confirmed": 1,
+  "dashboard": {
+    "daily": "2026-10-27",
+    "completion_rate": 0.0,
+    "open_tasks": 0
+  },
+  "calendar_days": 31,
+  "search_sources": [
+    "document",
+    "review"
+  ],
+  "search_review_count": 1,
+  "schedule": {
+    "timezone": "Asia/Shanghai",
+    "daily_at": "01:00:00",
+    "next_run_at": {
+      "daily": null,
+      "weekly": null,
+      "yearly": null
+    }
+  },
+  "schedule_update": 200,
+  "deletion": {
+    "status": 201,
+    "state": "cooling",
+    "notice_retain": [
+      "audit_logs(脱敏元数据)",
+      "merged_git_history"
+    ]
+  }
+}
