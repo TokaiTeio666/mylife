@@ -1,10 +1,10 @@
 # mylife
 
-多用户、多端访问的个人知识库 SaaS。当前进度：**Phase 0 / M1（Auth + Workspace + RunContext + RLS 骨架）**。
+多用户、多端访问的个人知识库 SaaS。当前进度：**Phase 4 / M4.5–M5（Git 交付、专题页、调度、仪表盘）**。
 
 > 需求与设计基线见 [`docs/`](./docs/README.md)。实现与文档的偏差、证据与剩余工作见
 > [`docs/IMPLEMENTATION-NOTES.md`](./docs/IMPLEMENTATION-NOTES.md) 与
-> [`docs/PHASE0-STATUS.md`](./docs/PHASE0-STATUS.md)。
+> [`docs/PHASE4-STATUS.md`](./docs/PHASE4-STATUS.md)。
 
 ## 技术栈
 
@@ -18,8 +18,9 @@
 ## 目录
 
 ```text
-apps/api            FastAPI：路由域 + service + repositories + migrations
-apps/web            Next.js：登录/注册/布局壳/仪表盘/文档树
+apps/api            FastAPI：路由域 + service + repositories + migrations + dispatcher
+apps/web            Next.js：登录/注册/布局壳/仪表盘/文档/搜索/对话/复盘/专题/设置
+apps/worker         Celery：导入与索引
 packages/contracts  单一事实源：Pydantic v2 契约、枚举、错误码、常量
 infra/compose       docker-compose.yml + 本地 dev override
 infra/postgres     角色初始化脚本

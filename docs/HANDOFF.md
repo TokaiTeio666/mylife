@@ -13,9 +13,9 @@
 | Phase 1 / M2（导入、混合检索、文档） | `4cf9f6f` | `PHASE1-STATUS.md` |
 | Phase 2 / M3（ToolGateway、chat、SSE、引用） | `f1c0025` | `PHASE2-STATUS.md` |
 | Phase 3 / M4（复盘 FSM、章节契约、Todo 台账、G0–G9） | 见 `git log`（C1–C14） | `PHASE3-STATUS.md`、`PHASE3-SPEC.md` |
-| Phase 4 / M4.5–M5（Git 交付、专题页、调度、仪表盘） | 未开始 | — |
+| Phase 4 / M4.5–M5（Git 交付、专题页、调度、仪表盘） | 见 `git log`（C1–C12 + 修复） | `PHASE4-STATUS.md`、`PHASE4-SPEC.md` |
 
-测试基线：`cd apps/api && uv run pytest -q` → **202 passed, 1 skipped**。
+测试基线：`cd apps/api && uv run pytest -q` → **249 passed, 1 skipped**。
 前端：`cd apps/web && npx tsc --noEmit && npm run lint && npm run build`。
 
 ---
@@ -23,14 +23,15 @@
 ## 2. 恢复会话的提示词（复制即用）
 
 ```text
-继续 mylife 项目。先读 docs/HANDOFF.md，再读 docs/PHASE3-STATUS.md §6/§8
-与 docs/IMPLEMENTATION-NOTES.md §2C。当前要做 Phase 4：
-Git 交付（分支/commit/PR/auto-merge）、专题页重渲染、调度、仪表盘。
-门禁：AC-39、AC-40、AC-43…AC-48、AC-51、AC-52、AC-67；SEC-27；
-FX-07、FX-09（配置 Git 时 FX-08）。
+继续 mylife 项目。先读 docs/HANDOFF.md，再读 docs/PHASE4-STATUS.md §8/§10
+与 docs/IMPLEMENTATION-NOTES.md §2D。当前要做 Phase 5：
+管理后台与审计收口、导出 ZIP 与删除撤销、LLM/Embedding 设置与蓝绿换维、
+备份恢复演练、AC-59 全量签收。
+门禁：AC-07、AC-49、AC-50、AC-53、AC-54、AC-55、AC-57、AC-59、AC-61…AC-64；
+SEC-01…SEC-30 全集；FX-11 + 全量回归。
 ```
 
-按阶段推进时，把“当前要做 Phase 4”替换成目标阶段即可。
+按阶段推进时，把“当前要做 Phase 5”替换成目标阶段即可。
 
 ---
 
@@ -58,9 +59,12 @@ FX-07、FX-09（配置 Git 时 FX-08）。
 | 仅接 internal 网络的容器不发布端口 | dev override 里 `networks.internal.internal: false` |
 | `alembic.ini` 出现中文即报 GBK 解码错误 | 该文件必须保持纯 ASCII |
 | pypi.org 本机不可达 | `.env` 的 `MYLIFE_PYPI_INDEX=https://mirrors.aliyun.com/pypi/simple` |
-| MinIO 镜像拉不到 | 只启动核心服务；Phase 1 用本地数据根 `MYLIFE_DATA_ROOT` |
+| MinIO 镜像拉不到 | 只启动核心服务（`up -d postgres redis migrate api worker dispatcher web caddy`）；交付走本地对象存储 |
 | Git 本地裸仓库浅克隆失败 | `file://` 源已自动关闭 `--depth 1` |
 | Windows MAX_PATH | 导入快照目录用 `snapshots/{job_id}` 短路径 |
+| `compose down` 时网络被 worker 占用 | 先 `docker compose down --remove-orphans` 再 `up`；否则 `network mylife_internal has active endpoints` |
+| 反复跑 E2E 触发注册限流 | 删除 `rl:register:ip:<ip>` 这一个 key（不要 FLUSHALL）；每次用新邀请码 |
+| 容器内跑测试 | 需 `docker compose -f ... -f docker-compose.dev.yml up postgres redis` 暴露 25432/26379 |
 
 ---
 

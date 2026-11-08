@@ -22,4 +22,6 @@
 | [PHASE2-STATUS.md](./PHASE2-STATUS.md) | Phase 2 / M3 交付状态：ToolGateway、chat FSM、SSE、引用闭包、注入防护 |
 | [PHASE3-SPEC.md](./PHASE3-SPEC.md) | Phase 3 施工规格：FSM、章节契约、台账、G0–G9、预算、迁移与文件清单 |
 | [PHASE3-STATUS.md](./PHASE3-STATUS.md) | Phase 3 / M4 交付状态：复盘运行时、门禁、预算、确认协议、专题、webhook |
+| [PHASE4-SPEC.md](./PHASE4-SPEC.md) | Phase 4 施工规格：交付、专题重渲染、调度、仪表盘、SEC-27 与 D1–D43 裁决 |
+| [PHASE4-STATUS.md](./PHASE4-STATUS.md) | Phase 4 / M4.5–M5 交付状态：Git 交付、专题页、dispatcher、仪表盘、删除冷却 |
 | [HANDOFF.md](./HANDOFF.md) | 会话交接：当前进度、恢复提示词、本机环境坑、清空上下文时机 |
