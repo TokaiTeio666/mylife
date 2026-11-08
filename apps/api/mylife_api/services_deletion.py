@@ -201,33 +201,38 @@ async def purge_due_deletions(session: AsyncSession) -> int:
     )
     rows = [dict(row._mapping) for row in result]
     purged = 0
+    # 无 workspace_id 列但含用户数据的表：按 owner 删除（DATA-MODEL §9.2 的 sessions）。
+    owner_scoped = {"sessions"}
     for row in rows:
         workspace_id = row["workspace_id"]
         await set_rls_context(session, workspace_id, None)
-        for table in DELETION_PURGE_TABLES:
-            if table in RETAINED_TABLES:
-                continue
-            try:
-                # 每表一个 SAVEPOINT：外键顺序/缺表不会中止整个 purge 事务。
-                async with session.begin_nested():
-                    await session.execute(
-                        text(f"DELETE FROM {table} WHERE workspace_id = :ws"),
-                        {"ws": workspace_id},
+        owner_id = (
+            await session.execute(
+                text("SELECT owner_id FROM workspaces WHERE id = :ws"),
+                {"ws": workspace_id},
+            )
+        ).scalar_one_or_none()
+        # 两轮：外键依赖解除后再删一次（顺序无关）。
+        for _pass in range(2):
+            for table in DELETION_PURGE_TABLES:
+                if table in RETAINED_TABLES:
+                    continue
+                if table in owner_scoped:
+                    if owner_id is None:
+                        continue
+                    statement = text(
+                        "DELETE FROM sessions WHERE user_id = :owner"
                     )
-            except Exception:  # noqa: BLE001 - 表可能不存在或受外键顺序影响
-                logger.warning("purge skip table=%s", table)
-        # 第二轮：外键依赖解除后再删一次（顺序无关）。
-        for table in DELETION_PURGE_TABLES:
-            if table in RETAINED_TABLES:
-                continue
-            try:
-                async with session.begin_nested():
-                    await session.execute(
-                        text(f"DELETE FROM {table} WHERE workspace_id = :ws"),
-                        {"ws": workspace_id},
-                    )
-            except Exception:  # noqa: BLE001
-                logger.warning("purge skip table(2)=%s", table)
+                    params = {"owner": owner_id}
+                else:
+                    statement = text(f"DELETE FROM {table} WHERE workspace_id = :ws")
+                    params = {"ws": workspace_id}
+                try:
+                    # 每表一个 SAVEPOINT：外键顺序/缺表不会中止整个 purge 事务。
+                    async with session.begin_nested():
+                        await session.execute(statement, params)
+                except Exception:  # noqa: BLE001 - 表可能不存在或受外键顺序影响
+                    logger.warning("purge skip table=%s pass=%s", table, _pass)
         await session.execute(
             text(
                 "UPDATE deletion_requests SET state = 'purged', updated_at = now() "

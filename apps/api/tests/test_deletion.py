@@ -131,6 +131,13 @@ async def test_cooling_purge_and_git_history_retained(client, admin_conn, tmp_pa
             f"SELECT count(*) FROM {table} WHERE workspace_id = %s", (workspace_id,)
         ).fetchone()[0]
         assert remaining == 0, f"{table} 仍残留正文"
+    owner_id = admin_conn.execute(
+        "SELECT owner_id FROM workspaces WHERE id = %s", (workspace_id,)
+    ).fetchone()[0]
+    sessions = admin_conn.execute(
+        "SELECT count(*) FROM sessions WHERE user_id = %s", (owner_id,)
+    ).fetchone()[0]
+    assert sessions == 0, "sessions 未清理"
     state = admin_conn.execute(
         "SELECT state FROM deletion_requests WHERE workspace_id = %s "
         "ORDER BY created_at DESC LIMIT 1",
