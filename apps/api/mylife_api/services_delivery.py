@@ -700,6 +700,9 @@ async def deliver_review(
             sha=commit_sha,
         )
     api_status = STATUS_TO_API.get(status, "blocked")
+    if target == "object_store" and status in {"committed", "pending"}:
+        # 对象存储是 Git 不可用时的降级交付（API 枚举用 ui_diff 表达）。
+        api_status = "ui_diff"
     await repo.set_review_delivery_status(
         session, workspace_id=workspace_id, review_id=review_id, status=api_status
     )
