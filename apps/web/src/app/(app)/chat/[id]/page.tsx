@@ -296,7 +296,7 @@ export default function ConversationPage() {
 
       {degraded ? (
         <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-small">
-          部分能力降级：{degraded}
+          {copy.common.degradedPrefix}{degraded}
         </p>
       ) : null}
       {errorText ? <p className="text-small text-danger">{errorText}</p> : null}

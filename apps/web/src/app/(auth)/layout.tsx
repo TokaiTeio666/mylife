@@ -20,7 +20,7 @@ export default function AuthLayout({
           </p>
         </div>
         <p className="text-caption text-muted-foreground">
-          多租户隔离 · 引用可追溯 · 中文优先
+          {copy.app.footerTagline}
         </p>
       </div>
 

@@ -52,7 +52,7 @@ export default function DocumentDetailPage() {
             <h1 className="text-display font-semibold tracking-tight">
               {document.data.title}
             </h1>
-            <p className="font-mono text-caption text-muted-foreground">
+            <p className="break-all font-mono text-caption text-muted-foreground">
               {document.data.path}
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -102,7 +102,7 @@ export default function DocumentDetailPage() {
                       </Link>
                       {!link.resolved ? (
                         <Badge variant="muted" className="ml-2">
-                          断链
+                          {copy.common.brokenLink}
                         </Badge>
                       ) : null}
                     </li>

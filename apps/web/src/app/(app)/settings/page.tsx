@@ -5,6 +5,7 @@ import { AlertTriangle, GitBranch, Settings2 } from "lucide-react";
 import * as React from "react";
 
 import { ErrorState } from "@/components/error-state";
+import { Phase5Settings } from "@/components/settings/phase5-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,13 +13,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api/client";
-import { copy } from "@/lib/copy/zh-CN";
+import { useCopy } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
 import { queryKeys } from "@/lib/query-keys";
 
 export default function SettingsPage() {
+  const copy = useCopy();
   const me = useMe();
   const workspaceId = me.data?.active_workspace_id;
+  const isOwner =
+    me.data?.workspaces.find((item) => item.id === workspaceId)?.role === "owner";
   const queryClient = useQueryClient();
 
   const schedule = useQuery({
@@ -419,6 +423,8 @@ export default function SettingsPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      {isOwner && workspaceId ? <Phase5Settings workspaceId={workspaceId} /> : null}
     </div>
   );
 }

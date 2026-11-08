@@ -10,6 +10,8 @@ export interface User {
   display_name: string;
   status: UserStatus;
   created_at: string;
+  /** AC-54：只用于决定是否展示 /admin 入口；服务端仍独立校验。 */
+  is_platform_admin?: boolean;
 }
 
 export interface Workspace {
@@ -505,4 +507,176 @@ export interface DeletionRequest {
   can_cancel: boolean;
   export_recommended: boolean;
   notice: { will_delete: string[]; will_retain: string[]; notice: string };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5：LLM / Embedding 设置、导出、管理后台
+// ---------------------------------------------------------------------------
+
+export type CredentialStatus = "valid" | "invalid" | "untested" | "missing";
+
+export interface LlmSettings {
+  provider: "deepseek" | "openai_compatible" | "mock" | null;
+  base_url: string | null;
+  model: string | null;
+  model_profile: string;
+  credential_status: CredentialStatus;
+  last_tested_at: string | null;
+  supports_json_mode: boolean;
+}
+
+export interface LlmTestResult {
+  ok: boolean;
+  latency_ms: number;
+  model_echo: string | null;
+  error: { code: string; message: string } | null;
+}
+
+export interface EmbeddingProfile {
+  id: string;
+  provider: string;
+  model: string;
+  dimension: number;
+  index_name: string;
+  status: "active" | "building" | "retired";
+  created_at: string;
+  coverage: number;
+  chunk_table: string | null;
+  activated_at: string | null;
+  retire_at: string | null;
+}
+
+export interface ReembedProgress {
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  processed_chunks: number;
+  total_chunks: number;
+  error: string | null;
+}
+
+export interface EmbeddingSettings {
+  active_profile: EmbeddingProfile | null;
+  profiles: EmbeddingProfile[];
+  credential_status: CredentialStatus;
+  last_tested_at: string | null;
+  reembed: ReembedProgress | null;
+}
+
+export interface EmbeddingTestResult {
+  ok: boolean;
+  dimension_observed: number | null;
+  latency_ms: number;
+  error: { code: string; message: string } | null;
+}
+
+export type ExportStatus =
+  | "queued"
+  | "running"
+  | "ready"
+  | "failed"
+  | "expired";
+
+export interface ExportJob {
+  id: string;
+  scope: "workspace" | "account";
+  status: ExportStatus;
+  progress: { files: number; bytes: number };
+  artifact_bytes: number | null;
+  created_at: string;
+  expires_at: string | null;
+  error: { code: string; message: string } | null;
+}
+
+export interface ExportCreated {
+  export_id: string;
+  status: "queued";
+  expires_at: string;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  display_name: string;
+  status: UserStatus;
+  created_at: string;
+  workspace_count: number;
+  last_login_at: string | null;
+}
+
+export interface AdminWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+  owner_id: string;
+  plan: Plan;
+  created_at: string;
+  counts: { documents: number; reviews: number; tokens_month: number };
+  deletion_state: string | null;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  workspace_id: string | null;
+  user_id: string | null;
+  action: string;
+  target: string | null;
+  detail: Record<string, unknown>;
+  ip: string | null;
+  created_at: string;
+}
+
+export interface AdminSystemConfigItem {
+  key: string;
+  value: unknown;
+  locked: boolean;
+  source: "env" | "db" | "default";
+}
+
+export interface InviteCode {
+  id: string;
+  code: string;
+  created_by: string;
+  used_by: string | null;
+  expires_at: string | null;
+  used_at: string | null;
+  note: string | null;
+  status: "unused" | "used" | "expired";
+}
+
+export interface UsageTotals {
+  prompt_tokens: number;
+  completion_tokens: number;
+  calls: number;
+  review_runs: number;
+  cost: number;
+}
+
+export interface UsageBucket {
+  bucket: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  calls: number;
+}
+
+export interface UsageResponse {
+  totals: UsageTotals;
+  series: UsageBucket[];
+  budget: Record<
+    string,
+    { input_tokens: number; output_tokens: number; ratio: number; state: "ok" | "warn" | "exceeded" }
+  >;
+}
+
+export interface AdminUsageWorkspace {
+  workspace_id: string;
+  workspace_name: string | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  calls: number;
+  cost: number;
+}
+
+export interface AdminUsageResponse {
+  totals: AdminUsageWorkspace | null;
+  items: AdminUsageWorkspace[];
 }

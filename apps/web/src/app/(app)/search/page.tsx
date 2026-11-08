@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
-import { copy } from "@/lib/copy/zh-CN";
+import { useCopy } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -27,6 +27,7 @@ type Submitted = {
 };
 
 export default function SearchPage() {
+  const copy = useCopy();
   const me = useMe();
   const workspaceId = me.data?.active_workspace_id;
   const [q, setQ] = React.useState("");
@@ -140,7 +141,7 @@ export default function SearchPage() {
                 id="tags"
                 value={filters.tags}
                 onChange={(e) => setFilters((prev) => ({ ...prev, tags: e.target.value }))}
-                placeholder="redis, 缓存"
+                placeholder={copy.search.tagsPlaceholder}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -238,9 +239,9 @@ export default function SearchPage() {
                       href={
                         item.source_type === "review"
                           ? `/reviews/${
-                              item.path.includes("每周复盘")
+                              item.path.includes("每周复盘") /* i18n-ignore */
                                 ? "weekly"
-                                : item.path.includes("年度复盘")
+                                : item.path.includes("年度复盘") /* i18n-ignore */
                                   ? "yearly"
                                   : "daily"
                             }/${item.path.split("/").pop()?.replace(".md", "") ?? ""}`

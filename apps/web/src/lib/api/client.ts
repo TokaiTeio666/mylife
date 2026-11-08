@@ -1,3 +1,4 @@
+import { copy } from "@/lib/copy";
 import type { ErrorEnvelope } from "./types";
 
 export const API_BASE =
@@ -47,7 +48,7 @@ export async function ensureCsrf(): Promise<string> {
     credentials: "include",
     cache: "no-store",
   });
-  if (!response.ok) throw new Error("CSRF 初始化失败");
+  if (!response.ok) throw new Error(copy.common.csrfFailed);
   const body = (await response.json()) as { csrf_token: string };
   return body.csrf_token;
 }
@@ -85,7 +86,7 @@ export async function apiFetch<T>(
     throw new ApiError(
       response.status,
       envelope?.error?.code ?? "INTERNAL_ERROR",
-      envelope?.error?.message ?? "请求失败，请稍后重试",
+      envelope?.error?.message ?? copy.common.requestFailed,
       envelope?.error?.details ?? null,
       envelope?.error?.retryable ?? false,
       envelope?.request_id ?? response.headers.get("X-Request-Id"),
@@ -139,7 +140,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file, file.name);
     form.append("mode", "managed");
-    form.append("reviews_root", "wiki/复盘");
+    form.append("reviews_root", "wiki/复盘"); // i18n-ignore: 数据路径约定
     return apiFetch<{ job: import("./types").IngestJob }>("/ingest/zip", {
       method: "POST",
       body: form,
@@ -283,4 +284,103 @@ export const api = {
     apiFetch<{ state: string }>(`/deletions/${deletionId}/cancel`, {
       method: "POST",
     }),
+  // ---------------------------------------------------------------- Phase 5
+  getLlmSettings: () => apiFetch<import("./types").LlmSettings>("/settings/llm"),
+  putLlmSettings: (body: Record<string, unknown>) =>
+    apiFetch<import("./types").LlmSettings>("/settings/llm", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  testLlm: (body: Record<string, unknown>) =>
+    apiFetch<import("./types").LlmTestResult>("/settings/llm/test", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getEmbeddingSettings: () =>
+    apiFetch<import("./types").EmbeddingSettings>("/settings/embedding"),
+  createEmbeddingProfile: (body: Record<string, unknown>) =>
+    apiFetch<{ profile: import("./types").EmbeddingProfile; job_id: string }>(
+      "/settings/embedding/profiles",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  testEmbedding: (body: Record<string, unknown>) =>
+    apiFetch<import("./types").EmbeddingTestResult>("/settings/embedding/test", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  rollbackEmbedding: () =>
+    apiFetch<import("./types").EmbeddingSettings>("/settings/embedding/rollback", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  createExport: (body: Record<string, unknown>, idempotencyKey: string) =>
+    apiFetch<import("./types").ExportCreated>("/exports", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Idempotency-Key": idempotencyKey },
+    }),
+  getExport: (exportId: string) =>
+    apiFetch<import("./types").ExportJob>(`/exports/${exportId}`),
+  exportDownloadUrl: (exportId: string) => `${API_BASE}/exports/${exportId}/download`,
+  getUsage: (from: string, to: string = new Date().toISOString()) =>
+    apiFetch<import("./types").UsageResponse>(
+      `/settings/usage?${toQuery({ from, to, group_by: "day" })}`,
+    ),
+  // ---------------------------------------------------------------- admin
+  adminUsers: (params: Record<string, string | number | undefined> = {}) =>
+    apiFetch<{ items: import("./types").AdminUser[]; next_cursor: string | null }>(
+      `/admin/users?${toQuery(params)}`,
+    ),
+  adminUser: (id: string) =>
+    apiFetch<import("./types").AdminUser>(`/admin/users/${id}`),
+  adminDisableUser: (id: string, reason: string) =>
+    apiFetch<import("./types").AdminUser>(`/admin/users/${id}/disable`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  adminEnableUser: (id: string) =>
+    apiFetch<import("./types").AdminUser>(`/admin/users/${id}/enable`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  adminWorkspaces: (params: Record<string, string | number | undefined> = {}) =>
+    apiFetch<{
+      items: import("./types").AdminWorkspace[];
+      next_cursor: string | null;
+    }>(`/admin/workspaces?${toQuery(params)}`),
+  adminAuditLogs: (params: Record<string, string | number | undefined> = {}) =>
+    apiFetch<{
+      items: import("./types").AdminAuditLog[];
+      next_cursor: string | null;
+    }>(`/admin/audit-logs?${toQuery(params)}`),
+  adminListInviteCodes: (status?: string) =>
+    apiFetch<{ items: import("./types").InviteCode[] }>(
+      `/admin/invite-codes${status ? `?status=${status}` : ""}`,
+    ),
+  adminCreateInviteCodes: (body: { count: number; expires_in_days: number }) =>
+    apiFetch<{ items: { code: string; expires_at: string }[] }>(
+      "/admin/invite-codes",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  adminPutSystemConfig: (key: string, value: unknown) =>
+    apiFetch<import("./types").AdminSystemConfigItem>("/admin/system-config", {
+      method: "PUT",
+      body: JSON.stringify({ key, value }),
+    }),
+  adminUsage: (from: string, to: string = new Date().toISOString()) =>
+    apiFetch<import("./types").AdminUsageResponse>(
+      `/admin/usage?${toQuery({ from, to })}`,
+    ),
+  adminSystemConfig: () =>
+    apiFetch<{ items: import("./types").AdminSystemConfigItem[] }>(
+      "/admin/system-config",
+    ),
 };
+
+function toQuery(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  return search.toString();
+}

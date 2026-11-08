@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 
 import "@/styles/globals.css";
 import { Providers } from "@/components/providers";
+import { SwRegister } from "@/components/sw-register";
 import { copy } from "@/lib/copy/zh-CN";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
+        <SwRegister />
       </body>
     </html>
   );

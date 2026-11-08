@@ -20,3 +20,16 @@ export const queryKeys = {
     ["deliveries", workspaceId, reviewId] as const,
   deletion: (workspaceId: string) => ["deletion", workspaceId] as const,
 };
+
+// Phase 5：LLM/Embedding/导出/管理后台（FRONTEND-DESIGN §6.1）
+export const phase5Keys = {
+  llm: (workspaceId: string) => ["settings", workspaceId, "llm"] as const,
+  embedding: (workspaceId: string) =>
+    ["settings", workspaceId, "embedding"] as const,
+  usage: (workspaceId: string, range: string) =>
+    ["settings", workspaceId, "usage", range] as const,
+  exportJob: (workspaceId: string, exportId: string) =>
+    ["exports", workspaceId, exportId] as const,
+  admin: (section: "users" | "workspaces" | "invites" | "audit" | "system") =>
+    ["admin", section] as const,
+};

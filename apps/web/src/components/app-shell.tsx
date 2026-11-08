@@ -4,12 +4,14 @@ import {
   CalendarCheck,
   FolderTree,
   LayoutDashboard,
+  Languages,
   LogOut,
   Menu,
   MessageSquare,
   Moon,
   Search,
   Settings,
+  Shield,
   ShieldOff,
   Sun,
   Tags,
@@ -26,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, api } from "@/lib/api/client";
-import { copy } from "@/lib/copy/zh-CN";
+import { useCopy, useLocale } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
 import { cn } from "@/lib/utils";
 
@@ -37,17 +39,20 @@ type NavItem = {
   available: boolean;
 };
 
-const NAV: NavItem[] = [
-  { href: "/dashboard", label: copy.nav.dashboard, icon: LayoutDashboard, available: true },
-  { href: "/documents", label: copy.nav.documents, icon: FolderTree, available: true },
-  { href: "/search", label: copy.nav.search, icon: Search, available: true },
-  { href: "/chat", label: copy.nav.chat, icon: MessageSquare, available: true },
-  { href: "/reviews", label: copy.nav.reviews, icon: CalendarCheck, available: true },
-  { href: "/topics", label: copy.nav.topics, icon: Tags, available: true },
-  { href: "/settings", label: copy.nav.settings, icon: Settings, available: true },
-];
+function navItems(copy: ReturnType<typeof useCopy>): NavItem[] {
+  return [
+    { href: "/dashboard", label: copy.nav.dashboard, icon: LayoutDashboard, available: true },
+    { href: "/documents", label: copy.nav.documents, icon: FolderTree, available: true },
+    { href: "/search", label: copy.nav.search, icon: Search, available: true },
+    { href: "/chat", label: copy.nav.chat, icon: MessageSquare, available: true },
+    { href: "/reviews", label: copy.nav.reviews, icon: CalendarCheck, available: true },
+    { href: "/topics", label: copy.nav.topics, icon: Tags, available: true },
+    { href: "/settings", label: copy.nav.settings, icon: Settings, available: true },
+  ];
+}
 
 function ThemeToggle() {
+  const copy = useCopy();
   const [dark, setDark] = React.useState(false);
 
   React.useEffect(() => {
@@ -80,6 +85,11 @@ function ThemeToggle() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { data, isLoading, error } = useMe();
+  const copy = useCopy();
+  const { locale, setLocale, locales } = useLocale();
+  const isAdmin =
+    Boolean(data?.user.is_platform_admin) ||
+    Boolean(data?.capabilities.includes("admin"));
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
@@ -160,8 +170,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         activeId={data.active_workspace_id}
       />
 
-      <nav className="flex flex-col gap-1" aria-label="主导航">
-        {NAV.map((item) => {
+      <nav className="flex flex-col gap-1" aria-label={copy.topbar.mainNav}>
+        {navItems(copy).map((item) => {
           const Icon = item.icon;
           const active = pathname.startsWith(item.href);
           if (!item.available) {
@@ -194,9 +204,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+        {isAdmin ? (
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-2 rounded-md px-2 py-2 text-small hover:bg-surface-2",
+              pathname.startsWith("/admin") &&
+                "bg-surface-2 font-medium text-primary",
+            )}
+            onClick={() => setMobileOpen(false)}
+          >
+            <Shield className="h-4 w-4" aria-hidden="true" />
+            {copy.nav.admin}
+          </Link>
+        ) : null}
       </nav>
 
       <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
+        <label className="flex items-center gap-2 px-2 pb-1 text-caption text-muted-foreground">
+          <Languages className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only">{copy.topbar.language}</span>
+          <select
+            aria-label={copy.topbar.language}
+            value={locale}
+            onChange={(event) => setLocale(event.target.value as typeof locale)}
+            className="w-full rounded-md border border-border bg-background px-2 py-1 text-small"
+          >
+            {locales.map((item) => (
+              <option key={item} value={item}>
+                {item === "zh-CN" ? "简体中文" : "English"}
+              </option>
+            ))}
+          </select>
+        </label>
         <Button
           variant="ghost"
           className="justify-start"
@@ -215,6 +255,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ShieldOff className="h-4 w-4" aria-hidden="true" />
           {copy.topbar.logoutAll}
         </Button>
+        <div className="flex flex-wrap gap-x-3 px-2 pt-2 text-caption text-muted-foreground">
+          <Link href="/privacy" className="hover:text-foreground">
+            {copy.legal.privacyTitle}
+          </Link>
+          <Link href="/terms" className="hover:text-foreground">
+            {copy.legal.termsTitle}
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -239,7 +287,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-sticky flex h-14 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur">
+        <header className="sticky top-0 z-sticky flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-background/90 px-4 backdrop-blur">
           <Button
             variant="ghost"
             size="icon"

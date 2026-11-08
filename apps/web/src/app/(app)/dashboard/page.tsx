@@ -17,7 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import type { ReviewSummary } from "@/lib/api/types";
-import { copy } from "@/lib/copy/zh-CN";
+import { useCopy } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -46,6 +46,7 @@ function StatCard({
 }
 
 function LatestRow({ label, review }: { label: string; review: ReviewSummary | null }) {
+  const copy = useCopy();
   if (!review) {
     return (
       <li className="flex items-center justify-between text-small text-muted-foreground">
@@ -70,6 +71,7 @@ function LatestRow({ label, review }: { label: string; review: ReviewSummary | n
 }
 
 export default function DashboardPage() {
+  const copy = useCopy();
   const me = useMe();
   const workspaceId = me.data?.active_workspace_id;
 
@@ -204,7 +206,7 @@ export default function DashboardPage() {
                   }`}
                   title={month.weekly_period_key ?? ""}
                 >
-                  {month.month}月
+                  {month.month}{copy.dashboard.monthSuffix}
                 </div>
               ))}
             </div>
