@@ -316,6 +316,67 @@ def upgrade() -> None:
         op.execute(f"ALTER FUNCTION {signature} OWNER TO mylife_admin")
         op.execute(f"REVOKE ALL ON FUNCTION {signature} FROM PUBLIC")
         op.execute(f"GRANT EXECUTE ON FUNCTION {signature} TO mylife_app")
+    # ------------------------------------------------------------ 蓝绿换维 DDL
+    # `mylife_app` 在 public 上没有 CREATE 权限（最小权限），因此换维的新表
+    # 由 `mylife_migrator` 持有的 SECURITY DEFINER 函数创建；函数内部校验
+    # 表名与维度，并显式补 RLS（`LIKE ... INCLUDING ALL` 不复制策略）。
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION create_chunk_table(p_table text, p_dim int)
+        RETURNS void
+        LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        BEGIN
+          IF p_table !~ '^document_chunks_v[0-9]{1,3}$' THEN
+            RAISE EXCEPTION 'invalid chunk table name: %', p_table;
+          END IF;
+          IF p_dim < 256 OR p_dim > 3072 THEN
+            RAISE EXCEPTION 'invalid embedding dimension: %', p_dim;
+          END IF;
+          IF to_regclass(p_table) IS NOT NULL THEN
+            RAISE EXCEPTION 'chunk table already exists: %', p_table;
+          END IF;
+          EXECUTE format(
+            'CREATE TABLE %I ('
+            '  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),'
+            '  workspace_id uuid NOT NULL,'
+            '  document_id uuid NOT NULL,'
+            '  heading text,'
+            '  content text NOT NULL,'
+            '  token_count int NOT NULL,'
+            '  chunk_ordinal int NOT NULL,'
+            '  chunk_hash text NOT NULL,'
+            '  embedding vector(%s),'
+            '  embedding_profile_id uuid,'
+            '  line_start int,'
+            '  line_end int,'
+            '  UNIQUE (document_id, chunk_ordinal),'
+            '  FOREIGN KEY (workspace_id, document_id)'
+            '    REFERENCES documents (workspace_id, id) ON DELETE CASCADE'
+            ')', p_table, p_dim
+          );
+          EXECUTE format(
+            'CREATE INDEX %I ON %I USING hnsw (embedding vector_cosine_ops) '
+            'WITH (m = 16, ef_construction = 64)',
+            p_table || '_embedding_idx', p_table
+          );
+          EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', p_table);
+          EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', p_table);
+          EXECUTE format(
+            'CREATE POLICY p_%s_tenant ON %I USING (workspace_id = app_workspace_id()) '
+            'WITH CHECK (workspace_id = app_workspace_id())',
+            p_table, p_table
+          );
+          EXECUTE format(
+            'GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO mylife_app', p_table
+          );
+        END $$;
+        """
+    )
+    op.execute(
+        "ALTER FUNCTION create_chunk_table(text,int) OWNER TO mylife_migrator"
+    )
+    op.execute("REVOKE ALL ON FUNCTION create_chunk_table(text,int) FROM PUBLIC")
+    op.execute("GRANT EXECUTE ON FUNCTION create_chunk_table(text,int) TO mylife_app")
     # ------------------------------------------------------------ dispatcher 扫描
     op.execute(
         """
@@ -372,6 +433,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # 函数可能不存在（例如从半应用状态回退），存在时才撤销并删除。
+    op.execute(
+        """
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND p.proname = 'create_chunk_table'
+          ) THEN
+            EXECUTE 'REVOKE ALL ON FUNCTION create_chunk_table(text,int) FROM PUBLIC';
+            EXECUTE 'DROP FUNCTION create_chunk_table(text,int)';
+          END IF;
+        END $$;
+        """
+    )
     for signature in (
         "dispatch_retired_embedding_profiles(int)",
         "dispatch_stale_ingest_jobs(int)",

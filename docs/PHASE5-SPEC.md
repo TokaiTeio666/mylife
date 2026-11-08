@@ -61,8 +61,8 @@
 | D5 | 系统配置落点 | API §3.10 要求逐键 `{key,value,locked,source}`，现只有全局布尔 | 新增非租户表 `platform_settings(key PK, value_json, updated_at, updated_by)`；环境变量锁定的键**不落库**，读取时以 `source=env, locked=true` 合成 |
 | D6 | `provider_credentials.status`：DB `active/invalid/disabled` vs wire `valid/invalid/untested/missing` | DATA-MODEL §4.22 vs API §3.9.1 | DB CHECK 追加 `untested`；映射 `active→valid`、`invalid→invalid`、`disabled→missing`、`untested→untested`；无行 → `missing` |
 | D7 | LLM/Embedding 连接参数落点 | 现为纯环境变量 | `provider_credentials` 增 `base_url/model/model_profile`；**有行则以 DB 为准，无行回落环境变量**；API Key 仍只存密文 |
-| D8 | 蓝绿换维的表名 | DATA-MODEL §4.26 只写 `document_chunks_v{n}` | `embedding_profiles` 增 `chunk_table text`；新建 profile 时创建 `document_chunks_v{n}`（含 HNSW），切换时改 `workspace_settings.embedding_profile_id`；**旧表 7 天后删除**，删除前写快照清单 |
-| D9 | 覆盖率的定义 | API §3.9.4 只写“已 embedding chunk 占比” | `coverage = count(chunks in profile table with embedding) / count(chunks in profile table)`；阈值 **≥0.995** 才允许自动切换（API 写 0.995，AC-50 写 100%；取 **1.0** 作为 AC-50 断言，自动切换阈值用 0.995 并在响应里回显实际值） |
+| D8 | 蓝绿换维的表名与 DDL 权限 | DATA-MODEL §4.26 只写 `document_chunks_v{n}`；`mylife_app` 在 `public` 上**没有 CREATE 权限** | `embedding_profiles` 增 `chunk_table text`；新建 profile 时由 `mylife_migrator` 持有的 `SECURITY DEFINER` 函数 `create_chunk_table(p_table text, p_dim int)` 建表（校验标识符 + 维度 + 建 HNSW + **ENABLE/FORCE RLS + 租户策略**）；切换时改 `workspace_settings.embedding_profile_id`；**旧表 7 天后删除**，删除前写快照清单。`LIKE ... INCLUDING ALL` 不复制 RLS 策略，必须显式补 |
+| D9 | 覆盖率的定义与切换阈值 | API §3.9.4 只写“已 embedding chunk 占比”；AC-50 要求 100% | `coverage = 已写入新表且 embedding 非空的 chunk 数 / document_chunks 总数`；**自动切换阈值 = 1.0**（AC-50 是硬门）；`0.995` 仅作为“接近完成”告警阈值。re-embed 必须**复制 `id/chunk_hash/chunk_ordinal`**（`evidence_items.chunk_id` 与消息引用存的是裸 UUID），只重写 `embedding`/`embedding_profile_id` |
 | D10 | AC-53 `review_runs` 口径 | AC-53 vs 现实现（`usage_events.kind='review'` 恒 0） | **改由 `agent_runs` 派生**：`kind IN ('daily','weekly','yearly') AND state='succeeded'`；`usage_events` 只负责 token/calls |
 | D11 | 失败/部分成功的 chat 是否计量 | AC-29/AC-53 vs 现状 | **是**：provider 已产生 usage 即写 `usage_events`（`degraded=true` 或 `role='partial'`），保证对账 |
 | D12 | `cost` 估算 | API §3.9.10 要求 USD 估算 | 用 `usage_events.cost`（numeric(12,6)）；**未知单价记 0 并在响应 `cost_source="unconfigured"`**，不伪造数字 |
@@ -199,21 +199,23 @@ CREATE FUNCTION admin_usage_totals(p_from timestamptz, p_to timestamptz) ... ;
 
 ### 4.3 蓝绿流程（FX-11）
 
-1. 校验 `dimension ∈ [256, 3072]`；`model/dimension` 已存在 → `CONFLICT`。
-2. `CREATE TABLE document_chunks_v{n} (LIKE document_chunks INCLUDING ALL)` 后 **重建 `embedding` 列维度**（新表，非 ALTER）与 HNSW 索引；`chunk_table` 写入 profile。
-3. 后台 job：逐文档 re-embed 到新表；每批更新 `processed_chunks/total_chunks`。
-4. `coverage = 已写入新表且 embedding 非空的 chunk 数 / document_chunks 总数`；`coverage >= 0.995` 才允许切换。
-5. **原子切换**：单事务 `UPDATE workspace_settings SET embedding_profile_id = :new`；旧 profile `status='retired'`、`retire_at=now()+7d`、`previous_profile_id` 保留。
-6. 回滚：`POST /settings/embedding/rollback`（运维端点，owner）把 `embedding_profile_id` 指回 `previous_profile_id`；旧表在 7 天内仍存在，查询立即可用。
-7. **禁止** `ALTER TABLE document_chunks ALTER COLUMN embedding TYPE vector(768)`；测试用 `pg_depend`/`information_schema` 断言不存在对该列的 `ALTER`（以迁移脚本 grep 断言）。
-8. 检索与索引器通过 `services_search._chunk_table(workspace_id)` / `indexer` 的 profile 解析器取表名，不再硬编码 `document_chunks`。
+1. 校验 `dimension ∈ [256, 3072]`；`model/dimension` 已存在 → `CONFLICT`；已有 `building` → `CONFLICT`。
+2. 调 `create_chunk_table('document_chunks_v{n}', dim)`：函数内建表（显式列定义，`embedding vector(<dim>)`）、HNSW 索引、`ENABLE + FORCE RLS` 与 `p_<table>_tenant` 策略、`GRANT` 给 `mylife_app`；`chunk_table` 写入 profile。**不在 API 进程里裸执行 DDL**（`mylife_app` 无 CREATE）。
+3. 后台 job：逐 chunk 复制 `id/chunk_hash/chunk_ordinal/document_id/...` 并用新 profile 重算 `embedding`；每批更新 `processed_chunks/total_chunks`。
+4. `coverage = 新表中 embedding 非空的行数 / document_chunks 总行数`；**达到 1.0 才切换**（D9）。
+5. **原子切换**：单事务内先 `UPDATE ... SET status='retired'` 旧 profile，再把新 profile 置 `active` 并 `UPDATE workspace_settings SET embedding_profile_id = :new`（顺序避免瞬时违反 `uq_embedding_active`）；旧 profile `retire_at=now()+7d`、`previous_profile_id` 保留。
+6. 回滚：`POST /settings/embedding/rollback`（owner）把 `embedding_profile_id` 指回 `previous_profile_id`，旧 profile 恢复 `active`；7 天内旧表仍在，查询立即可用。
+7. **禁止** `ALTER TABLE document_chunks ALTER COLUMN embedding TYPE vector(768)`；测试以迁移脚本 grep 断言不存在该语句。
+8. 检索与索引器通过 `services_search._chunk_table(workspace_id)` 解析 active profile 的 `chunk_table`，不再硬编码 `document_chunks`（12 处）。**building 期间查询仍用 active profile 的 provider/model/dimension**，否则向量维度与所读表不匹配。
+9. 退役：dispatcher 对 `retire_at <= now()` 的 profile 先写行数/哈希快照到 `outbox_events`，再 `DROP TABLE`；若该表仍是任一 profile 的 `chunk_table` 或仍是 workspace 的 active 表则跳过。
+10. purge：按 `embedding_profiles.chunk_table` 枚举所有 `document_chunks_v*` 表并一并清空（`DELETION_PURGE_TABLES` 无法静态列出动态表名）。
 
 ### 4.4 FX-11 断言
 
 `docs/evidence/phase5/fx11-embedding-migration.json`：
 
-- 新表存在且维度为 768；旧表仍为 1024。
-- 覆盖率从 <1 到 1.0 的序列；切换发生在覆盖率达到阈值之后（时间戳顺序）。
+- 新表存在且维度为 768；旧表仍为 1024；新表带 ENABLE + FORCE RLS 与租户策略。
+- 覆盖率从 <1 到 1.0 的序列；切换发生在覆盖率**达到 1.0**之后（时间戳顺序）。
 - 切换前查询（旧 profile）可用；切换后新 profile 可用；回滚后旧 profile 可用且行数不变。
 - `retire_at` 已写；无 `ALTER COLUMN TYPE` 语句（源码扫描）。
 
