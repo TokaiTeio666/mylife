@@ -67,6 +67,7 @@ async def _lexical_route(
     q: str,
     where: list[str],
     params: dict[str, Any],
+    table: str = "document_chunks",
 ) -> list[dict[str, Any]]:
     clauses = " AND ".join(["d.workspace_id = :ws", "d.tsv @@ q.query", *where])
     query = text(
@@ -85,7 +86,7 @@ async def _lexical_route(
         FROM matched m
         JOIN documents d ON d.id = m.id
         JOIN LATERAL (
-          SELECT c.* FROM document_chunks c
+          SELECT c.* FROM {table} c
           WHERE c.document_id = m.id
           ORDER BY (to_tsvector('simple', c.content) @@ (SELECT query FROM q)) DESC,
                    c.chunk_ordinal ASC
@@ -104,6 +105,7 @@ async def _vector_route(
     vector_literal: str,
     where: list[str],
     params: dict[str, Any],
+    table: str = "document_chunks",
 ) -> list[dict[str, Any]]:
     clauses = " AND ".join(
         ["c.workspace_id = :ws", "c.embedding IS NOT NULL", *where]
@@ -113,7 +115,7 @@ async def _vector_route(
         f"""
         WITH candidates AS (
           SELECT c.id, c.embedding <=> CAST(:vector AS vector) AS distance
-          FROM document_chunks c
+          FROM {table} c
           JOIN documents d ON d.id = c.document_id
           WHERE {clauses}
           ORDER BY c.embedding <=> CAST(:vector AS vector)
@@ -123,7 +125,7 @@ async def _vector_route(
                c.line_start, c.line_end, c.chunk_ordinal,
                d.path, d.title, d.occurred_on, cand.distance
         FROM candidates cand
-        JOIN document_chunks c ON c.id = cand.id
+        JOIN {table} c ON c.id = cand.id
         JOIN documents d ON d.id = c.document_id
         ORDER BY cand.distance ASC, d.path ASC, c.chunk_ordinal ASC
         """
@@ -138,6 +140,7 @@ async def _title_route(
     like: str,
     where: list[str],
     params: dict[str, Any],
+    table: str = "document_chunks",
 ) -> list[dict[str, Any]]:
     clauses = " AND ".join(
         ["d.workspace_id = :ws", "(d.title ILIKE :like OR d.path ILIKE :like)", *where]
@@ -149,7 +152,7 @@ async def _title_route(
                d.path, d.title, d.occurred_on
         FROM documents d
         JOIN LATERAL (
-          SELECT c.* FROM document_chunks c WHERE c.document_id = d.id
+          SELECT c.* FROM {table} c WHERE c.document_id = d.id
           ORDER BY c.chunk_ordinal ASC LIMIT 1
         ) c ON TRUE
         WHERE {clauses}
@@ -161,14 +164,16 @@ async def _title_route(
     return [dict(r._mapping) for r in result]
 
 
-async def _hydrate(session: AsyncSession, chunk_ids: list[UUID]) -> dict[UUID, dict[str, Any]]:
+async def _hydrate(
+    session: AsyncSession, chunk_ids: list[UUID], table: str = "document_chunks"
+) -> dict[UUID, dict[str, Any]]:
     if not chunk_ids:
         return {}
     result = await session.execute(
         text(
             "SELECT c.id AS chunk_id, c.document_id, c.heading, c.content, c.line_start, "
             "       c.line_end, c.chunk_ordinal, d.path, d.title, d.occurred_on "
-            "FROM document_chunks c JOIN documents d ON d.id = c.document_id "
+            f"FROM {table} c JOIN documents d ON d.id = c.document_id "
             "WHERE c.id = ANY(:ids)"
         ),
         {"ids": chunk_ids},
@@ -265,20 +270,32 @@ async def search(
     routes: list[tuple[str, list[UUID]]] = []
     degraded_reasons: list[str] = []
 
+    # 蓝绿换维后向量可能在 document_chunks_v{n}（PHASE5-SPEC D8）。
+    from mylife_api import services_embedding
+
+    table = await services_embedding.chunk_table(session, workspace_id=workspace_id)
+
     if mode in {"hybrid", "lexical"}:
         ts_query, _ = build_tsquery(query)
         if ts_query:
-            lexical = await _lexical_route(session, workspace_id, ts_query, where, params)
+            lexical = await _lexical_route(
+                session, workspace_id, ts_query, where, params, table=table
+            )
             routes.append(("lexical", [row["chunk_id"] for row in lexical]))
 
     if mode in {"hybrid", "vector"}:
         try:
+            # 查询向量必须与当前表维度一致：用 active profile 的模型/维度，
+            # 否则 building 期间会用新维度去查旧表（PHASE5-SPEC 风险 5）。
+            params_for_profile = await services_embedding.active_embedding_params(
+                session, workspace_id=workspace_id
+            )
             provider = build_provider(
                 provider=settings.embedding_provider,
                 base_url=settings.embedding_base_url,
                 api_key=settings.embedding_api_key,
-                model=settings.embedding_model,
-                dimension=settings.embedding_dimension,
+                model=params_for_profile["model"],
+                dimension=params_for_profile["dimension"],
             )
             # 只对 HTTP embedding 使用 wait_for；数据库查询用 statement_timeout，
             # 避免取消 in-flight 查询把连接/事务置于不可用状态。
@@ -295,7 +312,12 @@ async def search(
                         text("SET LOCAL plan_cache_mode = force_custom_plan")
                     )
                     vector_rows = await _vector_route(
-                        session, workspace_id, _vector_literal(vectors[0]), where, params
+                        session,
+                        workspace_id,
+                        _vector_literal(vectors[0]),
+                        where,
+                        params,
+                        table=table,
                     )
             except DBAPIError as exc:
                 if isinstance(getattr(exc, "orig", None), QueryCanceled):
@@ -315,13 +337,15 @@ async def search(
             degraded_reasons.append("embedding_unavailable")
 
     like = f"%{query.replace('%', '\\%').replace('_', '\\_')}%"
-    title_rows = await _title_route(session, workspace_id, like, where, params)
+    title_rows = await _title_route(
+        session, workspace_id, like, where, params, table=table
+    )
     routes.append(("title", [row["chunk_id"] for row in title_rows]))
 
     fused = rrf_fuse(routes)
     ordered = sorted(fused.values(), key=lambda item: sort_key(item, "", 0))
 
-    hydrated = await _hydrate(session, [item.key for item in ordered])
+    hydrated = await _hydrate(session, [item.key for item in ordered], table=table)
     results: list[tuple[tuple[float, str, int], SearchResult]] = []
     for item in ordered:
         row = hydrated.get(item.key)

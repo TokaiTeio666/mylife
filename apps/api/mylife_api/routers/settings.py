@@ -7,6 +7,11 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, Query, Response, status
 from mylife_contract.errors import ErrorCode
 from mylife_contract.settings import (
+    EmbeddingProfileCreate,
+    EmbeddingProfileCreated,
+    EmbeddingSettings,
+    EmbeddingTestRequest,
+    EmbeddingTestResult,
     GitConnectionList,
     GitSettingsUpdate,
     LlmSettings,
@@ -21,7 +26,7 @@ from mylife_contract.settings import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mylife_api import services_llm, services_settings
+from mylife_api import services_embedding, services_llm, services_settings
 from mylife_api.deps import RunContext, get_db, get_run_context
 from mylife_api.errors import AppError
 
@@ -73,8 +78,68 @@ async def test_llm(
 
 
 # ---------------------------------------------------------------------------
-# Embedding（§3.9.4–§3.9.6；AC-50）在 C5 接入
+# Embedding（§3.9.4–§3.9.6；AC-50）
 # ---------------------------------------------------------------------------
+
+
+@router.get("/embedding", response_model=EmbeddingSettings)
+async def get_embedding(
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> EmbeddingSettings:
+    return await services_embedding.get_embedding_settings(db, workspace_id=ctx.workspace_id)
+
+
+@router.post(
+    "/embedding/profiles",
+    response_model=EmbeddingProfileCreated,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_embedding_profile(
+    payload: EmbeddingProfileCreate,
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> EmbeddingProfileCreated:
+    created = await services_embedding.create_profile(
+        db,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        role=ctx.role,
+        payload=payload,
+    )
+    await services_embedding.start_reembed_in_background(
+        ctx.workspace_id, created.profile.id, created.job_id
+    )
+    return created
+
+
+@router.post("/embedding/test", response_model=EmbeddingTestResult)
+async def test_embedding(
+    payload: EmbeddingTestRequest,
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> EmbeddingTestResult:
+    return await services_embedding.test_embedding(
+        db,
+        workspace_id=ctx.workspace_id,
+        provider=payload.provider,
+        model=payload.model,
+        api_key=payload.api_key,
+    )
+
+
+@router.post("/embedding/rollback", response_model=EmbeddingSettings)
+async def rollback_embedding(
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> EmbeddingSettings:
+    """把 active profile 指回 `previous_profile_id`（AC-50 回滚断言）。"""
+    return await services_embedding.rollback_profile(
+        db,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        role=ctx.role,
+    )
 
 
 @router.get("/schedule", response_model=ScheduleSettings)

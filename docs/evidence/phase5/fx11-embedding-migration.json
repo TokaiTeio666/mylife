@@ -1,0 +1,22 @@
+{
+  "base_profile": {
+    "dimension": 1024,
+    "chunk_table": "document_chunks"
+  },
+  "new_profile": {
+    "dimension": 768,
+    "chunk_table": "document_chunks_v768"
+  },
+  "coverage_series": [
+    0.0,
+    1.0
+  ],
+  "switched_after_full_coverage": true,
+  "switch_atomic": true,
+  "retire_at_written": true,
+  "rollback_restored_previous": true,
+  "chunks_copied": 2,
+  "chunks_expected": 2,
+  "no_alter_column_type": true,
+  "alter_column_type_migrations": []
+}

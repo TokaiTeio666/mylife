@@ -409,7 +409,9 @@ class ChatRunner:
             deduped.append(item)
 
         chunk_ids = [item.chunk_id for item in deduped if item.chunk_id]
-        contents = await repo.get_chunk_contents(session, chunk_ids)
+        contents = await repo.get_chunk_contents(
+            session, chunk_ids, workspace_id=self.workspace_id
+        )
 
         evidence: list[EvidenceQuote] = []
         used_tokens = 0

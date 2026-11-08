@@ -9,11 +9,20 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mylife_api.chunk_tables import resolve_chunk_table
 from mylife_api.ids import uuid7
 
 
 def _row(row: Any) -> dict[str, Any] | None:
     return dict(row._mapping) if row is not None else None
+
+
+async def _chunk_table(session: AsyncSession, workspace_id: UUID | None) -> str:
+    from mylife_contract.chunk_tables import BASE_CHUNK_TABLE
+
+    if workspace_id is None:
+        return BASE_CHUNK_TABLE
+    return await resolve_chunk_table(session, workspace_id=workspace_id)
 
 
 def _rows(rows: Any) -> list[dict[str, Any]]:
@@ -284,10 +293,13 @@ async def list_backlinks(
     return _rows(result)
 
 
-async def list_chunks(session: AsyncSession, document_id: UUID) -> list[dict[str, Any]]:
+async def list_chunks(
+    session: AsyncSession, document_id: UUID, *, workspace_id: UUID | None = None
+) -> list[dict[str, Any]]:
+    table = await _chunk_table(session, workspace_id)
     result = await session.execute(
         text(
-            "SELECT id, heading, line_start, line_end, token_count FROM document_chunks "
+            f"SELECT id, heading, line_start, line_end, token_count FROM {table} "
             "WHERE document_id = :doc ORDER BY chunk_ordinal"
         ),
         {"doc": document_id},
@@ -295,9 +307,12 @@ async def list_chunks(session: AsyncSession, document_id: UUID) -> list[dict[str
     return _rows(result)
 
 
-async def document_counts(session: AsyncSession, document_id: UUID) -> tuple[int, int]:
+async def document_counts(
+    session: AsyncSession, document_id: UUID, *, workspace_id: UUID | None = None
+) -> tuple[int, int]:
+    table = await _chunk_table(session, workspace_id)
     chunks = await session.execute(
-        text("SELECT count(*) FROM document_chunks WHERE document_id = :doc"),
+        text(f"SELECT count(*) FROM {table} WHERE document_id = :doc"),
         {"doc": document_id},
     )
     links = await session.execute(

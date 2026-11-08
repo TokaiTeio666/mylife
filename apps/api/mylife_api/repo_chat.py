@@ -689,14 +689,23 @@ async def update_message_status(session: AsyncSession, message_id: UUID, status:
 
 
 async def get_chunk_contents(
-    session: AsyncSession, chunk_ids: list[UUID]
+    session: AsyncSession, chunk_ids: list[UUID], *, workspace_id: UUID | None = None
 ) -> dict[UUID, dict[str, Any]]:
     if not chunk_ids:
         return {}
+    from mylife_contract.chunk_tables import BASE_CHUNK_TABLE
+
+    from mylife_api.chunk_tables import resolve_chunk_table
+
+    table = (
+        await resolve_chunk_table(session, workspace_id=workspace_id)
+        if workspace_id is not None
+        else BASE_CHUNK_TABLE
+    )
     result = await session.execute(
         text(
             "SELECT id, document_id, heading, content, line_start, line_end "
-            "FROM document_chunks WHERE id = ANY(:ids)"
+            f"FROM {table} WHERE id = ANY(:ids)"
         ),
         {"ids": chunk_ids},
     )

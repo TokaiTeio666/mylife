@@ -134,7 +134,9 @@ async def read_note(
     lines = (document["content"] or "").split("\n")
     heading = args.heading
     if heading:
-        chunks = await repo1.list_chunks(session, document["id"])
+        chunks = await repo1.list_chunks(
+            session, document["id"], workspace_id=ctx.workspace_id
+        )
         matched = next(
             (chunk for chunk in chunks if heading in (chunk.get("heading") or "")), None
         )

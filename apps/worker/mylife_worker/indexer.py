@@ -15,6 +15,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
+from mylife_contract.chunk_tables import BASE_CHUNK_TABLE, validate_chunk_table
 from mylife_retrieval.embedding import EmbeddingProvider, EmbeddingUnavailable
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,15 +87,23 @@ async def _load_documents(session: AsyncSession, workspace_id: UUID) -> dict[str
     return {row.path: dict(row._mapping) for row in result}
 
 
-async def _existing_chunks(session: AsyncSession, document_id: UUID) -> list[dict[str, Any]]:
-    result = await session.execute(
-        text(
-            "SELECT id, chunk_hash, chunk_ordinal FROM document_chunks "
-            "WHERE document_id = :doc ORDER BY chunk_ordinal"
-        ),
-        {"doc": document_id},
-    )
-    return [dict(row._mapping) for row in result]
+async def _active_chunk_target(
+    session: AsyncSession, workspace_id: UUID
+) -> tuple[str, UUID | None]:
+    """解析当前 workspace 的向量表与 profile；无 active profile 时为基表。"""
+    row = (
+        await session.execute(
+            text(
+                "SELECT p.id, p.chunk_table FROM embedding_profiles p "
+                "JOIN workspace_settings s ON s.embedding_profile_id = p.id "
+                "WHERE s.workspace_id = :ws"
+            ),
+            {"ws": workspace_id},
+        )
+    ).first()
+    if row is None or not row.chunk_table:
+        return BASE_CHUNK_TABLE, None
+    return validate_chunk_table(str(row.chunk_table)), row.id
 
 
 async def _insert_document(
@@ -175,9 +184,12 @@ async def _replace_chunks(
     parsed: ParsedDocument,
     embedder: EmbeddingProvider | None,
     outcome: IngestOutcome,
+    table: str = "document_chunks",
+    profile_id: UUID | None = None,
 ) -> None:
+    validate_chunk_table(table)
     await session.execute(
-        text("DELETE FROM document_chunks WHERE document_id = :doc"), {"doc": document_id}
+        text(f"DELETE FROM {table} WHERE document_id = :doc"), {"doc": document_id}
     )
     inserted: list[tuple[UUID, str]] = []
     rows: list[dict[str, object]] = []
@@ -203,17 +215,17 @@ async def _replace_chunks(
         # executemany：5k 文档 / 40k chunk 时把逐行往返降到批处理。
         await session.execute(
             text(
-                """
-                INSERT INTO document_chunks (
+                f"""
+                INSERT INTO {table} (
                   id, workspace_id, document_id, heading, content, token_count,
-                  chunk_ordinal, chunk_hash, line_start, line_end
+                  chunk_ordinal, chunk_hash, line_start, line_end, embedding_profile_id
                 ) VALUES (
                   :id, :ws, :doc, :heading, :content, :tokens,
-                  :ordinal, :hash, :line_start, :line_end
+                  :ordinal, :hash, :line_start, :line_end, :profile
                 )
                 """
             ),
-            rows,
+            [{**row, "profile": profile_id} for row in rows],
         )
 
     if not inserted or embedder is None:
@@ -231,7 +243,7 @@ async def _replace_chunks(
         for (chunk_id, _), vector in zip(inserted, vectors, strict=True)
     ]
     await session.execute(
-        text("UPDATE document_chunks SET embedding = CAST(:vector AS vector) WHERE id = :id"),
+        text(f"UPDATE {table} SET embedding = CAST(:vector AS vector) WHERE id = :id"),
         updates,
     )
 
@@ -334,6 +346,8 @@ async def ingest_files(
     job_id: UUID | None = None,
 ) -> IngestOutcome:
     outcome = IngestOutcome()
+    # 蓝绿换维后写入必须落到 active profile 的表（PHASE5-SPEC D8）。
+    table, profile_id = await _active_chunk_target(session, workspace_id)
     existing = await _load_documents(session, workspace_id)
     current_paths = {file.path for file in files}
     deleted_candidates = {
@@ -449,6 +463,8 @@ async def ingest_files(
                 parsed=parsed,
                 embedder=embedder,
                 outcome=outcome,
+                table=table,
+                profile_id=profile_id,
             )
             await _replace_links(
                 session, workspace_id=workspace_id, document_id=document_id, parsed=parsed

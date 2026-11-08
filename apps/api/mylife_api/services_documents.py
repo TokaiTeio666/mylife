@@ -75,7 +75,9 @@ async def get_detail(
                 ),
                 token_count=c["token_count"],
             )
-            for c in await repo.list_chunks(session, document_id)
+            for c in await repo.list_chunks(
+                session, document_id, workspace_id=workspace_id
+            )
         ]
 
     mtime = row.get("mtime") or row["indexed_at"]
@@ -105,7 +107,9 @@ async def get_meta(
     row = await repo.get_document(session, workspace_id, document_id)
     if row is None:
         raise AppError(ErrorCode.NOT_FOUND)
-    chunk_count, link_count = await repo.document_counts(session, document_id)
+    chunk_count, link_count = await repo.document_counts(
+        session, document_id, workspace_id=workspace_id
+    )
     snapshot_id = await repo.snapshot_for_document(session, workspace_id, document_id)
     return DocumentMeta(
         id=row["id"],
