@@ -26,6 +26,7 @@ async def list_deliveries(
     review_id: UUID | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
     limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
     ctx: RunContext = Depends(get_run_context),
     db: AsyncSession = Depends(get_db),
 ) -> DeliveryList:
@@ -35,6 +36,7 @@ async def list_deliveries(
         review_id=review_id,
         status=status_filter,
         limit=limit,
+        cursor=cursor,
     )
 
 

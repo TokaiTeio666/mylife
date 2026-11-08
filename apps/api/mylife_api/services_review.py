@@ -288,6 +288,8 @@ async def list_reviews(
     status: str | None,
     limit: int,
     cursor: str | None,
+    from_key: str | None = None,
+    to_key: str | None = None,
 ) -> ReviewList:
     from mylife_api.pagination import decode_review_cursor, encode_review_cursor
 
@@ -299,6 +301,8 @@ async def list_reviews(
         status=status,
         limit=limit + 1,
         after=after,
+        from_key=from_key,
+        to_key=to_key,
     )
     has_more = len(rows) > limit
     items = [_summary(row) for row in rows[:limit]]

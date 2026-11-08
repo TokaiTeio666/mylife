@@ -26,13 +26,16 @@ async def commit_render_state(
     version: int,
     hashes: dict[str, str] | None = None,
 ) -> None:
-    """交付成功后记住 auto 区哈希；`manual` 状态不被覆盖。"""
+    """交付成功后记住 auto 区哈希。
+
+    `hashes` 只包含本次**成功合并**的专题（`_prepare_files` 的 auto 分支）；
+    因此这里必须把状态恢复为 auto —— 否则一次瞬时标记损坏留下的 manual
+    会永远拒绝更新（DB 哈希停留在旧值，下一次合并必判 ManualDetected）。
+    """
     if not hashes:
         return
     for topic, digest in hashes.items():
         row = await repo.get_topic_file(session, workspace_id=workspace_id, topic=topic)
-        if row is not None and row["status"] == "manual":
-            continue
         await repo.upsert_topic_file(
             session,
             workspace_id=workspace_id,

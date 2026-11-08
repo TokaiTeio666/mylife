@@ -59,7 +59,8 @@ class GitConnectionSummary(ApiModel):
     provider: Literal["github", "gitlab", "generic"]
     repo_full_name: str
     base_branch: str
-    auth_type: Literal["github_app", "deploy_key", "pat"]
+    # 响应统一使用 wire 值 `app`（与 PUT 请求一致，PHASE4-SPEC D21）。
+    auth_type: Literal["app", "deploy_key", "pat"]
     mode: str | None = None
     reviews_root: str | None = None
     sync_interval_minutes: int = 0

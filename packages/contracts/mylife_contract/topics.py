@@ -15,7 +15,7 @@ from pydantic import Field
 from mylife_contract.common import ApiModel
 
 TopicSlug = Literal["errors", "methods", "actions"]
-TopicStatusValue = Literal["pending", "open", "resolved", "stale"]
+TopicStatusValue = Literal["pending", "open", "resolved", "stale", "dropped"]
 
 
 class TopicSummary(ApiModel):

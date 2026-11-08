@@ -133,7 +133,8 @@ async def _topic_items(
                             "source_date": item["source_date"],
                             "source_path": item["source_path"],
                             "line_range": [item["line_start"], item["line_end"]]
-                            if item.get("line_start") is not None
+                            if item.get("line_start")
+                            and item.get("line_end") is not None
                             else None,
                             "quote": item["quote"],
                         }
@@ -231,6 +232,16 @@ async def _prepare_files(
             session, workspace_id=workspace_id, topic=slug
         )
         existing = read_existing(full_path)
+        if (
+            state_row is not None
+            and state_row["status"] == "manual"
+            and existing is not None
+        ):
+            # 人工编辑后自动重渲染暂停（FRONTEND-DESIGN §5.4）：保留文件与
+            # 旧哈希基线，不再合并；文件被删除时按正常流程重建。
+            files[full_path] = existing
+            topic_states[slug] = "manual"
+            continue
         content, digest, state = _merge_topic(
             existing=existing,
             inner=inner,
@@ -362,10 +373,17 @@ async def deliver_review(
     previous = await repo.latest_delivery_for_review(
         session, workspace_id=workspace_id, review_id=review_id
     )
-    # 只有“同一版本重试且内容未变”才是 noop；新版本即使正文相同也要重新
-    # 渲染专题页与索引（确认/解决专题条目会改变这些文件）。
+    # 只有“同一版本重试且内容未变、且上次交付成功”才是 noop；新版本即使正文
+    # 相同也要重新渲染专题页与索引（确认/解决专题条目会改变这些文件）。
+    # 失败/阻断的记录必须真正重试，不能被 noop 短路（重试端点依赖这一点）。
+    previous_ok = previous is not None and previous.get("status") in {
+        "committed",
+        "pr_open",
+        "merged",
+        "noop",
+    }
     if (
-        previous is not None
+        previous_ok
         and int(previous.get("version") or 0) == version
         and previous.get("content_hash") == content_hash
     ):
@@ -818,6 +836,36 @@ def _record(row: dict[str, Any]):
     )
 
 
+def encode_delivery_cursor(created_at: datetime, delivery_id: UUID) -> str:
+    import base64
+    import json
+
+    payload = json.dumps(
+        {"t": created_at.isoformat(), "id": str(delivery_id)}, separators=(",", ":")
+    )
+    return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii")
+
+
+def decode_delivery_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
+    if not cursor:
+        return None
+    import base64
+    import json
+
+    from mylife_contract.errors import ErrorCode
+
+    from mylife_api.errors import AppError
+
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        payload = json.loads(raw)
+        return datetime.fromisoformat(payload["t"]), UUID(payload["id"])
+    except Exception as exc:  # noqa: BLE001
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR, details={"reason": "CURSOR_INVALID"}
+        ) from exc
+
+
 async def list_delivery_records(
     session: AsyncSession,
     *,
@@ -825,6 +873,7 @@ async def list_delivery_records(
     review_id: UUID | None,
     status: str | None,
     limit: int,
+    cursor: str | None = None,
 ):
     from mylife_contract.delivery import DeliveryList
 
@@ -833,9 +882,17 @@ async def list_delivery_records(
         workspace_id=workspace_id,
         review_id=review_id,
         status=status,
-        limit=limit,
+        limit=limit + 1,
+        after=decode_delivery_cursor(cursor),
     )
-    return DeliveryList(items=[_record(row) for row in rows], has_more=False)
+    has_more = len(rows) > limit
+    items = [_record(row) for row in rows[:limit]]
+    next_cursor = (
+        encode_delivery_cursor(rows[limit - 1]["created_at"], rows[limit - 1]["id"])
+        if has_more and rows
+        else None
+    )
+    return DeliveryList(items=items, next_cursor=next_cursor, has_more=has_more)
 
 
 async def get_delivery_detail(

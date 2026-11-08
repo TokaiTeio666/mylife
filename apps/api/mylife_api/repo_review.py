@@ -644,6 +644,8 @@ async def list_reviews(
     status: str | None,
     limit: int,
     after: tuple[str, int] | None = None,
+    from_key: str | None = None,
+    to_key: str | None = None,
 ) -> list[dict[str, Any]]:
     conditions = ["workspace_id = :ws"]
     params: dict[str, Any] = {"ws": workspace_id, "limit": limit}
@@ -653,6 +655,12 @@ async def list_reviews(
     if status:
         conditions.append("status = :status")
         params["status"] = status
+    if from_key:
+        conditions.append("period_key >= :from_key")
+        params["from_key"] = from_key
+    if to_key:
+        conditions.append("period_key <= :to_key")
+        params["to_key"] = to_key
     if after:
         conditions.append("(period_key, version) < (:after_period, :after_version)")
         params["after_period"] = after[0]
@@ -910,20 +918,71 @@ async def insert_topic_occurrence(
     )
 
 
+async def merge_topic_fields(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    item_id: UUID,
+    fields: dict[str, Any],
+) -> None:
+    """把人工确认的字段合并进 `fields_json`，并同步 title（PHASE4-SPEC D9）。"""
+    import json
+
+    await session.execute(
+        text(
+            "UPDATE topic_items SET "
+            "  fields_json = fields_json || CAST(:fields AS jsonb), "
+            "  title = COALESCE(CAST(:title AS text), title) "
+            "WHERE workspace_id = :ws AND id = :id"
+        ),
+        {
+            "fields": json.dumps(fields, ensure_ascii=False, default=str),
+            "title": fields.get("title"),
+            "ws": workspace_id,
+            "id": item_id,
+        },
+    )
+
+
 async def delete_topic_occurrences_for_review(
     session: AsyncSession,
     *,
     workspace_id: UUID,
     review_id: UUID,
-    item_id: UUID,
-) -> None:
-    await session.execute(
+    item_id: UUID | None = None,
+) -> list[UUID]:
+    """删除该 review 的 occurrence；返回受影响的 item_id 列表。
+
+    不传 `item_id` 时覆盖整份 review —— 重跑时消失的条目也必须清掉，
+    否则旧 occurrence 会成为幽灵条目（PHASE4-SPEC D40）。
+    """
+    conditions = ["workspace_id = :ws", "review_id = :review"]
+    params: dict[str, Any] = {"ws": workspace_id, "review": review_id}
+    if item_id is not None:
+        conditions.append("item_id = :item")
+        params["item"] = item_id
+    result = await session.execute(
         text(
-            "DELETE FROM topic_occurrences WHERE workspace_id = :ws "
-            "AND review_id = :review AND item_id = :item"
+            "DELETE FROM topic_occurrences WHERE "
+            + " AND ".join(conditions)
+            + " RETURNING item_id"
         ),
-        {"ws": workspace_id, "review": review_id, "item": item_id},
+        params,
     )
+    return [row.item_id for row in result]
+
+
+async def list_topic_occurrence_fields(
+    session: AsyncSession, *, workspace_id: UUID, item_id: UUID
+) -> list[dict[str, Any]]:
+    result = await session.execute(
+        text(
+            "SELECT source_date, fields_json FROM topic_occurrences "
+            "WHERE workspace_id = :ws AND item_id = :item ORDER BY source_date ASC"
+        ),
+        {"ws": workspace_id, "item": item_id},
+    )
+    return _rows(result)
 
 
 async def refresh_topic_counts(
@@ -970,7 +1029,8 @@ async def list_topic_items(
         conditions.append("status = :status")
         params["status"] = status
     elif not include_pending:
-        conditions.append("status <> 'pending'")
+        # dropped 是 tombstone，不进入专题页默认视图（PHASE4-SPEC D8）。
+        conditions.append("status NOT IN ('pending','dropped')")
     result = await session.execute(
         text(
             "SELECT id, topic, canonical_key, title, first_seen, last_seen, "

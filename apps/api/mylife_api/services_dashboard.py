@@ -80,8 +80,9 @@ async def get_latest(
     task_row = (
         await session.execute(
             text(
-                "SELECT count(*) AS total, "
-                "       count(*) FILTER (WHERE status = 'done') AS completed "
+                "SELECT count(*) FILTER (WHERE status <> 'dropped') AS total, "
+                "       count(*) FILTER (WHERE status = 'done') AS completed, "
+                "       count(*) FILTER (WHERE status = 'open') AS open_tasks "
                 "FROM tasks WHERE workspace_id = :ws"
             ),
             {"ws": workspace_id},
@@ -89,13 +90,14 @@ async def get_latest(
     ).one()
     total = int(task_row.total)
     completed = int(task_row.completed)
+    open_tasks = int(task_row.open_tasks)
     value = {
         "daily": latest_reviews["daily"],
         "weekly": latest_reviews["weekly"],
         "yearly": latest_reviews["yearly"],
         "generated_at": datetime.now(UTC),
         "completion_rate": round(completed / total, 4) if total else 0.0,
-        "open_tasks": total - completed,
+        "open_tasks": open_tasks,
         "timezone": tz,
     }
     _cache[key] = (now + CACHE_TTL_SECONDS, value)
@@ -130,13 +132,16 @@ async def tasks(
     items = []
     counts = {"open": 0, "carried": 0, "done_today": 0}
     for row in rows:
-        derived = "open"
-        if row["status"] == "done":
+        if row["status"] == "dropped":
+            derived = "dropped"
+        elif row["status"] == "done":
             derived = "done"
             if row["done_date"] == today_local:
                 counts["done_today"] += 1
         elif row["first_seen"] is not None and row["first_seen"] < today_local:
             derived = "carried"
+        else:
+            derived = "open"
         if derived == "carried":
             counts["carried"] += 1
         elif derived == "open":
@@ -273,6 +278,7 @@ async def stats(
 ) -> dict[str, Any]:
     days = {"7d": 7, "30d": 30, "90d": 90, "year": 365}[range_key]
     start = datetime.now(UTC) - timedelta(days=days)
+    # 区间口径：任务在该区间内出现过（last_seen >= start）。
     task_row = (
         await session.execute(
             text(
@@ -280,7 +286,7 @@ async def stats(
                 "       count(*) FILTER (WHERE status = 'done') AS completed, "
                 "       count(*) FILTER (WHERE status = 'open' "
                 "         AND first_seen < :start) AS carried "
-                "FROM tasks WHERE workspace_id = :ws"
+                "FROM tasks WHERE workspace_id = :ws AND last_seen >= :start"
             ),
             {"ws": workspace_id, "start": start.date()},
         )
@@ -289,10 +295,7 @@ async def stats(
         await session.execute(
             text(
                 "SELECT COALESCE(sum(prompt_tokens),0) AS prompt, "
-                "       COALESCE(sum(completion_tokens),0) AS completion, "
-                "       count(*) AS calls, "
-                "       count(*) FILTER (WHERE degraded) AS degraded, "
-                "       count(*) FILTER (WHERE kind = 'review') AS reviews "
+                "       COALESCE(sum(completion_tokens),0) AS completion "
                 "FROM usage_events WHERE workspace_id = :ws AND created_at >= :start"
             ),
             {"ws": workspace_id, "start": start},
@@ -301,16 +304,43 @@ async def stats(
     review_counts = (
         await session.execute(
             text(
-                "SELECT kind, count(*) AS n FROM reviews WHERE workspace_id = :ws "
+                "SELECT kind, count(*) AS n, "
+                "       count(*) FILTER (WHERE degraded) AS degraded "
+                "FROM reviews WHERE workspace_id = :ws "
                 "AND generated_at >= :start GROUP BY kind"
             ),
             {"ws": workspace_id, "start": start},
         )
     ).all()
     counts = {row.kind: int(row.n) for row in review_counts}
+    total_reviews = sum(counts.values())
+    degraded_reviews = sum(int(row.degraded) for row in review_counts)
+
+    # no_evidence_ratio：哨兵章节数 / 总章节数（来自 review_sections）。
+    from mylife_contract.constants import SENTINELS
+
+    sentinel_rows = await session.execute(
+        text(
+            "SELECT rs.section_key, rs.content_md FROM review_sections rs "
+            "JOIN reviews r ON r.id = rs.review_id AND r.workspace_id = rs.workspace_id "
+            "  AND r.version = rs.version "
+            "WHERE r.workspace_id = :ws AND r.generated_at >= :start "
+            "  AND r.status IN ('delivered','approved')"
+        ),
+        {"ws": workspace_id, "start": start},
+    )
+    section_rows = [dict(row._mapping) for row in sentinel_rows]
+    sentinel_count = sum(
+        1
+        for row in section_rows
+        if (row["content_md"] or "").strip() == SENTINELS.get(row["section_key"])
+    )
+    no_evidence_ratio = (
+        round(sentinel_count / len(section_rows), 4) if section_rows else 0.0
+    )
+
     total = int(task_row.total)
     completed = int(task_row.completed)
-    calls = int(usage_row.calls)
     return {
         "range": range_key,
         "completion_rate": round(completed / total, 4) if total else 0.0,
@@ -324,14 +354,10 @@ async def stats(
             "weekly": counts.get("weekly", 0),
             "yearly": counts.get("yearly", 0),
         },
-        "no_evidence_ratio": round(
-            (int(usage_row.reviews) - int(usage_row.degraded))
-            / int(usage_row.reviews),
-            4,
-        )
-        if int(usage_row.reviews)
+        "no_evidence_ratio": no_evidence_ratio,
+        "degraded_rate": round(degraded_reviews / total_reviews, 4)
+        if total_reviews
         else 0.0,
-        "degraded_rate": round(int(usage_row.degraded) / calls, 4) if calls else 0.0,
         "tokens": {
             "prompt": int(usage_row.prompt),
             "completion": int(usage_row.completion),

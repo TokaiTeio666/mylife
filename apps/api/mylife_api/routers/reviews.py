@@ -50,6 +50,8 @@ async def create_review(
 async def list_reviews(
     kind: str | None = Query(default=None, pattern="^(daily|weekly|yearly)$"),
     status_filter: str | None = Query(default=None, alias="status"),
+    from_key: str | None = Query(default=None, alias="from", max_length=20),
+    to_key: str | None = Query(default=None, alias="to", max_length=20),
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
     ctx: RunContext = Depends(get_run_context),
@@ -62,6 +64,8 @@ async def list_reviews(
         status=status_filter,
         limit=limit,
         cursor=cursor,
+        from_key=from_key,
+        to_key=to_key,
     )
 
 

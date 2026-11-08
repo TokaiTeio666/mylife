@@ -382,6 +382,12 @@ async def search(
 def _review_result(row: dict[str, Any], *, query: str, rank: float) -> SearchResult:
     text_value = row.get("search_text") or ""
     snippet = text_value[:200]
+    # 片段来自用户笔记：必须先转义再插入 <mark>，否则前端
+    # dangerouslySetInnerHTML 会执行笔记中的 HTML（SEC-20）。
+    import html
+
+    escaped = html.escape(snippet)
+    marked = escaped.replace(html.escape(query), f"<mark>{html.escape(query)}</mark>")
     return SearchResult(
         source_type="review",
         document_id=None,
@@ -391,7 +397,7 @@ def _review_result(row: dict[str, Any], *, query: str, rank: float) -> SearchRes
         title=row["title"],
         heading=None,
         snippet=snippet,
-        snippet_html=None,
+        snippet_html=marked,
         score=round(float(rank), 6),
         matched_by="lexical",
         rank_lexical=None,

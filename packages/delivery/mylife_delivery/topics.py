@@ -44,9 +44,13 @@ def _frontmatter(payload: dict[str, Any]) -> str:
 
 def _line_range(item: dict[str, Any]) -> str:
     value = item.get("line_range")
-    if not value or len(value) < 2 or value[0] is None:
+    if not value or len(value) < 2:
         return ""
-    return f"#L{int(value[0])}-L{int(value[1])}"
+    start, end = value[0], value[1]
+    # 0/None 是“无行号”的哨兵（迁移 0005 把 NULL 回填为 0）。
+    if start in (None, 0) or end is None:
+        return ""
+    return f"#L{int(start)}-L{int(end)}"
 
 
 def _occurrence_lines(item: dict[str, Any]) -> list[str]:

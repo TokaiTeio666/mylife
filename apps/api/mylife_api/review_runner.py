@@ -353,15 +353,19 @@ class ReviewRunner:
             self.degraded_reasons.append("missing")
 
         evidence_by_path = {item.evidence_id: item.as_dict() for item in collector.items}
-        source_by_key = {
-            (entry["item_type"], entry["canonical_key"]): {
-                "source_path": entry.get("source_path"),
-                "line_range": entry.get("line_range"),
-                "source_date": entry.get("source_date"),
-                "evidence_id": entry.get("evidence_id"),
-            }
-            for entry in context.get("entries") or []
-        }
+        # 同一 canonical_key 在一天内可能来自多篇笔记；`materialize_entries`
+        # 保留第一条的字段，来源也必须取第一条，保证 path/line 与 quote 一致。
+        source_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+        for entry in context.get("entries") or []:
+            source_by_key.setdefault(
+                (entry["item_type"], entry["canonical_key"]),
+                {
+                    "source_path": entry.get("source_path"),
+                    "line_range": entry.get("line_range"),
+                    "source_date": entry.get("source_date"),
+                    "evidence_id": entry.get("evidence_id"),
+                },
+            )
         materialized = materialize_entries(
             draft.as_sections(),
             evidence_by_path=evidence_by_path,
@@ -617,7 +621,14 @@ class ReviewRunner:
         import json
 
         topic_by_type = {"error": "errors", "method": "methods", "action": "actions"}
-        cleared: set[UUID] = set()
+        # 重跑：先移除本 review 的全部旧贡献（含新版本中已消失的条目），
+        # 再按当前版本重建；否则被删除的条目会留下幽灵 occurrence（D40）。
+        affected = set(
+            await repo.delete_topic_occurrences_for_review(
+                session, workspace_id=self.workspace_id, review_id=self.review_id
+            )
+        )
+        touched: set[UUID] = set()
         for entry in draft.get("entries") or []:
             topic = topic_by_type.get(entry["item_type"])
             if topic is None:
@@ -637,46 +648,6 @@ class ReviewRunner:
                 source_date=source_date,
                 fields_json=fields,
             )
-            existing_fields = item.get("fields_json") or {}
-            if isinstance(existing_fields, str):
-                existing_fields = json.loads(existing_fields)
-            conflicts = item.get("conflicts_json") or []
-            if isinstance(conflicts, str):
-                conflicts = json.loads(conflicts)
-            changed = False
-            for field, value in fields.items():
-                old = existing_fields.get(field)
-                if old is None or str(old) == str(value):
-                    continue
-                entry_conflict = {
-                    "field": field,
-                    "values": [
-                        {"date": str(item.get("first_seen") or ""), "value": old},
-                        {"date": source_date.isoformat(), "value": value},
-                    ],
-                }
-                conflicts = [
-                    conflict
-                    for conflict in conflicts
-                    if conflict.get("field") != field
-                ] + [entry_conflict]
-                changed = True
-            if changed:
-                await repo.update_topic_conflicts(
-                    session,
-                    workspace_id=self.workspace_id,
-                    item_id=item["id"],
-                    conflicts=conflicts,
-                )
-            # 同 period 重跑：每个 item 只清一次旧贡献，再按当前版本重建（D40）。
-            if item["id"] not in cleared:
-                await repo.delete_topic_occurrences_for_review(
-                    session,
-                    workspace_id=self.workspace_id,
-                    review_id=self.review_id,
-                    item_id=item["id"],
-                )
-                cleared.add(item["id"])
             await repo.insert_topic_occurrence(
                 session,
                 workspace_id=self.workspace_id,
@@ -690,8 +661,38 @@ class ReviewRunner:
                 version=self.version,
                 fields_json=fields,
             )
+            touched.add(item["id"])
+
+        # 冲突以当前全部 occurrence 的字段值为准重算：第三个不同值不会覆盖
+        # 第二个值，值恢复一致时冲突也会消失（PHASE4-SPEC D7）。
+        for item_id in touched:
+            occurrences = await repo.list_topic_occurrence_fields(
+                session, workspace_id=self.workspace_id, item_id=item_id
+            )
+            by_field: dict[str, list[dict[str, Any]]] = {}
+            for occurrence in occurrences:
+                values = occurrence.get("fields_json") or {}
+                if isinstance(values, str):
+                    values = json.loads(values)
+                for field, value in values.items():
+                    by_field.setdefault(field, []).append(
+                        {"date": str(occurrence["source_date"]), "value": value}
+                    )
+            conflicts = []
+            for field, values in by_field.items():
+                distinct = {str(item["value"]) for item in values}
+                if len(distinct) > 1:
+                    conflicts.append({"field": field, "values": values})
+            await repo.update_topic_conflicts(
+                session,
+                workspace_id=self.workspace_id,
+                item_id=item_id,
+                conflicts=conflicts,
+            )
+
+        for item_id in {*touched, *affected}:
             await repo.refresh_topic_counts(
-                session, workspace_id=self.workspace_id, item_id=item["id"]
+                session, workspace_id=self.workspace_id, item_id=item_id
             )
 
     # ------------------------------------------------------------------ 失败

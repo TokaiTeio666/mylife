@@ -268,13 +268,17 @@ export default function SearchPage() {
                     {item.path}
                     {item.heading ? ` · ${item.heading}` : ""}
                   </p>
-                  <p
-                    className="mt-2 text-small leading-relaxed text-foreground/90 [&_mark]:rounded-sm [&_mark]:bg-citation-bg [&_mark]:px-0.5 [&_mark]:text-foreground"
-                    // snippet_html 由服务端先转义再插入 <mark>
-                    dangerouslySetInnerHTML={{
-                      __html: item.snippet_html ?? item.snippet,
-                    }}
-                  />
+                  {item.snippet_html ? (
+                    <p
+                      className="mt-2 text-small leading-relaxed text-foreground/90 [&_mark]:rounded-sm [&_mark]:bg-citation-bg [&_mark]:px-0.5 [&_mark]:text-foreground"
+                      // snippet_html 由服务端先转义再插入 <mark>
+                      dangerouslySetInnerHTML={{ __html: item.snippet_html }}
+                    />
+                  ) : (
+                    <p className="mt-2 whitespace-pre-wrap text-small leading-relaxed text-foreground/90">
+                      {item.snippet}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

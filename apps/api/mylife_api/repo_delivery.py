@@ -79,15 +79,31 @@ async def list_deliveries(
     review_id: UUID | None,
     status: str | None,
     limit: int,
+    after: tuple[datetime, UUID] | None = None,
 ) -> list[dict[str, Any]]:
     conditions = ["workspace_id = :ws"]
     params: dict[str, Any] = {"ws": workspace_id, "limit": limit}
+    if after is not None:
+        conditions.append("(created_at, id) < (:after_ts, :after_id)")
+        params["after_ts"] = after[0]
+        params["after_id"] = after[1]
     if review_id is not None:
         conditions.append("review_id = :review")
         params["review"] = review_id
     if status:
-        conditions.append("status = :status")
-        params["status"] = status
+        # 过滤参数是 API 枚举；DB 存储的是并集（conflict/committing/...）。
+        api_to_db = {
+            "pending": ["pending", "committing", "committed"],
+            "blocked": ["blocked", "conflict", "failed"],
+            "pr_open": ["pr_open"],
+            "merged": ["merged"],
+            "committed": ["committed"],
+            "closed": ["closed"],
+            "noop": ["noop"],
+            "failed": ["failed"],
+        }
+        conditions.append("status = ANY(:statuses)")
+        params["statuses"] = api_to_db.get(status, [status])
     result = await session.execute(
         text(
             DELIVERY_SELECT

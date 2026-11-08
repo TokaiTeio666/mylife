@@ -104,7 +104,16 @@ async def create_deletion(
             "user": user_id,
         },
     )
-    # 冷却期立即停用调度，避免继续生成产物。
+    # 冷却期立即停用调度，避免继续生成产物；先记录哪些原本启用，
+    # 撤销时按原状态恢复，不能把用户手动关闭的调度重新打开。
+    enabled_rows = await session.execute(
+        text(
+            "SELECT kind FROM workspace_schedules "
+            "WHERE workspace_id = :ws AND enabled"
+        ),
+        {"ws": workspace_id},
+    )
+    enabled_kinds = [row.kind for row in enabled_rows]
     await session.execute(
         text("UPDATE workspace_schedules SET enabled = false WHERE workspace_id = :ws"),
         {"ws": workspace_id},
@@ -115,7 +124,12 @@ async def create_deletion(
         user_id=user_id,
         action="deletion.requested",
         target=str(deletion_id),
-        detail={"scope": scope, "reason": reason, "purge_at": purge_at.isoformat()},
+        detail={
+            "scope": scope,
+            "reason": reason,
+            "purge_at": purge_at.isoformat(),
+            "enabled_kinds": enabled_kinds,
+        },
     )
     await session.commit()
     await set_rls_context(session, workspace_id, user_id)
@@ -175,10 +189,25 @@ async def cancel_deletion(
         ),
         {"ws": workspace_id, "id": deletion_id},
     )
-    await session.execute(
-        text("UPDATE workspace_schedules SET enabled = true WHERE workspace_id = :ws"),
-        {"ws": workspace_id},
+    # 只恢复“申请删除前本来就启用”的调度（记录在 deletion.requested 审计里）。
+    prior = await session.execute(
+        text(
+            "SELECT detail->'enabled_kinds' AS kinds FROM audit_logs "
+            "WHERE workspace_id = :ws AND action = 'deletion.requested' "
+            "  AND target = :target ORDER BY created_at DESC LIMIT 1"
+        ),
+        {"ws": workspace_id, "target": str(deletion_id)},
     )
+    kinds_row = prior.first()
+    enabled_kinds = list(kinds_row.kinds or []) if kinds_row else []
+    if enabled_kinds:
+        await session.execute(
+            text(
+                "UPDATE workspace_schedules SET enabled = true "
+                "WHERE workspace_id = :ws AND kind = ANY(:kinds)"
+            ),
+            {"ws": workspace_id, "kinds": enabled_kinds},
+        )
     await insert_audit(
         session,
         workspace_id=workspace_id,

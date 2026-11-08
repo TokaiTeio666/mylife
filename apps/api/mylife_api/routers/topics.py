@@ -59,8 +59,9 @@ def _item(row: dict, occurrences: list[dict]) -> TopicItem:
             {
                 "source_date": item["source_date"],
                 "source_path": item["source_path"],
+                # 0/None 是无行号的哨兵（迁移 0005 的 line_start 回填）。
                 "line_range": [item["line_start"], item["line_end"]]
-                if item.get("line_start") is not None
+                if item.get("line_start") and item.get("line_end") is not None
                 else None,
                 "quote": item["quote"],
                 "evidence_id": item.get("evidence_id"),
@@ -149,13 +150,34 @@ async def confirm_topic_item(
     await repo_review.update_topic_status(
         db, workspace_id=ctx.workspace_id, item_id=item_id, status=target
     )
+    # D9：人工确认时可修正抽取结果；白名单（title + 条目字段）写回
+    # fields_json，优先级高于物化值。
+    edited = payload.edited_fields or {}
+    if edited:
+        allowed = {"title", "event", "name", "text", "root_cause", "cost",
+                   "correct_action", "recurrence_trigger", "source",
+                   "applicable_scenario", "steps", "boundaries",
+                   "landing_action", "verification_criteria", "trigger",
+                   "verification", "summary"}
+        fields = {key: value for key, value in edited.items() if key in allowed}
+        if fields:
+            await repo_review.merge_topic_fields(
+                db,
+                workspace_id=ctx.workspace_id,
+                item_id=item_id,
+                fields=fields,
+            )
     await insert_audit(
         db,
         workspace_id=ctx.workspace_id,
         user_id=ctx.user_id,
         action="topic.confirmed",
         target=str(item_id),
-        detail={"topic": slug, "decision": payload.decision},
+        detail={
+            "topic": slug,
+            "decision": payload.decision,
+            "edited_fields": sorted((payload.edited_fields or {}).keys()),
+        },
     )
     updated = await repo_review.get_topic_item(
         db, workspace_id=ctx.workspace_id, item_id=item_id

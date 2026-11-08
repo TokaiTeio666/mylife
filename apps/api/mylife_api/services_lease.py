@@ -33,7 +33,9 @@ async def sweep_expired_leases(session: AsyncSession) -> int:
     rows = [dict(row._mapping) for row in result]
     reclaimed = 0
     for row in rows:
-        if row["state"] in {"created", "retry_wait"}:
+        # `human_gate` 是等待人工的终态（API §7.1），其 lease 本就为空，
+        # 不得被当成僵尸任务回收，否则会与审批操作互相抢状态。
+        if row["state"] in {"created", "retry_wait", "human_gate"}:
             continue
         # SECURITY DEFINER 扫描返回跨租户行；真正更新前必须绑定租户上下文。
         await set_rls_context(session, row["workspace_id"], None)
