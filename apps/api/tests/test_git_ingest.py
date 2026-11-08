@@ -215,3 +215,35 @@ def test_clone_rejects_symlink(tmp_path):
 
     with pytest.raises(GitRejected):
         git_source._reject_symlinks(work)  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_git_ingest_app_auth_type_is_mapped(client, admin_conn, tmp_path, monkeypatch):
+    """wire 值 `app` 必须映射为 DB 的 `github_app`（PHASE4-SPEC D21）。"""
+    remote = _make_remote(tmp_path)
+    monkeypatch.setattr(worker_settings, "git_base_url", remote.parents[1].as_uri())
+    monkeypatch.setattr(worker_settings, "allow_local_git", True)
+    helpers.insert_invite(admin_conn, "INV-GITAPP01", expires_in_days=30)
+    registered = await helpers.register(
+        client, invite_code="INV-GITAPP01", email="gitapp@example.com"
+    )
+    workspace_id = registered.json()["workspace"]["id"]
+    token = helpers.current_csrf(client)
+    created = await client.post(
+        f"{API}/ingest/git",
+        json={
+            "provider": "github",
+            "repo_full_name": "owner/app-repo",
+            "base_branch": "main",
+            "auth_type": "app",
+            "credential": "dummy-token",
+            "initial_sync": False,
+        },
+        headers=helpers.csrf_headers(token),
+    )
+    assert created.status_code == 202, created.text
+    stored = admin_conn.execute(
+        "SELECT auth_type FROM git_connections WHERE workspace_id = %s",
+        (workspace_id,),
+    ).fetchone()[0]
+    assert stored == "github_app"

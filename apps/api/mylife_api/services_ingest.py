@@ -214,6 +214,8 @@ async def create_git_connection(
         ciphertext = encrypt_credential(
             payload.credential, workspace_id=str(workspace_id), provider="git"
         )
+    # wire 值 `app` → DB CHECK 的 `github_app`（PHASE4-SPEC D21）。
+    db_auth_type = "github_app" if payload.auth_type == "app" else payload.auth_type
 
     await _assert_no_active(session, workspace_id)
     try:
@@ -223,7 +225,7 @@ async def create_git_connection(
             provider=payload.provider,
             repo_full_name=payload.repo_full_name,
             base_branch=payload.base_branch,
-            auth_type=payload.auth_type,
+            auth_type=db_auth_type,
             credential_ciphertext=ciphertext,
             reviews_root=payload.reviews_root,
             mode=payload.mode,
