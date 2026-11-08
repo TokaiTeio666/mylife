@@ -14,7 +14,7 @@
 | 后端测试 | **249 passed, 1 skipped**（skip 为 Windows 符号链接用例） |
 | 前端 `tsc` / `eslint` / `next build` | 通过（新增 `/reviews`、`/reviews/[kind]/[period]`、`/topics`、`/topics/[topic]`、`/settings`） |
 | 依赖方向检查 | 通过（`packages/delivery` 新增模块仅依赖 contracts/runtime） |
-| 迁移 | `0005_phase4_delivery`、`0006_phase4_dispatch`、`0007_phase4_resume` upgrade/downgrade 均通过 |
+| 迁移 | `0005_phase4_delivery` … `0009_phase4_outbox_scan` upgrade/downgrade 均通过 |
 | Phase 4 AC | AC-39、AC-40、AC-43…AC-48、AC-51、AC-52、AC-67 —— 见 §2 |
 | Phase 4 SEC | SEC-27（SEC-16/17/23 回归通过）—— 见 §3 |
 | FX | FX-07、FX-08、FX-09 —— 见 §4 |
@@ -111,6 +111,14 @@
 | 4 | 新建 workspace 的 `next_run_at` 为空 | 默认调度行未计算 | `insert_default_schedules` 创建即计算 |
 | 5 | 对象存储交付后 `delivery_status` 停在 pending | API 枚举无 `object_store` | 映射为 `ui_diff` |
 | 6 | dispatcher 日志 `event` 字段嵌套 JSON | `logger.info(json.dumps(...))` | 改用 `extra` 平铺字段 |
+| 7 | 删除冷却到期从不执行 purge | `deletion_requests` 是 FORCE RLS，dispatcher 普通 SELECT 恒 0 行 | 迁移 0008 增加 `dispatch_due_deletions()` |
+| 8 | outbox 重投从不执行 | 同上（`outbox_events`） | 迁移 0009 增加 `dispatch_due_outbox()` |
+| 9 | purge 后 owner 会话仍可登录 | `sessions` 无 `workspace_id`，通用循环静默跳过 | 按 owner 显式删除并加断言 |
+| 10 | 到期点因并发/活跃 run 被永久跳过 | 无论准入结果都推进 `next_run_at` | 仅在非暂时失败时推进 |
+| 11 | 编辑重评审时 G3c 被静默跳过 | `frozen_text` 传空 | 从快照加载冻结原文 |
+| 12 | 任意成员可读 webhook 投递日志 | 端点无角色校验 | 限 owner/admin |
+| 13 | `GET /deliveries/{id}` 对无 manifest 的历史行 500 | 直接 `model_validate` | 返回最小占位 manifest |
+| 14 | Phase 4 fixture 报告每次重跑都变化 | 报告写入随机 id 与时间戳 | 只写键名/长度，去掉时间戳 |
 
 ---
 
