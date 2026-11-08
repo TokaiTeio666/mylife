@@ -184,17 +184,35 @@ async def calendar_view(
             {"ws": workspace_id, "start": start, "end": end},
         )
         by_date = {row.period_key: row for row in result}
+        # 该日仍未完成的任务数：first_seen <= 当日 且（未完成 或 done_date > 当日）。
+        task_rows = await session.execute(
+            text(
+                "SELECT first_seen, done_date FROM tasks WHERE workspace_id = :ws "
+                "AND first_seen <= :end "
+                "AND (status <> 'done' OR done_date IS NULL OR done_date > :end)"
+            ),
+            {"ws": workspace_id, "end": end},
+        )
+        spans = [(row.first_seen, row.done_date) for row in task_rows]
         days = []
         for day in range(1, days_in_month + 1):
-            key = date(year, month, day).isoformat()
+            current = date(year, month, day)
+            key = current.isoformat()
             row = by_date.get(key)
+            open_tasks = sum(
+                1
+                for first_seen, done_date in spans
+                if first_seen is not None
+                and first_seen <= current
+                and (done_date is None or done_date > current)
+            )
             days.append(
                 {
                     "date": key,
                     "has_daily": row is not None,
                     "daily_status": row.status if row else None,
                     "degraded": bool(row.degraded) if row else False,
-                    "open_tasks": 0,
+                    "open_tasks": open_tasks,
                 }
             )
         return {"year": year, "months": [], "days": days}
