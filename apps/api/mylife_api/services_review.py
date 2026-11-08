@@ -716,6 +716,19 @@ async def _recheck_edited(
     full_path = review_path(reviews_root, run["kind"], run["period_key"])
     target = full_path[len(reviews_root.rstrip("/")) :].lstrip("/")
 
+    # G3c 需要冻结原文；缺失时该门禁会整体跳过，等于放宽校验。
+    frozen_text: dict[str, str] = {}
+    storage_path = payload.get("storage_path")
+    if storage_path:
+        from pathlib import Path
+
+        from mylife_runtime.snapshot_text import load_frozen_text, strip_frontmatter
+
+        for path in hashes:
+            text = load_frozen_text(Path(storage_path), path)
+            if text is not None:
+                frozen_text[path] = strip_frontmatter(text)[0]
+
     ctx = GateContext(
         kind=run["kind"],
         workspace_id=str(workspace_id),
@@ -738,7 +751,7 @@ async def _recheck_edited(
             for row in entries
         ],
         snapshot_hashes=hashes,
-        frozen_text={},
+        frozen_text=frozen_text,
         citations=citations,
         target_paths=(target,),
         parser_version="mylife-parser-1",
