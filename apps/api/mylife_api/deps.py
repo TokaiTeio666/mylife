@@ -18,6 +18,7 @@ from uuid import UUID
 from fastapi import Depends, Request
 from mylife_contract.constants import COOKIE_SESSION
 from mylife_contract.errors import ErrorCode
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mylife_api import repositories as repo
@@ -109,7 +110,30 @@ async def require_session(request: Request, db: AsyncSession = Depends(get_db)) 
     )
 
 
+#: 冷却期仍允许的路径前缀（删除撤销与认证本身）。
+_COOLING_ALLOWED_PREFIXES = ("/api/v1/deletions", "/api/v1/auth", "/api/v1/admin")
+
+
+async def _assert_workspace_writable(db: AsyncSession, *, workspace_id: UUID) -> None:
+    """删除冷却期“立即停用所有写操作”（API §3.11.4 / PHASE5-SPEC D14）。
+
+    只读请求与 `/deletions/*`、`/auth/*`、`/admin/*` 放行；其余写请求 403。
+    """
+    row = (
+        await db.execute(
+            text(
+                "SELECT 1 FROM deletion_requests WHERE workspace_id = :ws "
+                "AND state = 'cooling' LIMIT 1"
+            ),
+            {"ws": workspace_id},
+        )
+    ).first()
+    if row is not None:
+        raise AppError(ErrorCode.DELETE_IN_COOLING)
+
+
 async def get_run_context(
+    request: Request,
     auth: AuthState = Depends(require_session),
     db: AsyncSession = Depends(get_db),
 ) -> RunContext:
@@ -133,6 +157,16 @@ async def get_run_context(
         raise AppError(ErrorCode.NOT_FOUND)
 
     await set_rls_context(db, auth.active_workspace_id, auth.user_id)
+
+    # 冷却期只读（PHASE5-SPEC D14）：除只读请求与放行前缀外一律 403。
+    path = request.url.path if request is not None else ""
+    if (
+        request is not None
+        and request.method not in {"GET", "HEAD", "OPTIONS"}
+        and not path.startswith(_COOLING_ALLOWED_PREFIXES)
+    ):
+        await _assert_workspace_writable(db, workspace_id=auth.active_workspace_id)
+
     return RunContext(
         user_id=auth.user_id,
         workspace_id=auth.active_workspace_id,

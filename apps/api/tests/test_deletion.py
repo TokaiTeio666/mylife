@@ -17,9 +17,10 @@ from tests.helpers import API
 pytestmark = pytest.mark.db
 
 
-async def _post(client, path: str, body: dict):
+async def _post(client, path: str, body: dict, headers: dict | None = None):
     token = await helpers.csrf(client)
-    return await client.post(path, json=body, headers=helpers.csrf_headers(token))
+    merged = {**helpers.csrf_headers(token), **(headers or {})}
+    return await client.post(path, json=body, headers=merged)
 
 
 def _git(*args: str, cwd: Path) -> str:
@@ -73,6 +74,21 @@ async def test_cooling_purge_and_git_history_retained(client, admin_conn, tmp_pa
     )
     assert wrong.status_code == 422, wrong.text
 
+    # D15：没有近 7 天的成功导出时拒绝删除（AC-55 的“先导出”顺序）。
+    blocked = await _post(
+        client, f"{API}/deletions", {"scope": "workspace", "confirm_text": name}
+    )
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["error"]["details"]["reason"] == "EXPORT_REQUIRED"
+
+    exported = await _post(
+        client,
+        f"{API}/exports",
+        {"scope": "workspace", "include": ["documents", "reviews"]},
+        headers={"Idempotency-Key": "del-export"},
+    )
+    assert exported.status_code == 202, exported.text
+
     created = await _post(
         client, f"{API}/deletions", {"scope": "workspace", "confirm_text": name}
     )
@@ -88,6 +104,14 @@ async def test_cooling_purge_and_git_history_retained(client, admin_conn, tmp_pa
         client, f"{API}/deletions", {"scope": "workspace", "confirm_text": name}
     )
     assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "DELETE_IN_COOLING"
+
+    # 冷却期内写操作被冻结（除 GET/deletions/auth 外）
+    frozen = await _post(
+        client, f"{API}/reviews", {"kind": "daily", "period_key": "2026-10-27"}
+    )
+    assert frozen.status_code == 409, frozen.text
+    assert frozen.json()["error"]["code"] == "DELETE_IN_COOLING"
 
     current = await client.get(f"{API}/deletions/current")
     assert current.status_code == 200
@@ -131,6 +155,26 @@ async def test_cooling_purge_and_git_history_retained(client, admin_conn, tmp_pa
             f"SELECT count(*) FROM {table} WHERE workspace_id = %s", (workspace_id,)
         ).fetchone()[0]
         assert remaining == 0, f"{table} 仍残留正文"
+    # AC-55：purge 后 §9.2 级联清单全部 0 命中（除保留表），且无残留审计。
+    from mylife_contract.constants import DELETION_PURGE_TABLES
+
+    retained = {"audit_logs", "deletion_requests", "users", "workspaces", "invite_codes"}
+    residual = []
+    for table in DELETION_PURGE_TABLES:
+        if table in retained or table == "sessions":
+            continue
+        rows = admin_conn.execute(
+            f"SELECT count(*) FROM {table} WHERE workspace_id = %s", (workspace_id,)
+        ).fetchone()[0]
+        if rows:
+            residual.append(table)
+    assert residual == [], f"purge 残留：{residual}"
+    assert (
+        admin_conn.execute(
+            "SELECT count(*) FROM audit_logs WHERE action = 'deletion.purge_residual'"
+        ).fetchone()[0]
+        == 0
+    ), "不应出现残留告警"
     owner_id = admin_conn.execute(
         "SELECT owner_id FROM workspaces WHERE id = %s", (workspace_id,)
     ).fetchone()[0]

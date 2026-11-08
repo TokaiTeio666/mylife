@@ -33,6 +33,7 @@ async def create_deletion(
         scope=payload.scope,
         confirm_text=payload.confirm_text,
         reason=payload.reason,
+        skip_export=payload.skip_export,
     )
     return DeletionRequest(**data)
 
