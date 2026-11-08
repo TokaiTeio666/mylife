@@ -119,6 +119,9 @@
 | 12 | 任意成员可读 webhook 投递日志 | 端点无角色校验 | 限 owner/admin |
 | 13 | `GET /deliveries/{id}` 对无 manifest 的历史行 500 | 直接 `model_validate` | 返回最小占位 manifest |
 | 14 | Phase 4 fixture 报告每次重跑都变化 | 报告写入随机 id 与时间戳 | 只写键名/长度，去掉时间戳 |
+| 15 | 交付后仪表盘仍显示旧计数 | 60s 进程内缓存未失效 | 交付完成时 `clear_dashboard_cache()` |
+| 16 | 日历 `open_tasks` 恒为 0 | 硬编码占位 | 按任务区间逐日统计 |
+| 17 | outbox 重投可能给已成功周期再生成一版 | `admit_scheduled_review` 未做成功检查 | 函数内先判 `period_already_succeeded` |
 
 ---
 
