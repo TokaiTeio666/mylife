@@ -138,7 +138,10 @@
 | P4-27 | 回滚 | 生成 version+1（复制目标版本内容与子表），再交付 | 单行指针模型下无法直接改回（D34） |
 | P4-28 | `索引.md` 格式 | 冻结为 frontmatter + auto 区：最新日/周/年 + 三专题 open 计数 | 文档未定义内容（D10） |
 | P4-29 | 专题 `stale` 自动迁移 | 未实现，只有人工/显式操作产生 | N/TTL 未定义（D30） |
-| P4-30 | 删除 purge 表集合 | 取 API §3.11.7 与 DATA-MODEL §9.2 并集，补 `git_connections/workspace_schedules/job_runs/...` | 两份清单不一致（D19） |
+| P4-30 | 删除 purge 表集合 | 取 API §3.11.7 与 DATA-MODEL §9.2 并集，补 `git_connections/workspace_schedules/job_runs/...`；`sessions` 按 owner 删除 | 两份清单不一致（D19）；`sessions` 无 `workspace_id` |
+| P4-31 | 跨租户后台扫描 | 调度/续跑/删除/outbox 四个 `SECURITY DEFINER` 函数（owner=`mylife_dispatch`，只暴露必要列） | FORCE RLS 下普通 SELECT 恒 0 行（D26）；JOIN 回 `agent_runs` 会重新受 RLS（迁移 0007） |
+| P4-32 | 调度推进语义 | 仅“已准入 / 已成功 / 超窗”推进 `next_run_at`；`active`/`concurrency`/异常保留到期点待下 tick | 否则到期点会被永久跳过 |
+| P4-33 | 仪表盘缓存 | 60s 进程内缓存；交付完成时整体清空 | 交付会改变 latest/统计口径 |
 
 ---
 
