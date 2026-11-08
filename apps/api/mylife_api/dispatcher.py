@@ -213,13 +213,8 @@ async def _enqueue_outbox(
 async def relay_outbox(session: AsyncSession) -> int:
     from mylife_api import services_review
 
-    result = await session.execute(
-        text(
-            "SELECT id, workspace_id, topic, payload_json, attempts FROM outbox_events "
-            "WHERE status IN ('pending','failed') AND available_at <= now() "
-            "ORDER BY available_at ASC LIMIT 20"
-        )
-    )
+    # FORCE RLS：无租户上下文时必须走 SECURITY DEFINER 扫描函数。
+    result = await session.execute(text("SELECT * FROM dispatch_due_outbox(20)"))
     rows = [dict(row._mapping) for row in result]
     sent = 0
     for row in rows:
