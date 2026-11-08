@@ -14,7 +14,7 @@
 | 后端测试 | **249 passed, 1 skipped**（skip 为 Windows 符号链接用例） |
 | 前端 `tsc` / `eslint` / `next build` | 通过（新增 `/reviews`、`/reviews/[kind]/[period]`、`/topics`、`/topics/[topic]`、`/settings`） |
 | 依赖方向检查 | 通过（`packages/delivery` 新增模块仅依赖 contracts/runtime） |
-| 迁移 | `0005_phase4_delivery` … `0009_phase4_outbox_scan` upgrade/downgrade 均通过 |
+| 迁移 | `0005_phase4_delivery` … `0010_phase4_topic_backfill` upgrade/downgrade 均通过 |
 | Phase 4 AC | AC-39、AC-40、AC-43…AC-48、AC-51、AC-52、AC-67 —— 见 §2 |
 | Phase 4 SEC | SEC-27（SEC-16/17/23 回归通过）—— 见 §3 |
 | FX | FX-07、FX-08、FX-09 —— 见 §4 |
@@ -122,6 +122,28 @@
 | 15 | 交付后仪表盘仍显示旧计数 | 60s 进程内缓存未失效 | 交付完成时 `clear_dashboard_cache()` |
 | 16 | 日历 `open_tasks` 恒为 0 | 硬编码占位 | 按任务区间逐日统计 |
 | 17 | outbox 重投可能给已成功周期再生成一版 | `admit_scheduled_review` 未做成功检查 | 函数内先判 `period_already_succeeded` |
+
+### 7.1 独立评审（5 视角 + 对抗复核）发现并修复
+
+| # | 现象 | 修复 |
+|---|---|---|
+| 18 | `confirm(decision=drop)` 500：`TopicStatusValue` 缺 `dropped` | 枚举补 `dropped`；默认列表排除 `dropped` |
+| 19 | 重跑只清“仍存在的条目”，消失条目留下幽灵 occurrence | 重跑先按 review 清空全部 occurrence，再重建 |
+| 20 | 第三个不同字段值覆盖第二个；值恢复一致后冲突不消失 | 冲突由当前全部 occurrence 重算 |
+| 21 | 同日同 canonical_key 多篇笔记时，quote 与 path 来源错配 | 来源映射改为 first-wins |
+| 22 | 瞬时标记损坏留下的 `manual` 永久拒绝更新 | manual 文件不再合并；成功合并时恢复 auto 并写入新哈希 |
+| 23 | `line_start=0`/`line_end=NULL` 导致渲染与列表 500 | 0/None 视为无行号 |
+| 24 | sweeper 每 15s 回收 `human_gate` run | sweeper 跳过 `human_gate` |
+| 25 | 失败交付的“重试”被 noop 短路 | 仅上次成功时才判 noop |
+| 26 | `GET /deliveries` 分页恒 `has_more=false`；状态过滤用 API 枚举查 DB | 实现游标；过滤映射 API→DB |
+| 27 | 复盘搜索片段未转义 → 存储型 XSS | 服务端转义并生成 `snippet_html`；前端无 `snippet_html` 时按文本渲染 |
+| 28 | `GET /reviews` 忽略 `from/to` | 支持周期范围过滤 |
+| 29 | `GET /settings/git` 响应 `auth_type` 为 DB 值导致 500 | 响应统一 wire 值 `app` |
+| 30 | 仪表盘：dropped 任务算作未完成；`open_tasks` 含 done；区间参数不生效；`no_evidence_ratio` 口径错误 | 逐项修正（哨兵章节比例、降级复盘比例） |
+| 31 | 取消删除会把用户手动关闭的调度重新打开 | 记录并只恢复原本启用的 kind |
+| 32 | 专题 confirm 忽略 `edited_fields` | 白名单合并进 `fields_json` 并同步 title |
+| 33 | 历史 `occurrence_count` 虚高未回填 | 迁移 0010 按 occurrence 行数回填 |
+| 34 | 设置页三个启用开关文案都是“确认”；下载链接硬编码 `/api/v1` | 各自文案；下载走 `API_BASE` |
 
 ---
 
