@@ -181,11 +181,21 @@ export default function SettingsPage() {
           </div>
           {(
             [
-              ["daily_at", "enabled_daily", copy.settings.dailyAt],
-              ["weekly_at", "enabled_weekly", copy.settings.weeklyAt],
-              ["yearly_at", "enabled_yearly", copy.settings.yearlyAt],
+              ["daily_at", "enabled_daily", copy.settings.dailyAt, copy.settings.enabledDaily],
+              [
+                "weekly_at",
+                "enabled_weekly",
+                copy.settings.weeklyAt,
+                copy.settings.enabledWeekly,
+              ],
+              [
+                "yearly_at",
+                "enabled_yearly",
+                copy.settings.yearlyAt,
+                copy.settings.enabledYearly,
+              ],
             ] as const
-          ).map(([timeKey, enabledKey, label]) => (
+          ).map(([timeKey, enabledKey, label, enabledLabel]) => (
             <div key={timeKey} className="flex flex-col gap-1">
               <Label htmlFor={timeKey}>{label}</Label>
               <div className="flex items-center gap-2">
@@ -203,7 +213,7 @@ export default function SettingsPage() {
                       setForm({ ...form, [enabledKey]: event.target.checked })
                     }
                   />
-                  {copy.common.confirm}
+                  {enabledLabel}
                 </label>
               </div>
             </div>

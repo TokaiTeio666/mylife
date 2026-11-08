@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/api/client";
+import { API_BASE, api } from "@/lib/api/client";
 import type { ReviewSummary } from "@/lib/api/types";
 import { copy } from "@/lib/copy/zh-CN";
 import { useMe } from "@/lib/hooks/use-me";
@@ -145,7 +145,7 @@ export default function ReviewDetailPage() {
                 ) : null}
                 {delivery.target === "object_store" ? (
                   <a
-                    href={`/api/v1/deliveries/${delivery.id}/download`}
+                    href={`${API_BASE}/deliveries/${delivery.id}/download`}
                     className="inline-flex items-center gap-1 text-accent hover:underline"
                   >
                     <Download className="h-3 w-3" aria-hidden="true" />
