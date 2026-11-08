@@ -212,3 +212,6 @@ if PG_AVAILABLE:
         factory = get_session_factory()
         async with factory() as session:
             yield session
+            # 未显式回滚的会话会以打开事务归还连接池；下一个用例的 TRUNCATE
+            # 会与它互相等待（AccessExclusiveLock vs RowShareLock）。
+            await session.rollback()
