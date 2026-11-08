@@ -65,6 +65,9 @@ STATEMENTS: list[str] = [
     "ALTER TABLE provider_credentials ADD COLUMN base_url text",
     "ALTER TABLE provider_credentials ADD COLUMN model text",
     "ALTER TABLE provider_credentials ADD COLUMN model_profile text",
+    # `provider` 列区分凭据用途（llm/embedding），`provider_name` 才是厂商
+    # （deepseek/openai_compatible/mock）；两者语义不同，不能复用同一列。
+    "ALTER TABLE provider_credentials ADD COLUMN provider_name text",
     "ALTER TABLE provider_credentials DROP CONSTRAINT "
     "provider_credentials_status_check",
     "ALTER TABLE provider_credentials ADD CONSTRAINT "
@@ -509,7 +512,7 @@ def downgrade() -> None:
         "provider_credentials_status_check "
         "CHECK (status IN ('active','invalid','disabled'))"
     )
-    for column in ("model_profile", "model", "base_url"):
+    for column in ("provider_name", "model_profile", "model", "base_url"):
         op.execute(f"ALTER TABLE provider_credentials DROP COLUMN IF EXISTS {column}")
     op.execute("DROP INDEX IF EXISTS idx_users_created")
     for column in ("disabled_at", "disabled_reason", "last_login_at"):

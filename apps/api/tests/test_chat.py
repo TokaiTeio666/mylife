@@ -9,7 +9,6 @@ import uuid
 import pytest
 from mylife_agent.llm import MockLLMProvider
 
-from mylife_api import chat_runner
 from mylife_api.services_chat import wait_for_run
 from tests import helpers
 from tests.helpers import API
@@ -351,7 +350,12 @@ async def test_prompt_contains_only_minimal_evidence(client, admin_conn, monkeyp
         captured.append(provider)
         return provider
 
-    monkeypatch.setattr(chat_runner, "build_llm_provider", fake_provider)
+    async def fake_for_workspace(session, *, workspace_id):
+        return fake_provider()
+
+    monkeypatch.setattr(
+        "mylife_api.services_llm.build_llm_for_workspace", fake_for_workspace
+    )
 
     workspace_id, _ = await helpers.prepare_workspace_with_docs(
         client, admin_conn, email="chat-privacy@example.com", files=DOCS

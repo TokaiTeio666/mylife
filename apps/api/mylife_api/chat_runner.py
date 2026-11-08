@@ -23,7 +23,6 @@ from mylife_agent.llm import (
     LLMKeyMissing,
     LLMRequest,
     LLMUnavailable,
-    build_llm_provider,
 )
 from mylife_agent.prompt import build_messages, plan_tool_calls, should_read_note
 from mylife_contract.errors import ErrorCode
@@ -32,8 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from mylife_api import repo_chat as repo
 from mylife_api.db import get_session_factory, set_rls_context
+from mylife_api.errors import AppError
 from mylife_api.runbus import bus
-from mylife_api.settings import settings
 from mylife_api.tools import ToolContext, execute_tool
 
 logger = logging.getLogger("mylife.api.chat")
@@ -508,13 +507,13 @@ class ChatRunner:
             return answer, usage, False
 
         try:
-            provider = build_llm_provider(
-                provider=settings.llm_provider,
-                base_url=settings.llm_base_url,
-                api_key=settings.llm_api_key,
-                model=settings.llm_model,
+            # DB 行 → 环境变量 → mock（PHASE5-SPEC D7）；设置页保存的密钥立即生效。
+            from mylife_api import services_llm
+
+            provider = await services_llm.build_llm_for_workspace(
+                session, workspace_id=self.workspace_id
             )
-        except LLMKeyMissing:
+        except (LLMKeyMissing, AppError):
             await self._event(
                 session,
                 run,

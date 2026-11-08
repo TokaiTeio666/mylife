@@ -1,4 +1,4 @@
-"""设置路由（API-CONTRACTS §3.9.7–§3.9.11；AC-51/AC-52）。"""
+"""设置路由（API-CONTRACTS §3.9.1–§3.9.11；AC-49/AC-50/AC-51/AC-52/AC-53）。"""
 
 from __future__ import annotations
 
@@ -9,6 +9,10 @@ from mylife_contract.errors import ErrorCode
 from mylife_contract.settings import (
     GitConnectionList,
     GitSettingsUpdate,
+    LlmSettings,
+    LlmTestRequest,
+    LlmTestResult,
+    LlmUpdate,
     RetrievalSettings,
     RetrievalUpdate,
     ScheduleSettings,
@@ -17,11 +21,60 @@ from mylife_contract.settings import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mylife_api import services_settings
+from mylife_api import services_llm, services_settings
 from mylife_api.deps import RunContext, get_db, get_run_context
 from mylife_api.errors import AppError
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+# ---------------------------------------------------------------------------
+# LLM（§3.9.1–§3.9.3；AC-49）
+# ---------------------------------------------------------------------------
+
+
+@router.get("/llm", response_model=LlmSettings)
+async def get_llm(
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> LlmSettings:
+    return await services_llm.get_llm_settings(db, workspace_id=ctx.workspace_id)
+
+
+@router.put("/llm", response_model=LlmSettings)
+async def put_llm(
+    payload: LlmUpdate,
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> LlmSettings:
+    return await services_llm.put_llm_settings(
+        db,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        role=ctx.role,
+        payload=payload,
+    )
+
+
+@router.post("/llm/test", response_model=LlmTestResult)
+async def test_llm(
+    payload: LlmTestRequest,
+    ctx: RunContext = Depends(get_run_context),
+    db: AsyncSession = Depends(get_db),
+) -> LlmTestResult:
+    return await services_llm.test_llm(
+        db,
+        workspace_id=ctx.workspace_id,
+        provider=payload.provider,
+        base_url=payload.base_url,
+        model=payload.model,
+        api_key=payload.api_key,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Embedding（§3.9.4–§3.9.6；AC-50）在 C5 接入
+# ---------------------------------------------------------------------------
 
 
 @router.get("/schedule", response_model=ScheduleSettings)

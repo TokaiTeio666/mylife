@@ -481,19 +481,35 @@ async def upsert_provider_credential(
     provider: str,
     key_ciphertext: bytes,
     key_version: int,
+    base_url: str | None = None,
+    model: str | None = None,
+    model_profile: str | None = None,
+    provider_name: str | None = None,
+    status: str = "active",
 ) -> dict[str, Any]:
     result = await session.execute(
         text(
             """
             INSERT INTO provider_credentials
-              (id, workspace_id, provider, key_ciphertext, key_version, status)
-            VALUES (gen_random_uuid(), :ws, :provider, :ciphertext, :version, 'active')
+              (id, workspace_id, provider, key_ciphertext, key_version, status,
+               base_url, model, model_profile, provider_name, last_tested_at)
+            VALUES (gen_random_uuid(), :ws, :provider, :ciphertext, :version, :status,
+                    :base_url, :model, :profile, :provider_name, now())
             ON CONFLICT (workspace_id, provider) DO UPDATE
               SET key_ciphertext = EXCLUDED.key_ciphertext,
                   key_version = EXCLUDED.key_version,
-                  status = 'active',
+                  status = EXCLUDED.status,
+                  base_url = COALESCE(EXCLUDED.base_url, provider_credentials.base_url),
+                  model = COALESCE(EXCLUDED.model, provider_credentials.model),
+                  model_profile = COALESCE(
+                    EXCLUDED.model_profile, provider_credentials.model_profile),
+                  provider_name = COALESCE(
+                    EXCLUDED.provider_name, provider_credentials.provider_name),
+                  last_tested_at = now(),
                   updated_at = now()
-            RETURNING id, workspace_id, provider, key_version, status, created_at, updated_at
+            RETURNING id, workspace_id, provider, key_version, status,
+                      base_url, model, model_profile, provider_name, last_tested_at,
+                      created_at, updated_at
             """
         ),
         {
@@ -501,9 +517,51 @@ async def upsert_provider_credential(
             "provider": provider,
             "ciphertext": key_ciphertext,
             "version": key_version,
+            "status": status,
+            "base_url": base_url,
+            "model": model,
+            "profile": model_profile,
+            "provider_name": provider_name,
         },
     )
     return dict(result.one()._mapping)
+
+
+async def update_provider_credential_meta(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    provider: str,
+    status: str,
+    base_url: str | None = None,
+    model: str | None = None,
+    model_profile: str | None = None,
+    provider_name: str | None = None,
+    mark_tested: bool = True,
+) -> None:
+    """只更新连接参数与状态，不碰密钥（`api_key` 省略时的保存路径）。"""
+    await session.execute(
+        text(
+            "UPDATE provider_credentials SET status = :status, "
+            "  base_url = COALESCE(:base_url, base_url), "
+            "  model = COALESCE(:model, model), "
+            "  model_profile = COALESCE(:profile, model_profile), "
+            "  provider_name = COALESCE(:provider_name, provider_name), "
+            "  last_tested_at = CASE WHEN :tested THEN now() ELSE last_tested_at END, "
+            "  updated_at = now() "
+            "WHERE workspace_id = :ws AND provider = :provider"
+        ),
+        {
+            "ws": workspace_id,
+            "provider": provider,
+            "status": status,
+            "base_url": base_url,
+            "model": model,
+            "profile": model_profile,
+            "provider_name": provider_name,
+            "tested": mark_tested,
+        },
+    )
 
 
 async def get_provider_credential(
@@ -511,7 +569,8 @@ async def get_provider_credential(
 ) -> dict[str, Any] | None:
     result = await session.execute(
         text(
-            "SELECT id, workspace_id, provider, key_ciphertext, key_version, status "
+            "SELECT id, workspace_id, provider, key_ciphertext, key_version, status, "
+            "       base_url, model, model_profile, provider_name, last_tested_at "
             "FROM provider_credentials WHERE workspace_id = :ws AND provider = :provider"
         ),
         {"ws": workspace_id, "provider": provider},
