@@ -88,13 +88,12 @@ async def resume_pending_runs(*, limit: int = 20) -> int:
 
     factory = get_session_factory()
     async with factory() as session:
+        # `has_review` 必须由 SECURITY DEFINER 函数返回：外部 JOIN agent_runs
+        # 会重新受 RLS 约束（无租户上下文 → 0 行）。
         result = await session.execute(
             text(
-                "SELECT r.workspace_id, r.run_id, r.state, "
-                "       (a.state_payload ? 'review_id') AS has_review "
-                "FROM dispatch_resumable_review_runs(:limit) r "
-                "JOIN agent_runs a ON a.id = r.run_id "
-                "  AND a.workspace_id = r.workspace_id"
+                "SELECT workspace_id, run_id, state, has_review "
+                "FROM dispatch_resumable_review_runs(:limit)"
             ),
             {"limit": limit},
         )
