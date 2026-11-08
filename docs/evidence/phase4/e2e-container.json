@@ -10,11 +10,11 @@
     },
     {
       "step": "review",
-      "run_id": "01a1b8bb-b9f3-73e3-ac38-46b37b1ec7ae",
+      "run_id": "01a1b8d3-1a73-75cd-9690-a9419f736a80",
       "state": "succeeded"
     }
   ],
-  "workspace_id": "01a1b8bb-b589-7cd9-8144-01ef6101f53b",
+  "workspace_id": "01a1b8d3-1610-7aac-bbb7-c69c79014749",
   "review": {
     "version": 1,
     "sections": [
@@ -26,11 +26,10 @@
       "tomorrow_actions",
       "one_line_summary"
     ],
-    "degraded": false,
-    "delivery_status": null
+    "degraded": false
   },
   "delivery": {
-    "id": "0e3edb58-6bac-5dff-8eeb-fb88c8c30adc",
+    "id": "28498ebf-c00d-5346-b183-006c1df9c678",
     "target": "object_store",
     "status": "committed",
     "degraded": false,
@@ -74,9 +73,9 @@
     "timezone": "Asia/Shanghai",
     "daily_at": "01:00:00",
     "next_run_at": {
-      "daily": null,
-      "weekly": null,
-      "yearly": null
+      "daily": "2026-11-08T17:00:00Z",
+      "weekly": "2026-11-08T17:30:00Z",
+      "yearly": "2026-12-31T18:00:00Z"
     }
   },
   "schedule_update": 200,
