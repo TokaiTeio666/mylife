@@ -146,23 +146,45 @@ async def get_content(
     )
 
 
+def _sanitize_svg(raw: str) -> str:
+    """SEC-21：代理 SVG 时移除脚本、foreignObject 与内联事件属性。"""
+    import re
+
+    cleaned = re.sub(r"(?is)<\s*script\b[^>]*>.*?<\s*/\s*script\s*>", "", raw)
+    cleaned = re.sub(r"(?is)<\s*script\b[^>]*/\s*>", "", cleaned)
+    cleaned = re.sub(
+        r"(?is)<\s*foreignObject\b[^>]*>.*?<\s*/\s*foreignObject\s*>", "", cleaned
+    )
+    cleaned = re.sub(r"""(?i)\s+on[a-z0-9_-]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)""", "", cleaned)
+    cleaned = re.sub(r"(?i)javascript\s*:", "blocked:", cleaned)
+    return cleaned
+
+
 @router.get("/{document_id}/asset")
 async def get_asset(
     document_id: UUID,
     path: str = Query(min_length=1, max_length=1024),
     ctx: RunContext = Depends(get_run_context),
     db: AsyncSession = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     target, content_type = await services_documents.get_asset(
         db, workspace_id=ctx.workspace_id, document_id=document_id, path=path
     )
+    headers = {
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "sandbox",
+    }
+    if target.suffix.lower() == ".svg":
+        raw = target.read_text(encoding="utf-8", errors="replace")  # noqa: ASYNC240
+        return Response(
+            content=_sanitize_svg(raw),
+            media_type="image/svg+xml; charset=utf-8",
+            headers=headers,
+        )
     return FileResponse(
         target,
         media_type=content_type,
-        headers={
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy": "sandbox",
-        },
+        headers=headers,
     )
 
 

@@ -42,7 +42,9 @@ RECOVERY_SECONDS = 300
 
 
 def _run(args: list[str], **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(args, capture_output=True, text=True, **kwargs)
+    return subprocess.run(
+        args, capture_output=True, text=True, encoding="utf-8", errors="replace", **kwargs
+    )
 
 
 def compose_config_restart_policies() -> dict[str, str]:

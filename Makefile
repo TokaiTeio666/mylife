@@ -60,6 +60,7 @@ upgrade:
 
 backup:
 	sh scripts/backup_pg.sh
+	sh scripts/backup_data.sh
 
 restore-drill:
 	uv run python scripts/restore_drill.py

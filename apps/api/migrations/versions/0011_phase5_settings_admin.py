@@ -82,8 +82,9 @@ STATEMENTS: list[str] = [
     "ALTER TABLE embedding_profiles ADD COLUMN retire_at timestamptz",
     "ALTER TABLE embedding_profiles ADD COLUMN updated_at timestamptz "
     "NOT NULL DEFAULT now()",
-    # 历史行都指向基表；新 profile 在创建时写自己的 document_chunks_v{n}。
-    "UPDATE embedding_profiles SET chunk_table = 'document_chunks' "
+    # 历史 1024 维指向基表，其余维度按 `document_chunks_v{dim}` 回填，保证降级再升级幂等。
+    "UPDATE embedding_profiles SET chunk_table = CASE WHEN dimension = 1024 "
+    "THEN 'document_chunks' ELSE 'document_chunks_v' || dimension::text END "
     "WHERE chunk_table IS NULL",
     "ALTER TABLE embedding_profiles ALTER COLUMN chunk_table SET NOT NULL",
     "CREATE UNIQUE INDEX uq_embedding_chunk_table "

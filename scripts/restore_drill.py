@@ -65,9 +65,19 @@ def _run(args: list[str], **kwargs) -> subprocess.CompletedProcess:
              "postgres", *inner],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=kwargs.get("check", False),
         )
-    return subprocess.run(args, capture_output=True, text=True, env=env, check=kwargs.get("check", False))
+    return subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=kwargs.get("check", False),
+    )
 
 
 def _psql(db: str, sql: str) -> str:
@@ -161,6 +171,7 @@ def main() -> int:
         "rpo_hours": rpo_hours,
         "rpo_within_limit": rpo_hours <= RPO_LIMIT_HOURS,
         "encryption_required": bool(os.environ.get("MYLIFE_BACKUP_PASSPHRASE")),
+        "minio": "not_applicable",
         "kept_drill_database": args.keep,
     }
     EVIDENCE.parent.mkdir(parents=True, exist_ok=True)

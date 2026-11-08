@@ -1,0 +1,266 @@
+{
+  "executed_at": "2026-11-08T12:15:24.551723+00:00",
+  "viewports_tested": [
+    1440,
+    768,
+    390
+  ],
+  "responsive_matrix": [
+    {
+      "path": "/login",
+      "width": 1440,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/login",
+      "width": 768,
+      "scroll_width": 768,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/login",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/privacy",
+      "width": 1440,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/privacy",
+      "width": 768,
+      "scroll_width": 768,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/privacy",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/terms",
+      "width": 1440,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/terms",
+      "width": 768,
+      "scroll_width": 768,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/terms",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/dashboard",
+      "rendered_path": "/dashboard",
+      "width": 1440,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/dashboard",
+      "rendered_path": "/dashboard",
+      "width": 768,
+      "scroll_width": 768,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/dashboard",
+      "rendered_path": "/dashboard",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/search",
+      "rendered_path": "/search",
+      "width": 1440,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/search",
+      "rendered_path": "/search",
+      "width": 768,
+      "scroll_width": 768,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/search",
+      "rendered_path": "/search",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/documents",
+      "rendered_path": "/documents",
+      "width": 1440,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/documents",
+      "rendered_path": "/documents",
+      "width": 768,
+      "scroll_width": 768,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/documents",
+      "rendered_path": "/documents",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/chat",
+      "rendered_path": "/chat",
+      "width": 1440,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/chat",
+      "rendered_path": "/chat",
+      "width": 768,
+      "scroll_width": 768,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/chat",
+      "rendered_path": "/chat",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/settings",
+      "rendered_path": "/settings",
+      "width": 1440,
+      "scroll_width": 1425,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/settings",
+      "rendered_path": "/settings",
+      "width": 768,
+      "scroll_width": 753,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/settings",
+      "rendered_path": "/settings",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/admin/users",
+      "rendered_path": "/admin/users",
+      "width": 1440,
+      "scroll_width": 1425,
+      "inner_width": 1440,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/admin/users",
+      "rendered_path": "/admin/users",
+      "width": 768,
+      "scroll_width": 753,
+      "inner_width": 768,
+      "overflow_x": 0,
+      "non_blank": true
+    },
+    {
+      "path": "/admin/users",
+      "rendered_path": "/admin/users",
+      "width": 390,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "overflow_x": 0,
+      "non_blank": true
+    }
+  ],
+  "overflow_violations": [],
+  "pwa": {
+    "manifest_status": 200,
+    "name": "mylife",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "icons_count": 2,
+    "has_maskable_icon": true,
+    "sw_status": 200,
+    "sw_skips_api": true,
+    "offline_status": 200,
+    "offline_non_blank": true
+  },
+  "screenshots": [
+    "desktop-1440-admin-users.png",
+    "desktop-1440-settings.png",
+    "mobile-390-privacy.png",
+    "mobile-390-settings.png",
+    "offline-shell.png",
+    "tablet-768-dashboard.png"
+  ],
+  "passed": true
+}

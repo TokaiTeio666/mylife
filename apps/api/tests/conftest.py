@@ -140,6 +140,8 @@ if PG_AVAILABLE:
             env=env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         if result.returncode != 0:
             raise RuntimeError(f"alembic 迁移失败:\n{result.stdout}\n{result.stderr}")

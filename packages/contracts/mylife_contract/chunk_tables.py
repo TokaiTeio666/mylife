@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import re
 
-#: 允许的表名形态：基表或 `document_chunks_v<1-3 位数字>`。
-CHUNK_TABLE_PATTERN = re.compile(r"^document_chunks(_v[0-9]{1,3})?$")
+#: 允许的表名形态：基表或 `document_chunks_v<1-4 位数字>`（维度 256..3072）。
+CHUNK_TABLE_PATTERN = re.compile(r"^document_chunks(_v[0-9]{1,4})?$")
 
 BASE_CHUNK_TABLE = "document_chunks"
 

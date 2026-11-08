@@ -1,5 +1,5 @@
 {
-  "executed_at": "2026-11-08T09:24:36.893401+00:00",
+  "executed_at": "2026-11-08T12:06:07.436724+00:00",
   "restart_policies": {
     "api": "unless-stopped",
     "caddy": "unless-stopped",
@@ -14,7 +14,7 @@
   },
   "restart_policy_violations": [],
   "worker_recovered": true,
-  "worker_recovery_seconds": 2.9,
+  "worker_recovery_seconds": 2.8,
   "worker_recovered_within_limit": true,
   "readyz_during_redis_pause": "200",
   "passed": true

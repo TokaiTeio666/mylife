@@ -294,6 +294,7 @@ async def _fail_stale_ingest_jobs(session: AsyncSession) -> int:
     rows = await session.execute(text("SELECT * FROM dispatch_stale_ingest_jobs(50)"))
     count = 0
     for row in rows:
+        await _set_context(session, row.workspace_id)
         result = await session.execute(
             text(
                 "UPDATE job_runs SET status = 'failed', "
@@ -306,6 +307,12 @@ async def _fail_stale_ingest_jobs(session: AsyncSession) -> int:
             count += 1
     await session.commit()
     return count
+
+
+async def _retire_embedding_profiles(session: AsyncSession) -> int:
+    from mylife_api import services_embedding
+
+    return await services_embedding.retire_expired_profiles(session)
 
 
 async def tick(session: AsyncSession) -> dict[str, Any]:
@@ -321,6 +328,7 @@ async def tick(session: AsyncSession) -> dict[str, Any]:
     relayed = await relay_outbox(session)
     expired_exports = await _expire_exports(session)
     stale_jobs = await _fail_stale_ingest_jobs(session)
+    retired_profiles = await _retire_embedding_profiles(session)
     await session.commit()
     return {
         "scheduled": len(outcomes),
@@ -331,6 +339,7 @@ async def tick(session: AsyncSession) -> dict[str, Any]:
         "outbox": relayed,
         "expired_exports": expired_exports,
         "stale_jobs": stale_jobs,
+        "retired_profiles": retired_profiles,
     }
 
 

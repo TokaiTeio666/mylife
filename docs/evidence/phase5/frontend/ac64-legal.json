@@ -1,0 +1,23 @@
+{
+  "executed_at": "2026-11-08T12:15:24.555451+00:00",
+  "privacy": {
+    "anonymous_status": 200,
+    "discloses_cross_border_providers": true,
+    "discloses_git_history_retention": true
+  },
+  "terms": {
+    "anonymous_status": 200,
+    "discloses_cross_border": true,
+    "discloses_git_history_retention": true
+  },
+  "export_categories": [
+    "audit",
+    "conversations",
+    "documents",
+    "reviews",
+    "settings",
+    "usage"
+  ],
+  "export_count_difference": 0,
+  "passed": true
+}

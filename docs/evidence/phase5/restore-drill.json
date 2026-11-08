@@ -1,5 +1,5 @@
 {
-  "executed_at": "2026-11-08T09:19:23.611078+00:00",
+  "executed_at": "2026-11-08T12:10:59.879594+00:00",
   "source": {
     "database": "mylife",
     "counts": {
@@ -8,7 +8,7 @@
     }
   },
   "restored": {
-    "database": "mylife_restore_drill_20261108091604",
+    "database": "mylife_restore_drill_20261108120746",
     "counts": {
       "documents": 15011,
       "reviews": 5
@@ -17,12 +17,13 @@
   "counts_equal": true,
   "sampled_documents": 10,
   "content_hash_match": true,
-  "dump_sha256": "09650ee6327d7907a18c50b9c3c5648b4f32a9ea00d61a9c7266b3aa14978648",
-  "duration_seconds": 198.6,
-  "rto_hours": 0.055,
+  "dump_sha256": "c03543efcbad92b8ae5e5fa182732f7c84052364920835f5230ea2c7abf23f3f",
+  "duration_seconds": 192.9,
+  "rto_hours": 0.054,
   "rto_within_limit": true,
   "rpo_hours": 0.0,
   "rpo_within_limit": true,
   "encryption_required": false,
+  "minio": "not_applicable",
   "kept_drill_database": false
 }

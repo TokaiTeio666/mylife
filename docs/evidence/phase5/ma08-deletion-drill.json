@@ -1,0 +1,44 @@
+{
+  "scenario": "MA-08",
+  "steps": [
+    {
+      "step": 1,
+      "action": "export_workspace",
+      "status": 202
+    },
+    {
+      "step": 2,
+      "action": "confirm_text_mismatch_rejected",
+      "status": 422
+    },
+    {
+      "step": 3,
+      "action": "request_deletion_cooling",
+      "state": "cooling",
+      "can_cancel": true
+    },
+    {
+      "step": 4,
+      "action": "cancel_in_cooling_and_verify_doc",
+      "state": "cancelled",
+      "document_intact": true
+    },
+    {
+      "step": 5,
+      "action": "re_request_and_purge",
+      "state": "purged",
+      "checked_tables": 38,
+      "residual_tables": [],
+      "dynamic_chunk_rows": 0,
+      "sessions_remaining": 0,
+      "post_purge_auth_status": 401
+    },
+    {
+      "step": 6,
+      "action": "git_history_retained_and_disclosed",
+      "git_commit_readable": true,
+      "notice_present": true
+    }
+  ],
+  "passed": true
+}

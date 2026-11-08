@@ -65,6 +65,7 @@ async def test_embedding_profile_requires_confirm(client, admin_conn):
     assert response.status_code == 422, response.text
 
 
+@pytest.mark.fixture
 @pytest.mark.asyncio
 async def test_blue_green_dimension_switch_and_rollback(client, admin_conn):
     """FX-11：1024 dim active → 768 dim building → 覆盖率 1.0 → 原子切换 → 回滚。"""
@@ -188,6 +189,31 @@ async def test_blue_green_dimension_switch_and_rollback(client, admin_conn):
     assert rollback_ok
     assert admin_conn.execute("SELECT count(*) FROM document_chunks").fetchone()[0] == previous_rows
 
+    # 回滚后，之前激活过的 768 profile 变为 retired；推进 retire_at 到期以验证
+    # D30 / §4.3(9)：先写 outbox 快照清单，再 DROP TABLE；基表正在被 active 引用则绝不误删。
+    admin_conn.execute(
+        "UPDATE embedding_profiles SET retire_at = now() - interval '1 minute' "
+        "WHERE id = %s",
+        (profile_id,),
+    )
+    async with factory() as session:
+        await set_rls_context(session, None, None)
+        retired_count = await services_embedding.retire_expired_profiles(session)
+    assert retired_count >= 1
+    still_exists = admin_conn.execute(
+        "SELECT to_regclass('public.document_chunks_v768')"
+    ).fetchone()[0]
+    assert still_exists is None, "到期且无引用的旧换维表必须被 DROP"
+    snapshot_row = admin_conn.execute(
+        "SELECT payload_json FROM outbox_events WHERE workspace_id = %s "
+        "AND topic = 'embedding.table_retired'",
+        (workspace_id,),
+    ).fetchone()
+    assert snapshot_row is not None, "删除旧表前必须写快照清单"
+    assert snapshot_row[0]["chunk_table"] == "document_chunks_v768"
+    assert snapshot_row[0]["rows"] == copied
+    assert snapshot_row[0]["dropped"] is True
+
     # FX-11 证据：`no_alter_column_type` 由真实源码扫描得出，不是硬编码。
     migrations = Path(__file__).resolve().parents[1] / "migrations" / "versions"  # noqa: ASYNC240
     alter_hits = [
@@ -209,6 +235,7 @@ async def test_blue_green_dimension_switch_and_rollback(client, admin_conn):
                 "switch_atomic": switch_atomic,
                 "retire_at_written": row[3] is not None,
                 "rollback_restored_previous": rollback_ok,
+                "retired_table_dropped_with_snapshot": True,
                 "chunks_copied": copied,
                 "chunks_expected": total,
                 "no_alter_column_type": True,

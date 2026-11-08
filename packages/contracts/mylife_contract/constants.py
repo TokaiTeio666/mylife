@@ -233,6 +233,7 @@ DELETION_PURGE_TABLES: Final[tuple[str, ...]] = (
     "delivery_events",
     "provider_credentials",
     "embedding_profiles",
+    "embedding_reembed_jobs",
     "export_jobs",
     "workspace_settings",
     "workspace_schedules",

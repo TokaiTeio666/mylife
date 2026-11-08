@@ -628,11 +628,86 @@ async def start_reembed_in_background(
     return task
 
 
+async def retire_expired_profiles(session: AsyncSession) -> int:
+    """dispatcher：退役到期的 `embedding_profiles` 先写快照清单再删旧表（D30）。"""
+    import json
+
+    rows = (
+        await session.execute(text("SELECT * FROM dispatch_retired_embedding_profiles(20)"))
+    ).all()
+    retired = 0
+    for row in rows:
+        await _bind(session, row.workspace_id, None)
+        table = validate_chunk_table(str(row.chunk_table))
+        if table == BASE_CHUNK_TABLE:
+            await session.execute(
+                text("UPDATE embedding_profiles SET retire_at = NULL WHERE id = :id"),
+                {"id": row.id},
+            )
+            await session.commit()
+            retired += 1
+            continue
+
+        outcome = (
+            await session.execute(
+                text("SELECT retire_chunk_table(:table)"), {"table": table}
+            )
+        ).scalar_one()
+        info = dict(outcome) if isinstance(outcome, dict) else {}
+        if not info.get("dropped") and info.get("reason") in {
+            "still_active_or_building",
+            "still_referenced",
+        }:
+            await session.rollback()
+            continue
+
+        snapshot = {
+            "profile_id": str(row.id),
+            "chunk_table": table,
+            "dropped": bool(info.get("dropped")),
+            "rows": int(info.get("rows") or 0),
+            "digest": str(info.get("digest") or ""),
+        }
+        await session.execute(
+            text(
+                "INSERT INTO outbox_events "
+                "(id, workspace_id, topic, payload_json, idempotency_key, status, sent_at) "
+                "VALUES (gen_random_uuid(), :ws, 'embedding.table_retired', "
+                "        CAST(:payload AS jsonb), :key, 'sent', now()) "
+                "ON CONFLICT (idempotency_key) DO NOTHING"
+            ),
+            {
+                "ws": row.workspace_id,
+                "payload": json.dumps(snapshot, ensure_ascii=False),
+                "key": f"retire:{row.id}",
+            },
+        )
+        await session.execute(
+            text(
+                "UPDATE embedding_profiles SET retire_at = NULL, updated_at = now() "
+                "WHERE id = :id"
+            ),
+            {"id": row.id},
+        )
+        await insert_audit(
+            session,
+            workspace_id=row.workspace_id,
+            user_id=None,
+            action="settings.embedding.retired_dropped",
+            target=str(row.id),
+            detail=snapshot,
+        )
+        await session.commit()
+        retired += 1
+    return retired
+
+
 __all__ = [
     "activate_profile",
     "chunk_table",
     "create_profile",
     "get_embedding_settings",
+    "retire_expired_profiles",
     "rollback_profile",
     "run_reembed",
     "start_reembed_in_background",

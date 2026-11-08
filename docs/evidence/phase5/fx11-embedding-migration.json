@@ -15,6 +15,7 @@
   "switch_atomic": true,
   "retire_at_written": true,
   "rollback_restored_previous": true,
+  "retired_table_dropped_with_snapshot": true,
   "chunks_copied": 2,
   "chunks_expected": 2,
   "no_alter_column_type": true,

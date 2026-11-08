@@ -1,0 +1,43 @@
+{
+  "executed_at": "2026-11-08T12:15:24.553809+00:00",
+  "default_locale": "zh-CN",
+  "static_scan_exit_code": 0,
+  "static_scan_output": "check_i18n: ok",
+  "hardcoded_cjk_violations": 0,
+  "pages_verified": [
+    {
+      "path": "/privacy",
+      "zh_lang": "zh-CN",
+      "en_lang": "en-US",
+      "zh_heading": "隐私政策",
+      "en_heading": "Privacy policy",
+      "changed": true
+    },
+    {
+      "path": "/terms",
+      "zh_lang": "zh-CN",
+      "en_lang": "en-US",
+      "zh_heading": "用户协议",
+      "en_heading": "Terms of service",
+      "changed": true
+    },
+    {
+      "path": "/dashboard",
+      "zh_lang": "zh-CN",
+      "en_lang": "en-US",
+      "zh_heading": "你好，FE 验收员",
+      "en_heading": "你好，FE 验收员",
+      "changed": true
+    },
+    {
+      "path": "/settings",
+      "zh_lang": "zh-CN",
+      "en_lang": "en-US",
+      "zh_heading": "设置",
+      "en_heading": "Settings",
+      "changed": true
+    }
+  ],
+  "changed_page_count": 4,
+  "passed": true
+}

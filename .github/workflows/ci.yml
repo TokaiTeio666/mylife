@@ -16,6 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/check_boundaries.py
+      - run: python3 scripts/check_i18n.py
 
   backend:
     name: 后端（ruff + pytest + RLS 矩阵）

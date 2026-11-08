@@ -291,8 +291,37 @@ async def purge_due_deletions(session: AsyncSession) -> int:
                 {"ws": workspace_id},
             )
         ).scalar_one_or_none()
+        # 在删除 `embedding_profiles` 之前记录动态换维表名（document_chunks_v*），
+        # 否则后续既无法删除这些表中的本租户行，也无法做 0 残留校验。
+        from mylife_contract.chunk_tables import validate_chunk_table
+
+        dynamic_rows = (
+            await session.execute(
+                text(
+                    "SELECT DISTINCT chunk_table FROM embedding_profiles "
+                    "WHERE workspace_id = :ws AND chunk_table <> 'document_chunks'"
+                ),
+                {"ws": workspace_id},
+            )
+        ).fetchall()
+        dynamic_tables: list[str] = []
+        for (raw_table,) in dynamic_rows:
+            try:
+                dynamic_tables.append(validate_chunk_table(str(raw_table)))
+            except Exception:  # noqa: BLE001
+                continue
+
         # 两轮：外键依赖解除后再删一次（顺序无关）。
         for _pass in range(2):
+            for dyn_table in dynamic_tables:
+                try:
+                    async with session.begin_nested():
+                        await session.execute(
+                            text(f"DELETE FROM {dyn_table} WHERE workspace_id = :ws"),
+                            {"ws": workspace_id},
+                        )
+                except Exception:  # noqa: BLE001
+                    logger.warning("purge skip dynamic table=%s pass=%s", dyn_table, _pass)
             for table in DELETION_PURGE_TABLES:
                 if table in RETAINED_TABLES:
                     continue
@@ -313,7 +342,12 @@ async def purge_due_deletions(session: AsyncSession) -> int:
                 except Exception:  # noqa: BLE001 - 表可能不存在或受外键顺序影响
                     logger.warning("purge skip table=%s pass=%s", table, _pass)
         # AC-55：purge 后逐表校验 0 命中；残留不静默，记审计与结构化日志。
-        residual = await _verify_purged(session, workspace_id=workspace_id, owner_id=owner_id)
+        residual = await _verify_purged(
+            session,
+            workspace_id=workspace_id,
+            owner_id=owner_id,
+            dynamic_tables=dynamic_tables,
+        )
         if residual:
             logger.error(
                 "deletion purge residual workspace=%s tables=%s",
@@ -359,9 +393,14 @@ async def purge_due_deletions(session: AsyncSession) -> int:
 
 
 async def _verify_purged(
-    session: AsyncSession, *, workspace_id: UUID, owner_id: UUID | None
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    owner_id: UUID | None,
+    dynamic_tables: list[str] | None = None,
 ) -> list[str]:
     """逐表确认 purge 后 0 行（AC-55）；`sessions` 按 owner 统计。"""
+    from mylife_contract.chunk_tables import validate_chunk_table
     from mylife_contract.constants import DELETION_PURGE_TABLES
 
     residual: list[str] = []
@@ -384,18 +423,19 @@ async def _verify_purged(
         except Exception:  # noqa: BLE001 - 缺表不计入残留
             continue
     # 动态换维表（document_chunks_v*）不在常量列表里。
-    profiles = (
-        await session.execute(
-            text(
-                "SELECT DISTINCT chunk_table FROM embedding_profiles "
-                "WHERE workspace_id = :ws AND chunk_table <> 'document_chunks'"
-            ),
-            {"ws": workspace_id},
-        )
-    ).fetchall()
-    from mylife_contract.chunk_tables import validate_chunk_table
-
-    for (table,) in profiles:
+    tables = list(dynamic_tables or [])
+    if not tables:
+        profiles = (
+            await session.execute(
+                text(
+                    "SELECT DISTINCT chunk_table FROM embedding_profiles "
+                    "WHERE workspace_id = :ws AND chunk_table <> 'document_chunks'"
+                ),
+                {"ws": workspace_id},
+            )
+        ).fetchall()
+        tables = [str(row[0]) for row in profiles]
+    for table in tables:
         try:
             safe = validate_chunk_table(str(table))
             async with session.begin_nested():

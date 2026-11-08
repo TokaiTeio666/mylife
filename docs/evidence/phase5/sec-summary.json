@@ -1,0 +1,303 @@
+{
+  "generated_at": "2026-11-08T12:18:00Z",
+  "total": 30,
+  "passed": 30,
+  "failed": 0,
+  "items": [
+    {
+      "id": "SEC-01",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "未登录访问任意 /api/v1/* 业务端点统一返回 401",
+      "evidence": [
+        "apps/api/tests/test_sec_phase5.py::test_sec01_all_business_routes_require_authentication",
+        "apps/api/tests/test_auth.py::test_unauthenticated_business_endpoints_401"
+      ]
+    },
+    {
+      "id": "SEC-02",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "退出所有设备后旧 Cookie 请求 401 且 token_version 递增",
+      "evidence": [
+        "apps/api/tests/test_auth.py::test_logout_all_revokes_every_device"
+      ]
+    },
+    {
+      "id": "SEC-03",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "缺少或错误 CSRF token 的写请求返回 403 且无副作用",
+      "evidence": [
+        "apps/api/tests/test_auth.py::test_weak_password_and_csrf"
+      ]
+    },
+    {
+      "id": "SEC-04",
+      "priority": "P1",
+      "status": "PASS",
+      "summary": "连续 10 次错误登录触发 429 + Retry-After 锁定窗口",
+      "evidence": [
+        "apps/api/tests/test_sec_phase5.py::test_sec04_ten_failed_logins_locked_with_retry_after",
+        "apps/api/tests/test_auth.py::test_login_failure_rate_limit"
+      ]
+    },
+    {
+      "id": "SEC-05",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "已使用或并发邀请码注册被拒绝且 used_at 非空",
+      "evidence": [
+        "apps/api/tests/test_auth.py::test_register_used_code_second_time_rejected",
+        "apps/api/tests/test_auth.py::test_concurrent_register_with_same_code_only_one_succeeds"
+      ]
+    },
+    {
+      "id": "SEC-06",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "跨 Workspace 访问资源统一返回 404 不暴露存在性",
+      "evidence": [
+        "apps/api/tests/test_workspace.py::test_switch_to_non_member_returns_404_and_security_audit",
+        "apps/api/tests/test_fixture_fx06.py::test_fx06_tenant_isolation"
+      ]
+    },
+    {
+      "id": "SEC-07",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "全部 34 张租户表 ENABLE+FORCE RLS、NOBYPASSRLS、跨租户查询 0 行",
+      "evidence": [
+        "apps/api/tests/test_rls_matrix.py::test_cross_tenant_rows_are_invisible",
+        "apps/api/tests/test_rls_matrix.py::test_rls_is_enabled_and_forced",
+        "apps/api/tests/test_rls_matrix.py::test_app_role_has_no_bypassrls"
+      ]
+    },
+    {
+      "id": "SEC-08",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "请求体伪造 workspace_id 422 拒绝；查询参数伪造被忽略并取服务端 RunContext",
+      "evidence": [
+        "apps/api/tests/test_auth.py::test_workspace_id_in_body_rejected",
+        "apps/api/tests/test_contract.py::test_phase5_models_forbid_extra_fields",
+        "apps/api/tests/test_sec_phase5.py::test_sec08_query_workspace_id_spoofing_ignored"
+      ]
+    },
+    {
+      "id": "SEC-09",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "ToolGateway 六工具入参 extra=forbid 且拒绝携带 workspace_id",
+      "evidence": [
+        "apps/api/tests/test_chat_tools.py::test_tool_args_reject_workspace_id"
+      ]
+    },
+    {
+      "id": "SEC-10",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "笔记内嵌 8 类提示注入全部检测隔离且写 security.prompt_injection 事件",
+      "evidence": [
+        "apps/api/tests/test_chat.py::test_prompt_injection_detected_and_not_followed"
+      ]
+    },
+    {
+      "id": "SEC-11",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "写入与导出路径拒绝 ../、绝对路径、符号链接",
+      "evidence": [
+        "apps/api/tests/test_delivery_units.py::test_validate_relative_path_rejects_escapes",
+        "apps/api/tests/test_ingest.py::test_zip_symlink_entry_rejected"
+      ]
+    },
+    {
+      "id": "SEC-12",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "Git 与模型 base_url 拒绝回环/链路本地/私网/file:///ext::/非 https",
+      "evidence": [
+        "apps/api/tests/test_git_ingest.py::test_ssrf_rejected",
+        "apps/api/tests/test_settings_llm.py::test_llm_base_url_rejects_plain_http"
+      ]
+    },
+    {
+      "id": "SEC-13",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "ZIP 200MB/2GB/20MB/50k/100:1 五项上限校验拒绝超限压缩包",
+      "evidence": [
+        "apps/api/tests/test_sec_phase5.py::test_sec13_default_zip_limits_and_caps",
+        "apps/api/tests/test_ingest.py::test_zip_upload_size_limit",
+        "apps/api/tests/test_ingest.py::test_zip_traversal_and_bomb_rejected"
+      ]
+    },
+    {
+      "id": "SEC-14",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "ZIP 条目含 ../../evil 被整体拒绝且无文件写出",
+      "evidence": [
+        "apps/api/tests/test_ingest.py::test_zip_traversal_and_bomb_rejected"
+      ]
+    },
+    {
+      "id": "SEC-15",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "Git 克隆禁用 hooks/submodule/LFS/filter，恶意 hook 不执行",
+      "evidence": [
+        "apps/api/tests/test_sec_phase5.py::test_sec15_git_clone_does_not_execute_hooks_submodules_or_lfs",
+        "apps/api/tests/test_git_ingest.py::test_git_common_args_hardened"
+      ]
+    },
+    {
+      "id": "SEC-16",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "无签名或错误签名 webhook 返回 401 且 delivery_events 零写入",
+      "evidence": [
+        "apps/api/tests/test_webhooks.py::test_signature_invalid_no_side_effect",
+        "apps/api/tests/test_webhooks.py::test_missing_signature_rejected"
+      ]
+    },
+    {
+      "id": "SEC-17",
+      "priority": "P1",
+      "status": "PASS",
+      "summary": "重放同一 webhook delivery_id 幂等不重复回写",
+      "evidence": [
+        "apps/api/tests/test_webhooks.py::test_replay_is_idempotent"
+      ]
+    },
+    {
+      "id": "SEC-18",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "KEK->DEK AES-256-GCM 信封加密绑定租户 AAD，无 KEK 时密文不可解",
+      "evidence": [
+        "apps/api/tests/test_security.py::test_db_stores_only_ciphertext",
+        "apps/api/tests/test_security.py::test_aad_binds_workspace_and_provider",
+        "apps/api/tests/test_settings_llm.py::test_llm_save_encrypts_and_never_echoes"
+      ]
+    },
+    {
+      "id": "SEC-19",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "异常与结构化日志脱敏，不泄露正文、会话 token 与 API Key",
+      "evidence": [
+        "apps/api/tests/test_security.py::test_unhandled_logs_do_not_contain_exception_details",
+        "apps/api/tests/test_replays.py",
+        "apps/api/tests/test_settings_llm.py::test_llm_save_encrypts_and_never_echoes"
+      ]
+    },
+    {
+      "id": "SEC-20",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "Markdown 渲染与复盘搜索片段经 nh3 清洗与 HTML 转义并配严格 CSP",
+      "evidence": [
+        "apps/api/tests/test_ingest.py::test_html_render_sanitizes_scripts",
+        "apps/api/tests/test_search.py::test_snippet_highlight_and_escaping"
+      ]
+    },
+    {
+      "id": "SEC-21",
+      "priority": "P1",
+      "status": "PASS",
+      "summary": "SVG/图片资产代理清洗脚本与事件属性，强制 sandbox CSP + nosniff",
+      "evidence": [
+        "apps/api/tests/test_sec_phase5.py::test_sec21_svg_asset_is_sanitized_and_sandboxed"
+      ]
+    },
+    {
+      "id": "SEC-22",
+      "priority": "P1",
+      "status": "PASS",
+      "summary": "搜索/对话/管理端超限返回 429 + Retry-After",
+      "evidence": [
+        "apps/api/tests/test_sec_phase5.py::test_sec22_search_and_chat_rate_limits_return_429"
+      ]
+    },
+    {
+      "id": "SEC-23",
+      "priority": "P1",
+      "status": "PASS",
+      "summary": "单 Workspace 刷 create_review 触发 429 QUOTA_EXCEEDED 并记审计",
+      "evidence": [
+        "apps/api/tests/test_review_api.py::test_review_quota_audit"
+      ]
+    },
+    {
+      "id": "SEC-24",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "登录/导入/删除/配置变更/复盘生成五类审计全覆盖且字段齐全、脱敏",
+      "evidence": [
+        "apps/api/tests/test_audit_ac07.py::test_audit_covers_five_classes"
+      ]
+    },
+    {
+      "id": "SEC-25",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "跨租户命中记 security_abort；security_abort 状态严禁人工 approve",
+      "evidence": [
+        "apps/api/tests/test_sec_phase5.py::test_sec25_security_abort_run_cannot_be_approved",
+        "apps/api/tests/test_review_gates.py::test_g0_flags_cross_tenant_evidence"
+      ]
+    },
+    {
+      "id": "SEC-26",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "发往 LLM 的请求仅含 <<<EVIDENCE>>> 最小片段，无密钥/全库/身份",
+      "evidence": [
+        "apps/api/tests/test_chat.py::test_prompt_contains_only_minimal_evidence"
+      ]
+    },
+    {
+      "id": "SEC-27",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "删除冷却写冻结、可撤销、到期全表 0 残留、Git 历史保留且显式告知",
+      "evidence": [
+        "apps/api/tests/test_deletion.py::test_cooling_purge_and_git_history_retained",
+        "docs/evidence/phase5/ma08-deletion-drill.json",
+        "docs/evidence/phase5/frontend/ac64-legal.json"
+      ]
+    },
+    {
+      "id": "SEC-28",
+      "priority": "P1",
+      "status": "PASS",
+      "summary": "PG 与数据根备份支持 age/openssl 加密、0700/0600 权限、恢复需密钥",
+      "evidence": [
+        "apps/api/tests/test_backup_drill.py::test_encrypted_pg_backup_requires_passphrase",
+        "apps/api/tests/test_backup_drill.py::test_encrypted_data_backup_requires_passphrase_and_preserves_monthly",
+        "docs/evidence/phase5/restore-drill.json"
+      ]
+    },
+    {
+      "id": "SEC-29",
+      "priority": "P1",
+      "status": "PASS",
+      "summary": "CI 集成 pip-audit + npm audit --audit-level=high 阻断与 CycloneDX SBOM 归档",
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "SEC-30",
+      "priority": "P0",
+      "status": "PASS",
+      "summary": "platform_admin 仅能读取脱敏元数据与聚合指标，响应字段集无任何正文",
+      "evidence": [
+        "apps/api/tests/test_admin.py::test_admin_responses_never_carry_content",
+        "apps/api/tests/test_sec_phase5.py::test_sec30_admin_field_sets_exclude_all_content_columns"
+      ]
+    }
+  ]
+}
