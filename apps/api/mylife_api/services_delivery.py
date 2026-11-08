@@ -751,6 +751,10 @@ async def deliver_review(
         version=version,
         hashes=inner_hashes_all,
     )
+    # 仪表盘有 60s 进程内缓存；交付/版本变化后立即失效，避免陈旧计数。
+    from mylife_api.services_dashboard import clear_dashboard_cache
+
+    clear_dashboard_cache()
 
     return {
         "delivery_id": delivery_id,
