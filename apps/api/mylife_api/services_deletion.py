@@ -195,11 +195,9 @@ async def purge_due_deletions(session: AsyncSession) -> int:
     """冷却到期：删除正文表与对象存储产物，保留审计与 Git 历史（SEC-27）。"""
     from mylife_contract.constants import DELETION_PURGE_TABLES
 
+    # FORCE RLS：dispatcher 无租户上下文，必须走 SECURITY DEFINER 扫描函数。
     result = await session.execute(
-        text(
-            "SELECT id, workspace_id, scope FROM deletion_requests "
-            "WHERE state = 'cooling' AND purge_at <= now() LIMIT 20"
-        )
+        text("SELECT id, workspace_id, scope FROM dispatch_due_deletions(20)")
     )
     rows = [dict(row._mapping) for row in result]
     purged = 0
