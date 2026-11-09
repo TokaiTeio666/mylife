@@ -1,0 +1,50 @@
+{
+  "branch": "review/daily/2026-11-09",
+  "targets": [
+    {
+      "kind": "git",
+      "path": "每日复盘/2026/2026-11-09.md",
+      "content_hash": "00149455a0eaba5328bcd9a4417547cd6bb8021cb54d9f67eaa807b38383222e",
+      "mode": "update_allowed"
+    },
+    {
+      "kind": "git",
+      "path": "专题/错误清单.md",
+      "content_hash": "2eb687e7ea9932d89e164b45318af2874c8c2248392874a1dc8cb728e1b5974e",
+      "mode": "update_allowed"
+    },
+    {
+      "kind": "git",
+      "path": "专题/正确方法论.md",
+      "content_hash": "234e7870d338dd5c76414f6d8424ce7ba0a7e833f5b9149d56a0704d9b37160e",
+      "mode": "update_allowed"
+    },
+    {
+      "kind": "git",
+      "path": "专题/行动清单.md",
+      "content_hash": "4ec609baa72e84f05d3f0aeebb89f0297351cfbd0fe918913700267949b5323a",
+      "mode": "update_allowed"
+    },
+    {
+      "kind": "git",
+      "path": "索引.md",
+      "content_hash": "4af185ab2c2bb712db8362180c0387e35a1c88f9d79316f390736de53018f560",
+      "mode": "update_allowed"
+    }
+  ],
+  "commit_message": "chore(review): 生成 2026-11-09 每日复盘 (v1)\n\nRun-Id: 01a1bf3f-dc4f-7554-b8a2-19012f126ce1\nReview-Id: 01a1bf3f-dc4e-738f-ae50-c8f775128c91\nVersion: 1\nWorkspace: 01a1bf3f-ca95-7dee-9fe5-3d23a9514913",
+  "pr": {
+    "title": "[复盘] 2026-11-09 每日复盘 (v1)",
+    "body_md": "## 30 秒结论\n本日要点：### 已完成\n## 章节自检\n- [x] 1. today_tasks\n- [x] 2. learning_summary\n- [x] 3. journal_events\n- [x] 4. mistakes\n- [x] 5. methods\n- [x] 6. tomorrow_actions\n- [x] 7. one_line_summary\n## 证据前 10 条\n- `日记/2026/11.09.md#L6-L6` · “修复向量检索超时”\n- `日记/2026/11.09.md#L7-L7` · “补写 HNSW 压测”\n## 变更文件\n- `wiki/复盘/每日复盘/2026/2026-11-09.md`（update_allowed）\n- `wiki/复盘/专题/错误清单.md`（update_allowed）\n- `wiki/复盘/专题/正确方法论.md`（update_allowed）\n- `wiki/复盘/专题/行动清单.md`（update_allowed）\n- `wiki/复盘/索引.md`（update_allowed）\n## 风险与回滚\n- 回滚：`POST /reviews/01a1bf3f-dc4e-738f-ae50-c8f775128c91/rollback {\"version\": 1, \"confirm\": true}`\n- 冲突：保留分支供人工处理，不 force push。\n## GateResult\nAPPROVE (0 blocking, 0 warnings)\n\nRun-Id: 01a1bf3f-dc4f-7554-b8a2-19012f126ce1\nReview-Id: 01a1bf3f-dc4e-738f-ae50-c8f775128c91\nVersion: 1\nKind: 每日复盘 2026-11-09\n",
+    "base_branch": "main",
+    "head_branch": "review/daily/2026-11-09",
+    "draft": false,
+    "auto_merge": false
+  },
+  "review_row": {
+    "review_id": "01a1bf3f-dc4e-738f-ae50-c8f775128c91",
+    "version": 1,
+    "content_hash": "00149455a0eaba5328bcd9a4417547cd6bb8021cb54d9f67eaa807b38383222e",
+    "git_path": "每日复盘/2026/2026-11-09.md"
+  }
+}

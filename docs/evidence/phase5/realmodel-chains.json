@@ -1,0 +1,377 @@
+{
+  "generated_at": "2026-11-09T15:39:51+0800",
+  "notes": [
+    "复盘 Writer 为确定性装配（IMPLEMENTATION-NOTES P3-2），该链路不含 LLM 调用；导入与检索使用真实 embedding。",
+    "蓝绿换维的激活步骤没有 HTTP 端点，按 services_embedding.activate_profile 调用链验证。",
+    "运行镜像必须带 --build：旧镜像缺少 cdb06a8 的 search_embedding_timeout_ms，真实 embedding 首次调用会 vector_timeout。",
+    "Ollama 冷加载 768 维模型可能超过 provider 的 10s HTTP 超时，re-embed 首次会失败且不自动重试；脚本先直连预热。",
+    "/settings/embedding/test 按环境维度 1024 校验返回向量，测试 768 维模型会得到 EMBEDDING_UNAVAILABLE。"
+  ],
+  "workspace_id": "01a1bf3f-ca95-7dee-9fe5-3d23a9514913",
+  "email": "realmodel-29affed2@example.com",
+  "ingest": {
+    "status": "succeeded",
+    "progress": {
+      "total_files": 4,
+      "processed_files": 4,
+      "failed_files": 0,
+      "skipped_files": 0
+    },
+    "counters": {
+      "created": 4,
+      "updated": 0,
+      "unchanged": 0,
+      "skipped": 0,
+      "failed": 0,
+      "task_occurrences": 4,
+      "tasks_skipped_no_date": 0,
+      "date_conflicts": 0
+    },
+    "snapshot": {
+      "snapshot_id": "01a1bf3f-d3d5-7c51-8782-ede16a8dbef6",
+      "commit_sha": null,
+      "doc_count": 4,
+      "as_of": "2026-11-09T07:39:53Z",
+      "manifest_digest": "2828a572275609e97a4286a0ba44db8cd4d5e5f1af138de3dfcb181fd36e40d4"
+    },
+    "failed_items": [],
+    "documents": 4,
+    "chunks": 6,
+    "embedded_chunks": 6
+  },
+  "model_warmup": [
+    {
+      "model": "qwen3-embedding:0.6b",
+      "status": 200,
+      "dimension": 1024
+    },
+    {
+      "model": "nomic-embed-text",
+      "status": 200,
+      "dimension": 768
+    }
+  ],
+  "embedding_test_1024": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "dimension_observed": 1024,
+      "latency_ms": 0,
+      "error": null
+    }
+  },
+  "embedding_test_768": {
+    "status": 200,
+    "body": {
+      "ok": false,
+      "dimension_observed": null,
+      "latency_ms": 0,
+      "error": {
+        "code": "EMBEDDING_UNAVAILABLE",
+        "message": "Embedding 不可用"
+      }
+    },
+    "note": "测试端点按环境维度 1024 校验，故 768 维模型会报 EMBEDDING_UNAVAILABLE"
+  },
+  "search_before_switch": {
+    "matched_by": [
+      "vector",
+      "vector",
+      "vector",
+      "vector",
+      "vector"
+    ],
+    "paths": [
+      "学习/向量检索.md",
+      "日记/2026/11.09.md",
+      "日记/2026/11.09.md",
+      "日记/2026/11.08.md",
+      "学习/缓存.md"
+    ],
+    "degraded": false,
+    "degraded_reasons": [],
+    "attempts": [
+      {
+        "took_ms": 9,
+        "degraded": false,
+        "degraded_reasons": [],
+        "items": 5
+      }
+    ]
+  },
+  "review_run": {
+    "run_id": "01a1bf3f-dc4f-7554-b8a2-19012f126ce1",
+    "review_id": "01a1bf3f-dc4e-738f-ae50-c8f775128c91",
+    "states": [
+      "snapshotting",
+      "succeeded"
+    ],
+    "final_state": "succeeded",
+    "degraded": false
+  },
+  "review": {
+    "version": 1,
+    "status": null,
+    "sections": [
+      "today_tasks",
+      "learning_summary",
+      "journal_events",
+      "mistakes",
+      "methods",
+      "tomorrow_actions",
+      "one_line_summary"
+    ],
+    "verdict_decision": "APPROVE",
+    "blocking": 0,
+    "degraded": false,
+    "entries": 2
+  },
+  "delivery": {
+    "id": "d3c18c7d-ba3c-51b8-b21c-ab7efb16c111",
+    "target": "object_store",
+    "status": "committed",
+    "degraded": false,
+    "manifest_paths": [
+      "每日复盘/2026/2026-11-09.md",
+      "专题/错误清单.md",
+      "专题/正确方法论.md",
+      "专题/行动清单.md",
+      "索引.md"
+    ],
+    "zip_entries": [
+      "wiki/复盘/专题/正确方法论.md",
+      "wiki/复盘/专题/行动清单.md",
+      "wiki/复盘/专题/错误清单.md",
+      "wiki/复盘/每日复盘/2026/2026-11-09.md",
+      "wiki/复盘/索引.md",
+      "manifest.json"
+    ],
+    "review_markdown": "wiki/复盘/每日复盘/2026/2026-11-09.md",
+    "review_markdown_bytes": 1282,
+    "has_section_heading": true,
+    "saved_artifacts": [
+      "docs/evidence/phase5/realmodel-daily-review.md",
+      "docs/evidence/phase5/realmodel-delivery-manifest.json"
+    ]
+  },
+  "embedding_initial": {
+    "active_profile": null,
+    "profiles": [],
+    "credential_status": "missing",
+    "last_tested_at": null,
+    "reembed": null
+  },
+  "chunk_stats_before_switch": {
+    "table": "document_chunks",
+    "rows": 6,
+    "embedded": 6,
+    "dims": 1024
+  },
+  "baseline_profile": {
+    "id": "48070a95-0da7-4431-84f9-bc6bf01bb129",
+    "chunk_table": "document_chunks",
+    "job_id": "098ef1bc-3986-4678-a933-c77845e4f997",
+    "reembed": {
+      "job_id": "098ef1bc-3986-4678-a933-c77845e4f997",
+      "status": "succeeded",
+      "processed_chunks": 0,
+      "total_chunks": 6,
+      "error": null
+    },
+    "coverage": 1.0
+  },
+  "baseline_activation": {
+    "output": "{'activated': '48070a95-0da7-4431-84f9-bc6bf01bb129', 'coverage': 1.0}"
+  },
+  "switch_profile": {
+    "id": "b25ec151-366b-40f3-b838-083d9c705cf0",
+    "model": "nomic-embed-text",
+    "dimension": 768,
+    "chunk_table": "document_chunks_v768",
+    "job_id": "4d8de51f-3095-4d7a-8450-ac837fbe7a03",
+    "reembed": {
+      "job_id": "4d8de51f-3095-4d7a-8450-ac837fbe7a03",
+      "status": "succeeded",
+      "processed_chunks": 6,
+      "total_chunks": 6,
+      "error": null
+    },
+    "coverage": 1.0
+  },
+  "chunk_stats_v768": {
+    "table": "document_chunks_v768",
+    "rows": 6,
+    "embedded": 6,
+    "dims": 768
+  },
+  "switch_activation": {
+    "output": "{'activated': 'b25ec151-366b-40f3-b838-083d9c705cf0', 'coverage': 1.0}"
+  },
+  "embedding_after_switch": {
+    "active_profile": {
+      "id": "b25ec151-366b-40f3-b838-083d9c705cf0",
+      "provider": "openai",
+      "model": "nomic-embed-text",
+      "dimension": 768,
+      "index_name": "idx_document_chunks_v768_embedding",
+      "status": "active",
+      "created_at": "2026-11-09T07:39:58Z",
+      "coverage": 1.0,
+      "chunk_table": "document_chunks_v768",
+      "activated_at": "2026-11-09T07:40:00Z",
+      "retire_at": null
+    },
+    "profiles": [
+      {
+        "id": "48070a95-0da7-4431-84f9-bc6bf01bb129",
+        "provider": "openai",
+        "model": "qwen3-embedding:0.6b",
+        "dimension": 1024,
+        "index_name": "idx_document_chunks_embedding",
+        "status": "retired",
+        "created_at": "2026-11-09T07:39:56Z",
+        "coverage": 1.0,
+        "chunk_table": "document_chunks",
+        "activated_at": "2026-11-09T07:39:58Z",
+        "retire_at": "2026-11-16T07:40:00Z"
+      },
+      {
+        "id": "b25ec151-366b-40f3-b838-083d9c705cf0",
+        "provider": "openai",
+        "model": "nomic-embed-text",
+        "dimension": 768,
+        "index_name": "idx_document_chunks_v768_embedding",
+        "status": "active",
+        "created_at": "2026-11-09T07:39:58Z",
+        "coverage": 1.0,
+        "chunk_table": "document_chunks_v768",
+        "activated_at": "2026-11-09T07:40:00Z",
+        "retire_at": null
+      }
+    ],
+    "credential_status": "valid",
+    "last_tested_at": "2026-11-09T07:39:58Z",
+    "reembed": {
+      "job_id": "4d8de51f-3095-4d7a-8450-ac837fbe7a03",
+      "status": "succeeded",
+      "processed_chunks": 6,
+      "total_chunks": 6,
+      "error": null
+    }
+  },
+  "search_after_switch": {
+    "matched_by": [
+      "vector",
+      "vector",
+      "vector",
+      "vector",
+      "vector"
+    ],
+    "paths": [
+      "日记/2026/11.09.md",
+      "学习/向量检索.md",
+      "学习/缓存.md",
+      "日记/2026/11.09.md",
+      "日记/2026/11.08.md"
+    ],
+    "degraded": false,
+    "degraded_reasons": [],
+    "attempts": [
+      {
+        "took_ms": 6,
+        "degraded": false,
+        "degraded_reasons": [],
+        "items": 5
+      }
+    ]
+  },
+  "rollback": {
+    "active_profile": {
+      "id": "48070a95-0da7-4431-84f9-bc6bf01bb129",
+      "provider": "openai",
+      "model": "qwen3-embedding:0.6b",
+      "dimension": 1024,
+      "index_name": "idx_document_chunks_embedding",
+      "status": "active",
+      "created_at": "2026-11-09T07:39:56Z",
+      "coverage": 1.0,
+      "chunk_table": "document_chunks",
+      "activated_at": "2026-11-09T07:40:00Z",
+      "retire_at": null
+    },
+    "profiles": [
+      {
+        "id": "48070a95-0da7-4431-84f9-bc6bf01bb129",
+        "model": "qwen3-embedding:0.6b",
+        "dimension": 1024,
+        "status": "active",
+        "retire_at": null
+      },
+      {
+        "id": "b25ec151-366b-40f3-b838-083d9c705cf0",
+        "model": "nomic-embed-text",
+        "dimension": 768,
+        "status": "retired",
+        "retire_at": null
+      }
+    ]
+  },
+  "search_after_rollback": {
+    "matched_by": [
+      "vector",
+      "vector",
+      "vector",
+      "vector",
+      "vector"
+    ],
+    "paths": [
+      "学习/向量检索.md",
+      "日记/2026/11.09.md",
+      "日记/2026/11.09.md",
+      "日记/2026/11.08.md",
+      "学习/缓存.md"
+    ],
+    "degraded": false,
+    "degraded_reasons": [],
+    "attempts": [
+      {
+        "took_ms": 5,
+        "degraded": false,
+        "degraded_reasons": [],
+        "items": 5
+      }
+    ]
+  },
+  "findings": [
+    {
+      "severity": "high",
+      "area": "runtime image",
+      "summary": "运行中的 API 镜像构建于 cdb06a8 之前，真实 embedding 单次约 255ms 超过旧的 250ms VECTOR_TIMEOUT_SECONDS，search 返回 degraded=vector_timeout 且 0 结果；--build 后首次 1027ms、缓存后 10ms，结果正常。",
+      "status": "resolved_by_rebuild"
+    },
+    {
+      "severity": "medium",
+      "area": "embedding blue-green",
+      "summary": "activate_profile 只有服务层函数，HTTP 路由只有 create/test/rollback，前端也没有激活按钮；蓝绿切换无法通过公开 API 完成，本次用容器内服务层调用验证。",
+      "status": "open"
+    },
+    {
+      "severity": "medium",
+      "area": "embedding provider",
+      "summary": "provider 内建 httpx 超时 10s；Ollama 首次加载 nomic-embed-text 超过 10s，re-embed 任务直接 failed(EMBEDDING_UNAVAILABLE) 且不自动重试。预热后成功。",
+      "status": "open"
+    },
+    {
+      "severity": "low",
+      "area": "embedding settings",
+      "summary": "/settings/embedding/test 固定用 app_settings.embedding_dimension(1024) 校验返回向量，测试 768 维模型误报 EMBEDDING_UNAVAILABLE。",
+      "status": "open"
+    },
+    {
+      "severity": "info",
+      "area": "review composer",
+      "summary": "复盘链路全程不调用 LLM；确定性装配的 one_line_summary 会抽到小节标题，交付正文出现「本日要点：### 已完成」。",
+      "status": "open"
+    }
+  ]
+}
