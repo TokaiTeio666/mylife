@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections import OrderedDict
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -26,10 +27,48 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from mylife_api.errors import AppError
 from mylife_api.settings import settings
 
+#: Postgres HNSW 语句超时保持 250ms（AC-21）；
+#: HTTP embedding 超时由 settings.search_embedding_timeout_ms 控制。
 VECTOR_TIMEOUT_SECONDS = 0.25
+QUERY_EMBEDDING_CACHE_MAX = 256
+_query_embedding_cache: OrderedDict[tuple[str, str, str, int, str], list[float]] = OrderedDict()
 LEXICAL_LIMIT = 50
 VECTOR_LIMIT = 50
 TITLE_LIMIT = 20
+
+
+def clear_query_embedding_cache() -> None:
+    _query_embedding_cache.clear()
+
+
+async def _embed_query(
+    *,
+    provider_name: str,
+    base_url: str | None,
+    api_key: str | None,
+    model: str,
+    dimension: int,
+    query: str,
+) -> list[float]:
+    cache_key = (provider_name, base_url or "", model, dimension, query)
+    cached = _query_embedding_cache.get(cache_key)
+    if cached is not None:
+        _query_embedding_cache.move_to_end(cache_key)
+        return cached
+    provider = build_provider(
+        provider=provider_name,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+        dimension=dimension,
+    )
+    timeout_s = max(settings.search_embedding_timeout_ms / 1000.0, VECTOR_TIMEOUT_SECONDS)
+    vectors = await asyncio.wait_for(provider.embed([query]), timeout=timeout_s)
+    vector = vectors[0]
+    _query_embedding_cache[cache_key] = vector
+    if len(_query_embedding_cache) > QUERY_EMBEDDING_CACHE_MAX:
+        _query_embedding_cache.popitem(last=False)
+    return vector
 
 
 def _filters(
@@ -276,11 +315,15 @@ async def search(
     table = await services_embedding.chunk_table(session, workspace_id=workspace_id)
 
     if mode in {"hybrid", "lexical"}:
-        ts_query, _ = build_tsquery(query)
-        if ts_query:
+        and_query, or_query = build_tsquery(query)
+        if and_query:
             lexical = await _lexical_route(
-                session, workspace_id, ts_query, where, params, table=table
+                session, workspace_id, and_query, where, params, table=table
             )
+            if not lexical and or_query and or_query != and_query:
+                lexical = await _lexical_route(
+                    session, workspace_id, or_query, where, params, table=table
+                )
             routes.append(("lexical", [row["chunk_id"] for row in lexical]))
 
     if mode in {"hybrid", "vector"}:
@@ -290,17 +333,15 @@ async def search(
             params_for_profile = await services_embedding.active_embedding_params(
                 session, workspace_id=workspace_id
             )
-            provider = build_provider(
-                provider=settings.embedding_provider,
+            # 只对 HTTP embedding 使用 wait_for；数据库查询用 statement_timeout，
+            # 避免取消 in-flight 查询把连接/事务置于不可用状态。
+            query_vector = await _embed_query(
+                provider_name=settings.embedding_provider,
                 base_url=settings.embedding_base_url,
                 api_key=settings.embedding_api_key,
                 model=params_for_profile["model"],
                 dimension=params_for_profile["dimension"],
-            )
-            # 只对 HTTP embedding 使用 wait_for；数据库查询用 statement_timeout，
-            # 避免取消 in-flight 查询把连接/事务置于不可用状态。
-            vectors = await asyncio.wait_for(
-                provider.embed([query]), timeout=VECTOR_TIMEOUT_SECONDS
+                query=query,
             )
             try:
                 async with session.begin_nested():
@@ -314,7 +355,7 @@ async def search(
                     vector_rows = await _vector_route(
                         session,
                         workspace_id,
-                        _vector_literal(vectors[0]),
+                        _vector_literal(query_vector),
                         where,
                         params,
                         table=table,

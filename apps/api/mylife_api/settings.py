@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     embedding_api_key: str | None = None
     embedding_model: str = "BAAI/bge-m3"
     embedding_dimension: int = 1024
+    # 查询向量 HTTP 超时（毫秒）；DB HNSW 查询仍固定受 statement_timeout=250ms 保护。
+    search_embedding_timeout_ms: int = 3000
 
     secret_key: str = Field(default="dev-only-change-me-please-32-bytes-min", min_length=32)
     # Git webhook 验签密钥（SEC-16）；未按连接配置时的兜底。

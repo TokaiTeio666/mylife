@@ -197,3 +197,46 @@ async def test_search_validation(client, admin_conn):
         f"{API}/search", params={"q": " ".join(f"词{i}" for i in range(80))}
     )
     assert too_many.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_lexical_or_fallback_and_query_embedding_cache(client, admin_conn, monkeypatch):
+    from mylife_api import services_search
+
+    services_search.clear_query_embedding_cache()
+    await _ingest(
+        client,
+        admin_conn,
+        {"notes/redis.md": "# Redis\n缓存穿透的治理方案是布隆过滤器。"},
+        "search-or-fallback@example.com",
+    )
+
+    # 自然语言问句包含文档未出现的词（“解决”“什么”“问题”），AND 为 0 时应回退 OR 命中。
+    lexical = await client.get(
+        f"{API}/search",
+        params={"q": "布隆过滤器解决什么问题", "mode": "lexical", "top_k": 5},
+    )
+    assert lexical.status_code == 200
+    items = lexical.json()["items"]
+    assert items and items[0]["path"] == "notes/redis.md"
+    assert items[0]["matched_by"] == "lexical"
+
+    # 同一查询词连续做两次向量检索，第二次应直接命中进程内 LRU 缓存。
+    calls = 0
+    real_build = services_search.build_provider
+
+    def counting_build(**kwargs):
+        nonlocal calls
+        calls += 1
+        return real_build(**kwargs)
+
+    monkeypatch.setattr(services_search, "build_provider", counting_build)
+    first = await client.get(
+        f"{API}/search", params={"q": "布隆过滤器解决什么问题", "mode": "vector"}
+    )
+    second = await client.get(
+        f"{API}/search", params={"q": "布隆过滤器解决什么问题", "mode": "vector"}
+    )
+    assert first.status_code == 200 and second.status_code == 200
+    assert calls == 1
+
