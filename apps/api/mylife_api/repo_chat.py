@@ -171,7 +171,11 @@ async def list_messages(
             "SELECT id, conversation_id, role, content, status, references_json, "
             "       tool_events_json, usage_json, run_id, created_at "
             "FROM messages WHERE conversation_id = :cid AND role <> 'system' "
-            "ORDER BY created_at ASC, id ASC LIMIT :limit"
+            # 同一回合的 user/assistant 在同一事务写入，created_at 相同；
+            # UUIDv7 同毫秒内只有随机尾数，仅靠 id 排序会让 assistant 抢先。
+            "ORDER BY created_at ASC, "
+            "         CASE role WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END ASC, "
+            "         id ASC LIMIT :limit"
         ),
         {"cid": conversation_id, "limit": limit},
     )

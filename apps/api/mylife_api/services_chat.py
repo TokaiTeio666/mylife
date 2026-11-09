@@ -49,6 +49,16 @@ TURN_RATE_WINDOW = 60
 TURN_QUOTA_USER = 200
 TURN_QUOTA_WINDOW = 86400
 
+# 终止帧：客户端收到后通常会断开 SSE，之前的 token 增量必须先送达。
+TERMINAL_EVENTS = {
+    "chat.done",
+    "done",
+    "chat.error",
+    "error",
+    "chat.cancelled",
+    "cancelled",
+}
+
 _tasks: set[asyncio.Task[Any]] = set()
 
 
@@ -520,27 +530,30 @@ async def stream_run_events(
     async with bus.subscribe(run_id) as queue:
         while True:
             rows = await fetch(last)
+            deferred_terminal: tuple[int, str, dict[str, Any]] | None = None
             for row in rows:
                 if row["event_id"] <= last:
                     continue
                 last = row["event_id"]
-                yield _frame(last, row["event"], row["payload"])
-                if row["event"] in {
-                    "chat.done",
-                    "done",
-                    "chat.error",
-                    "error",
-                    "chat.cancelled",
-                    "cancelled",
-                }:
+                if row["event"] in TERMINAL_EVENTS:
+                    # 终止帧先压住：token 增量只在总线里，落库的 chat.done
+                    # 可能先于队列中的 token 被回放。
+                    deferred_terminal = (last, row["event"], row["payload"])
                     terminal_seen = True
+                    break
+                yield _frame(last, row["event"], row["payload"])
 
+            # 先排空总线上的非持久化帧（token），再发终止帧，避免客户端
+            # 收到 chat.done 就断开而丢掉已生成的 token。
             while not queue.empty():
                 frame = queue.get_nowait()
                 if frame.get("id") is None:
                     yield _frame(None, frame["event"], frame["data"])
                 # 持久化事件由上面的 DB 回放负责，避免重复
 
+            if deferred_terminal is not None:
+                yield _frame(*deferred_terminal)
+                return
             if terminal_seen:
                 return
             state = await run_state()

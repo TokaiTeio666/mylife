@@ -88,12 +88,14 @@ async def test_full_chat_with_citations(client, admin_conn):
     assert all(s["tool_name"] in {"search_notes", "read_note"} for s in steps)
 
     usage = admin_conn.execute(
-        "SELECT prompt_tokens, completion_tokens, model, latency_ms FROM usage_events "
-        "WHERE workspace_id = %s AND kind = 'chat'",
+        "SELECT prompt_tokens, completion_tokens, model, latency_ms, run_id, role "
+        "FROM usage_events WHERE workspace_id = %s AND kind = 'chat'",
         (workspace_id,),
     ).fetchall()
     assert len(usage) == 1
     assert usage[0][0] > 0 and usage[0][2]
+    assert str(usage[0][4]) == body["run_id"]
+    assert usage[0][5] == "draft"
 
     # SSE 回放：包含 run.state / 工具轨迹 / 引用 / chat.done
     sse = await client.get(f"{API}/runs/{body['run_id']}/events?after=0")
@@ -104,6 +106,49 @@ async def test_full_chat_with_citations(client, admin_conn):
     for event in ("run.state", "chat.tool_call", "chat.tool_result", "chat.citation", "chat.done"):
         assert f"event: {event}" in text, event
     assert "retry: 3000" in text
+
+
+@pytest.mark.asyncio
+async def test_same_turn_messages_put_user_before_assistant(client, admin_conn, db_session):
+    """同一事务写入的 user/assistant created_at 相同，排序仍需 user 在前。"""
+    from mylife_api import repo_chat
+    from mylife_api.db import set_rls_context
+
+    workspace_id, user_id = await helpers.prepare_workspace_with_docs(
+        client, admin_conn, email="chat-order@example.com"
+    )
+    conversation_id = await _conversation(client)
+    ws, uid, cid = uuid.UUID(workspace_id), uuid.UUID(user_id), uuid.UUID(conversation_id)
+    await set_rls_context(db_session, ws, uid)
+    for role, content in (("user", "问题"), ("assistant", "回答")):
+        await repo_chat.insert_message(
+            db_session,
+            workspace_id=ws,
+            conversation_id=cid,
+            role=role,
+            content=content,
+            status="complete",
+        )
+    await db_session.commit()
+
+    # 模拟同事务时间戳 + uuid7 同毫秒随机尾数让 assistant 的 id 更小。
+    admin_conn.execute(
+        "UPDATE messages SET created_at = %s::timestamptz WHERE conversation_id = %s",
+        ("2026-10-27T10:00:00Z", conversation_id),
+    )
+    admin_conn.execute(
+        "UPDATE messages SET id = (CASE role WHEN 'user' THEN %s ELSE %s END)::uuid "
+        "WHERE conversation_id = %s",
+        (
+            "00000000-0000-7000-8000-0000000000ff",
+            "00000000-0000-7000-8000-000000000001",
+            conversation_id,
+        ),
+    )
+
+    messages = await client.get(f"{API}/conversations/{conversation_id}/messages")
+    assert messages.status_code == 200, messages.text
+    assert [m["role"] for m in messages.json()["items"]] == ["user", "assistant"]
 
 
 @pytest.mark.asyncio

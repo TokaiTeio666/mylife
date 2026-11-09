@@ -76,6 +76,7 @@ class ChatRunner:
     def __init__(self, run_id: UUID, workspace_id: UUID) -> None:
         self.run_id = run_id
         self.workspace_id = workspace_id
+        self.attempt_id: UUID | None = None
         self.user_id: UUID | None = None
         self.conversation_id: UUID | None = None
         self.assistant_message_id: UUID | None = None
@@ -215,6 +216,7 @@ class ChatRunner:
             if isinstance(payload, str):
                 payload = json.loads(payload)
             self.user_id = UUID(payload["user_id"])
+            self.attempt_id = run.get("attempt_id")
             self.conversation_id = run["conversation_id"]
             self.assistant_message_id = UUID(payload["assistant_message_id"])
             if payload.get("user_message_id"):
@@ -626,6 +628,9 @@ class ChatRunner:
                 completion_tokens=int(usage.get("completion_tokens", 0)),
                 latency_ms=int(usage.get("latency_ms", 0)),
                 degraded=False,
+                run_id=self.run_id,
+                attempt_id=self.attempt_id,
+                role="draft",
             )
         await session.commit()
         await set_rls_context(session, self.workspace_id, self.user_id)
@@ -688,6 +693,9 @@ class ChatRunner:
                 completion_tokens=int(usage.get("completion_tokens", 0)),
                 latency_ms=int(usage.get("latency_ms", 0)),
                 degraded=True,
+                run_id=self.run_id,
+                attempt_id=self.attempt_id,
+                role="partial",
             )
         await session.commit()
         await set_rls_context(session, self.workspace_id, self.user_id)
