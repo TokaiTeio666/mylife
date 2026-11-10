@@ -28,7 +28,7 @@ class Plan(StrEnum):
 class RunKind(StrEnum):
     CHAT = "chat"
     DAILY = "daily"
-    WEEKLY = "weekly"
+    MONTHLY = "monthly"
     YEARLY = "yearly"
 
 

@@ -96,9 +96,9 @@ def _remote_url(connection: dict[str, Any]) -> str:
 def _occurred_on(kind: str, period_key: str) -> date:
     if kind == "daily":
         return date.fromisoformat(period_key)
-    if kind == "weekly":
-        year, week = period_key.split("-W")
-        return date.fromisocalendar(int(year), int(week), 1)
+    if kind == "monthly":
+        year, month = (int(part) for part in period_key.split("-"))
+        return date(year, month, 1)
     return date(int(period_key), 1, 1)
 
 

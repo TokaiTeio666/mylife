@@ -48,7 +48,7 @@ async def create_review(
 
 @router.get("/reviews", response_model=ReviewList)
 async def list_reviews(
-    kind: str | None = Query(default=None, pattern="^(daily|weekly|yearly)$"),
+    kind: str | None = Query(default=None, pattern="^(daily|monthly|yearly)$"),
     status_filter: str | None = Query(default=None, alias="status"),
     from_key: str | None = Query(default=None, alias="from", max_length=20),
     to_key: str | None = Query(default=None, alias="to", max_length=20),

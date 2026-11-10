@@ -49,11 +49,11 @@ def test_top_mistakes_frequency_desc_then_key_asc_and_cap_ten():
     assert ties == sorted(ties)
 
 
-def test_learning_map_reads_weekly_rollup_only():
+def test_learning_map_reads_monthly_rollup_only():
     sections = [
         {
             "section_key": "method_landing",
-            "period_key": "2026-W43",
+            "period_key": "2026-10",
             "structured": {
                 "items": [
                     {
@@ -74,10 +74,10 @@ def test_learning_map_reads_weekly_rollup_only():
     assert mapped["topics"] == ["先写测试", "缓存"]
     assert mapped["concepts"] == ["verified", "布隆过滤器"]
     assert mapped["outputs"] == ["笔记"]
-    assert mapped["related_weeks"] == ["2026-W43"]
+    assert mapped["related_months"] == ["2026-10"]
 
 
-def test_timeline_prefers_journal_and_falls_back_to_weekly_actions():
+def test_timeline_prefers_journal_and_falls_back_to_monthly_actions():
     sections = [
         {
             "section_key": "journal_events",
@@ -85,14 +85,14 @@ def test_timeline_prefers_journal_and_falls_back_to_weekly_actions():
             "period_key": "2026-10-27",
         },
         {
-            "section_key": "next_week_actions",
+            "section_key": "next_month_actions",
             "structured": {"items": [{"text": "补测试", "verification": "CI 全绿"}]},
-            "period_key": "2026-W43",
+            "period_key": "2026-10",
         },
     ]
     rows = _timeline(sections)
     assert {"date": "2026-10-27", "event": "复盘", "result": "完成"} in rows
-    assert {"date": "2026-W43", "event": "补测试", "result": "CI 全绿"} in rows
+    assert {"date": "2026-10-01", "event": "补测试", "result": "CI 全绿"} in rows
 
 
 def test_method_landing_and_system_derive_from_entries():

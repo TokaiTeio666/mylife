@@ -86,7 +86,7 @@ class ListTasksResult(ApiModel):
 
 class GetReviewArgs(ApiModel):
     review_id: UUID | None = None
-    kind: Literal["daily", "weekly", "yearly"] | None = None
+    kind: Literal["daily", "monthly", "yearly"] | None = None
     period_key: str | None = Field(default=None, max_length=20)
     version: int | None = Field(default=None, ge=1)
     include: list[Literal["summary", "sections", "entries"]] = Field(
@@ -134,7 +134,7 @@ class GetStatsResult(ApiModel):
 
 
 class CreateReviewArgs(ApiModel):
-    kind: Literal["daily", "weekly", "yearly"]
+    kind: Literal["daily", "monthly", "yearly"]
     period_key: str = Field(min_length=4, max_length=20)
     timezone: str | None = Field(default=None, max_length=64)
     confirmation_token: str | None = Field(default=None, max_length=4096)

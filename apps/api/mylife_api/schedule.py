@@ -2,7 +2,7 @@
 
 纯函数，无数据库与副作用：
 - daily：本地日期 + 时间；
-- weekly：固定周一 + 时间（PHASE4-SPEC D12）；
+- monthly：每月 1 日 + 时间（生成上一个月）；
 - yearly：固定 1 月 1 日 + 时间；
 - DST：不存在的本地时刻顺延，歧义时刻取较早 offset（fold=0）。
 """
@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 DAILY = "daily"
-WEEKLY = "weekly"
+MONTHLY = "monthly"
 YEARLY = "yearly"
 
 
@@ -50,14 +50,14 @@ def next_run_at(kind: str, at: time, tz: str, after: datetime) -> datetime:
             if candidate > after:
                 return candidate
             day += timedelta(days=1)
-    elif kind == WEEKLY:
-        day = local_date
-        day += timedelta(days=(0 - day.weekday()) % 7)
+    elif kind == MONTHLY:
+        day = local_date.replace(day=1)
         for _ in range(4):
             candidate = localize(day, at, tz)
             if candidate > after:
                 return candidate
-            day += timedelta(days=7)
+            # 下一个月的 1 日。
+            day = (day.replace(day=28) + timedelta(days=4)).replace(day=1)
     elif kind == YEARLY:
         for year in (local_date.year, local_date.year + 1):
             candidate = localize(date(year, 1, 1), at, tz)
@@ -71,15 +71,14 @@ def next_run_at(kind: str, at: time, tz: str, after: datetime) -> datetime:
 def due_period(kind: str, run_date: date) -> str:
     """运行日 → 要生成的周期键。
 
-    daily 生成 D-1；weekly（周一运行）生成上一 ISO 周；yearly（1/1 运行）
+    daily 生成 D-1；monthly（每月 1 日运行）生成上一个月；yearly（1/1 运行）
     生成上一年。
     """
     if kind == DAILY:
         return (run_date - timedelta(days=1)).isoformat()
-    if kind == WEEKLY:
-        previous_monday = run_date - timedelta(days=7 - run_date.weekday())
-        iso = previous_monday.isocalendar()
-        return f"{iso.year}-W{iso.week:02d}"
+    if kind == MONTHLY:
+        previous = run_date.replace(day=1) - timedelta(days=1)
+        return f"{previous.year}-{previous.month:02d}"
     return str(run_date.year - 1)
 
 
@@ -130,7 +129,7 @@ def missed_occurrences(
 
 __all__ = [
     "DAILY",
-    "WEEKLY",
+    "MONTHLY",
     "YEARLY",
     "due_period",
     "localize",

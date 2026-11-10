@@ -72,7 +72,7 @@ flowchart LR
 1. `workspace_id` 只来自服务端 `RunContext/ToolContext`（会话行或运行行）；HTTP 入参与工具参数模型**不声明该字段**，Pydantic `extra="forbid"`；数据库 RLS 兜底（FR-D7、NFR-1）。
 2. 接入层**零生成式 LLM**：只做解析、哈希、分块、embedding、Todo 与日期抽取。LLM 仅用于可关闭的查询改写，不参与任务状态与引用判定（FR-E1、NFR-3）。
 3. **证据先于写作**：Writer 只拿到冻结的 `EvidenceBundle`，无检索工具；无证据写固定哨兵，不凑内容（FR-D6、FR-E11、REQUIREMENTS §6.4）。
-4. **结构化先于 Markdown**：先写 `review_sections/review_entries/review_citations`，再渲染文件；周报/年报从结构化 rollup 聚合，不重新解析散文（FR-E7/E8）。
+4. **结构化先于 Markdown**：先写 `review_sections/review_entries/review_citations`，再渲染文件；月报/年报从结构化 rollup 聚合，不重新解析散文（FR-E7/E8）。
 5. **一切副作用幂等**：导入、复盘、PR 都有幂等键；同 period 覆盖同一路径、递增 version，不产生重复文件（FR-E14、NFR-4）。
 
 ### 1.4 系统边界
@@ -104,7 +104,7 @@ flowchart LR
 |---|---|
 | Obsidian Git/ZIP 接入、解析、增量索引、混合检索 | Obsidian 客户端/插件、笔记编辑器、用户本地同步 |
 | 带引用的 AI 对话、工具轨迹、会话历史 | 通用任务管理、日历、提醒、邮件客户端 |
-| Todo 台账、日/周/年复盘、三个长期专题页 | 团队协作、成员权限、公开注册、计费（MVP 仅预留数据模型） |
+| Todo 台账、日/月/年复盘、三个长期专题页 | 团队协作、成员权限、公开注册、计费（MVP 仅预留数据模型） |
 | 仪表盘、设置、管理后台、审计、导出/删除 | Git 托管、仓库权限管理、CI/CD 平台 |
 | Git 分支 + PR 交付、版本历史、合并回写 | LLM/Embedding 服务本身、模型训练、模型评测平台 |
 | 多租户隔离、用量计量、预算控制 | 原生 App、第三方插件市场、复杂知识图谱可视化 |
@@ -134,7 +134,7 @@ flowchart LR
 
 | 类别 | 内容 |
 |---|---|
-| **MVP 必须** | 邀请制注册、个人 Workspace、Git/ZIP 导入、混合检索、带引用对话、Todo 台账、日/周/年复盘、三个专题页、仪表盘、设置、管理后台、审计、导出/删除、Git PR 交付 |
+| **MVP 必须** | 邀请制注册、个人 Workspace、Git/ZIP 导入、混合检索、带引用对话、Todo 台账、日/月/年复盘、三个专题页、仪表盘、设置、管理后台、审计、导出/删除、Git PR 交付 |
 | **延后（Phase 2+）** | 团队协作、计费、公开注册、OAuth、Web 搜索、PDF/Office 深度解析、知识图谱可视化、多 Vault、异构 Reviewer、在线换维、原生 App |
 | **明确不做** | 运行在 Obsidian 内、笔记编辑器、通用任务/日历、Git 托管、模型训练、第三方插件市场、默认第三方分析/广告 |
 
@@ -222,7 +222,7 @@ flowchart LR
 | # | 反目标 | 为什么危险 | 硬约束/门禁 | 违反处置 |
 |---|---|---|---|---|
 | D1 | 绝不为同一 period 产生重复文件或重复 PR | 版本混乱，用户无法判断哪份为准 | 唯一路径 + 幂等键 + open PR 复用 | 覆盖/复用，不新建 |
-| D2 | 绝不让自动合并绕过 Gate | 错误内容直接进入长期知识 | 决策 3B：daily opt-in + Gate 全通过；weekly/yearly 人工 | 阻止合并 |
+| D2 | 绝不让自动合并绕过 Gate | 错误内容直接进入长期知识 | 决策 3B：daily opt-in + Gate 全通过；monthly/yearly 人工 | 阻止合并 |
 | D3 | 绝不让成本无上限 | 账单失控 | 决策 5B：预算跨重试累计 + 80% 告警 + 100% 硬停 | 终止为 `FAILED/NEEDS_HUMAN` |
 | D4 | 绝不静默降级或静默丢事件 | 用户误判完整性 | `degraded` 事件 + UI 横幅 + PR 首行标注 + `usage_events.degraded` | 显式告知 |
 | D5 | 绝不让可视化或架构图成为事实源 | 事实漂移，图与数据不一致 | PostgreSQL 唯一事实源；图只读、可重建 | 以 DB 为准 |
@@ -322,7 +322,7 @@ flowchart LR
 | ingest | Git 连接/手动同步、ZIP 上传、导入任务状态与重试 | `POST /ingest/git`、`POST /ingest/zip`、`POST /ingest/sync`、`GET /ingest/jobs/{id}`、`POST /ingest/jobs/{id}/retry` | `job_runs`、进度事件 | B1/B2/B8 | 单文件失败隔离；重试只跑失败文件；ZIP 超限 413 |
 | search | 混合检索、四类过滤器、高亮、全局搜索（笔记 + 复盘独立索引） | `GET /search?q=&filters=` | `SearchResult[]`（§2.6） | C1–C6/F4 | embedding 超时降级 lexical-only 并标 `degraded` |
 | chat | 会话 CRUD、消息、SSE run、引用、上下文配置 | `POST /conversations`、`POST /conversations/{id}/turns`、`GET /runs/{id}/events` | SSE、`messages` | D1–D9 | LLM 不可用 → 哨兵 + `degraded`；流中断标 `partial` |
-| review | 手动触发日/周/年复盘、查询 run、审批门、交付状态 | `POST /reviews`、`GET /reviews/{id}`、`GET /runs/{id}`、`POST /runs/{id}/approve`、`POST /runs/{id}/reject`、`GET /deliveries` | run_id、状态、PR | E12/E13/E14 | 活跃 run 返回 409 + 现有 run_id；审批校验 `workspace_members` |
+| review | 手动触发日/月/年复盘、查询 run、审批门、交付状态 | `POST /reviews`、`GET /reviews/{id}`、`GET /runs/{id}`、`POST /runs/{id}/approve`、`POST /runs/{id}/reject`、`GET /deliveries` | run_id、状态、PR | E12/E13/E14 | 活跃 run 返回 409 + 现有 run_id；审批校验 `workspace_members` |
 | dashboard | 最新复盘、任务面板、复盘日历、完成率 | `GET /dashboard/latest`、`/dashboard/tasks`、`/dashboard/calendar`、`/dashboard/stats` | 结构化只读视图（60s 缓存） | F1–F4 | 只读表 + 缓存，不调 LLM；缓存失效降级直查 |
 | settings | LLM/Embedding/定时/Git/用量设置 | `GET/PUT /settings/*` | 配置、测试连接结果 | G1–G5 | 凭据测试失败不保存；解密失败告警 |
 | admin | 用户、Workspace、邀请码、禁用、系统配置 | `/admin/*` | 列表、审计 | G6/A7 | `platform_admin` 双重校验 + `audit_logs` |
@@ -501,7 +501,7 @@ stateDiagram-v2
 ### 4.3 幂等、并发与续跑
 
 - **三把索引，而非一把**（`kind` 含 chat 时不能共用 `(workspace,kind,period_key)`，否则所有会话退化为同一把键）：
-  1. **复盘活跃唯一**：`UNIQUE (workspace_id, kind, period_key) WHERE kind IN ('daily','weekly','yearly') AND state IN (<活跃态>)`；活跃态集合抽成单一 DB 函数 `is_active_state(state)`，禁止在四处各写一遍。
+  1. **复盘活跃唯一**：`UNIQUE (workspace_id, kind, period_key) WHERE kind IN ('daily','monthly','yearly') AND state IN (<活跃态>)`；活跃态集合抽成单一 DB 函数 `is_active_state(state)`，禁止在四处各写一遍。
   2. **chat 会话内串行**：`UNIQUE (workspace_id, conversation_id) WHERE kind='chat' AND state IN ('created','retrieving','drafting','verifying')`；新 turn 到来时优先显式取消旧 run（`CANCELLED + chat.cancelled`），409 仅作兜底。不同 `conversation_id` 必须允许并发。
   3. **chat 同 turn 幂等**：`UNIQUE (workspace_id, conversation_id, client_turn_id)`；`client_turn_id` 由客户端每次“发送”生成并在重试时复用，**不要**用服务端自增 turn_index 当幂等键（超时重发会拿到新值，导致重复回答）。
 - **版本键**：产物版本 `(workspace_id, kind, period_key, version)` 唯一，version 由 DB 序列/CAS 分配；`attempt_id` 只记录重试，不参与逻辑去重。
@@ -512,7 +512,7 @@ stateDiagram-v2
 
 ### 4.4 revise 循环与收敛
 
-轮次上限取 §5 的 `REVISION_LIMIT[kind]`：daily 2、weekly 2、yearly 3；`RunOptions.max_revisions` 不得高于该表。继续修订需**同时满足**：轮次未超 + 违规集合指纹变化 + 确定性 blocker 数下降（分数仅参考）。任一不满足 → `ESCALATE → HUMAN_GATE`，避免无限打转与越改越差。缺证据时走 `REVISING → RETRIEVING` 定向补检索，并计入一轮。
+轮次上限取 §5 的 `REVISION_LIMIT[kind]`：daily 2、monthly 2、yearly 3；`RunOptions.max_revisions` 不得高于该表。继续修订需**同时满足**：轮次未超 + 违规集合指纹变化 + 确定性 blocker 数下降（分数仅参考）。任一不满足 → `ESCALATE → HUMAN_GATE`，避免无限打转与越改越差。缺证据时走 `REVISING → RETRIEVING` 定向补检索，并计入一轮。
 
 ### 4.5 人审门与死信
 
@@ -541,7 +541,7 @@ SectionId = Literal[            # 仅 daily
     "today_tasks", "learning_summary", "journal_events", "mistakes",
     "methods", "tomorrow_actions", "one_line_summary",
 ]
-WeeklySectionId = Literal[
+MonthlySectionId = Literal[
     "completion_rate", "recurring_mistakes", "method_landing", "next_week_actions",
 ]
 YearlySectionId = Literal[
@@ -549,7 +549,7 @@ YearlySectionId = Literal[
 ]
 
 REVISION_LIMIT: dict[str, int] = {   # 按 kind 的权威上限（§4.4）
-    "daily": 2, "weekly": 2, "yearly": 3,
+    "daily": 2, "monthly": 2, "yearly": 3,
 }
 
 class RunOptions(BaseModel):
@@ -564,8 +564,8 @@ class RunOptions(BaseModel):
 class ReviewJobRequest(BaseModel):
     run_id: UUID
     workspace_id: UUID          # 服务端注入，请求体不暴露
-    kind: Literal["daily","weekly","yearly"]
-    period_key: str             # YYYY-MM-DD | YYYY-Www(ISO) | YYYY | topic_key
+    kind: Literal["daily","monthly","yearly"]
+    period_key: str             # YYYY-MM-DD | YYYY-MM(ISO) | YYYY | topic_key
     timezone: str
     trigger: Literal["manual","schedule","api"]
     options: RunOptions
@@ -582,7 +582,7 @@ class Plan(BaseModel):
     plan_version: int
     period_start: date
     period_end: date
-    sections: list[SectionPlan]      # 按 kind 取 §5.1：daily=7 / weekly=4 / yearly=5，ordinal 连续
+    sections: list[SectionPlan]      # 按 kind 取 §5.1：daily=7 / monthly=4 / yearly=5，ordinal 连续
     tasks: list[RetrievalTask]
     correlations: list[CorrelationTarget]
     budget: Budget
@@ -658,7 +658,7 @@ class SearchResult(BaseModel):
 
 ### 5.1 章节契约表（各 kind 的唯一权威）
 
-§5.1 是各 kind 章节契约的唯一权威：`SectionId` 仅约束 daily；周/年分别用 `WeeklySectionId` / `YearlySectionId`。`review-profile.yml` 只是镜像，启动时按 kind 逐项校验（§16.9）。**FR-E6 只列 6 章、REQUIREMENTS §6.2 列 7 章**，本设计以 REQUIREMENTS §6.2 为准取 7 章（含“一句话总结”），FR-E6 属摘要性遗漏，记入 §14 待需求 v1.1 修正。
+§5.1 是各 kind 章节契约的唯一权威：`SectionId` 仅约束 daily；周/年分别用 `MonthlySectionId` / `YearlySectionId`。`review-profile.yml` 只是镜像，启动时按 kind 逐项校验（§16.9）。**FR-E6 只列 6 章、REQUIREMENTS §6.2 列 7 章**，本设计以 REQUIREMENTS §6.2 为准取 7 章（含“一句话总结”），FR-E6 属摘要性遗漏，记入 §14 待需求 v1.1 修正。
 
 **daily（7 章，ordinal 1–7）**
 
@@ -672,14 +672,14 @@ class SearchResult(BaseModel):
 | 6 | `tomorrow_actions` | 明日行动 | `- [ ]` 可执行项，含 `trigger, verification` | `明日行动：无（未找到可执行依据）` | 12 |
 | 7 | `one_line_summary` | 一句话总结 | `summary`（可由前 6 节派生） | `一句话总结：本日无可总结内容` | 1 |
 
-**weekly（4 章，ordinal 1–4，对齐 FR-E7）**
+**monthly（4 章，ordinal 1–4，对齐 FR-E7）**
 
 | # | section_key | 中文名 | 必填字段 | 哨兵文案 | 单章证据上限 |
 |---|---|---|---|---|---|
-| 1 | `completion_rate` | 任务完成率 | `completed, total, rate, ledger_recalc` | `本周完成率：无记录` | 12 |
-| 2 | `recurring_mistakes` | 重复错误 | `canonical_key, top_n, occurrences, first_seen, last_seen` | `重复错误：本周无记录` | 12 |
-| 3 | `method_landing` | 方法论落地 | `method, action_count, verification_status` | `方法论落地：本周无记录` | 12 |
-| 4 | `next_week_actions` | 下周行动 | `- [ ]` 可执行项，含 `trigger, verification` | `下周行动：无（未找到可执行依据）` | 12 |
+| 1 | `completion_rate` | 任务完成率 | `completed, total, rate, ledger_recalc` | `本月完成率：无记录` | 12 |
+| 2 | `recurring_mistakes` | 重复错误 | `canonical_key, top_n, occurrences, first_seen, last_seen` | `重复错误：本月无记录` | 12 |
+| 3 | `method_landing` | 方法论落地 | `method, action_count, verification_status` | `方法论落地：本月无记录` | 12 |
+| 4 | `next_week_actions` | 下月行动 | `- [ ]` 可执行项，含 `trigger, verification` | `下月行动：无（未找到可执行依据）` | 12 |
 
 **yearly（5 章，ordinal 1–5，对齐 FR-E8）**
 
@@ -691,7 +691,7 @@ class SearchResult(BaseModel):
 | 4 | `method_system` | 方法论体系 | `category, name, scenario, verification` | `方法论体系：本年无记录` | 20 |
 | 5 | `next_year_direction` | 下一年方向 | `direction, basis, first_action` | `下一年方向：本年无记录` | 10 |
 
-- 周报只能从日报结构化数据派生，年报走 daily → weekly rollup → yearly 分层；不重新定义口径，不把全年原文塞进单次上下文。
+- 月报只能从日报结构化数据派生，年报走 daily → monthly rollup → yearly 分层；不重新定义口径，不把全年原文塞进单次上下文。
 - `review_entries.fields_json` 按 `item_type` 用 `ITEM_SCHEMAS[item_type]` 校验（`extra="forbid"`）；`review_sections.structured_json` 按 `SECTION_SCHEMAS[kind][section_key]` 校验。schema 随 `schema_version` 冻结。
 
 ## 6. 数据模型增量
@@ -724,7 +724,7 @@ class SearchResult(BaseModel):
 | `delivery_events` | provider_delivery_id, conn_id, event, payload_digest | provider_delivery_id 唯一 | webhook 幂等 |
 | `workspace_schedules` | workspace_id, kind, local_time, timezone, next_run_at, catchup_days, enabled, last_skip_reason | 唯一 (ws, kind)；`catchup_days` 取值 0–30 | FR-E13 |
 | `git_connections` | workspace_id, role(source/output), provider, repo_full_name, base_branch, auth_type, credential_ciphertext, reviews_root, mode, sync_enabled, sync_interval_minutes, next_sync_at, last_sync_at, last_sync_status | 唯一 (ws, provider, repo_full_name, role) | FR-G4；源/输出仓库分离 |
-| `workspace_settings` | workspace_id, timezone, daily_at, weekly_at, yearly_at, reviews_root, delivery_policy_json, auto_merge_daily, retrieval_top_k, context_window_tokens, web_search_enabled, embedding_profile_id | PK workspace_id；数值列带范围 CHECK | FR-G3/E9/D9/G2/3B |
+| `workspace_settings` | workspace_id, timezone, daily_at, monthly_at, yearly_at, reviews_root, delivery_policy_json, auto_merge_daily, retrieval_top_k, context_window_tokens, web_search_enabled, embedding_profile_id | PK workspace_id；数值列带范围 CHECK | FR-G3/E9/D9/G2/3B |
 | `sessions` | id, user_id, token_hash, token_version, active_workspace_id, expires_at, revoked_at | 索引 (user_id)；token_hash 唯一 | FR-A6；退出所有设备 = token_version+1 |
 | `provider_credentials` | workspace_id, provider, key_ciphertext, key_version, status, last_tested_at | 唯一 (ws, provider) | FR-G1/G2；信封加密 |
 | `embedding_profiles` | workspace_id, provider, model, dimension, index_name, status, created_at | 唯一 (ws, model, dimension)；`CHECK (status IN ('active','building','retired'))`；部分唯一 (ws) WHERE status='active' | FR-G2 蓝绿换维；`workspace_settings.embedding_profile_id` 指向 active |
@@ -736,7 +736,7 @@ class SearchResult(BaseModel):
 ```sql
 -- 1) 复盘活跃唯一（chat 不参与）
 CREATE UNIQUE INDEX uq_runs_review_active ON agent_runs (workspace_id, kind, period_key)
-  WHERE kind IN ('daily','weekly','yearly') AND is_active_state(state);
+  WHERE kind IN ('daily','monthly','yearly') AND is_active_state(state);
 -- 2) chat 会话内串行
 CREATE UNIQUE INDEX uq_runs_chat_serial ON agent_runs (workspace_id, conversation_id)
   WHERE kind='chat' AND state IN ('created','retrieving','drafting','verifying');
@@ -790,7 +790,7 @@ RLS：所有租户表 `workspace_id NOT NULL`，`ENABLE` + `FORCE ROW LEVEL SECU
 
 ```text
 {reviews_root}/每日复盘/2026/2026-10-27.md
-{reviews_root}/每周复盘/2026/2026-W43.md
+{reviews_root}/每月复盘/2026/2026-10.md
 {reviews_root}/年度复盘/2026.md
 {reviews_root}/专题/错误清单.md | 正确方法论.md | 行动清单.md
 {reviews_root}/索引.md
@@ -805,7 +805,7 @@ RLS：所有租户表 `workspace_id NOT NULL`，`ENABLE` + `FORCE ROW LEVEL SECU
 | PR 标题 | `[复盘] 2026-10-27 每日复盘 (v2)` |
 | PR 正文 | 30 秒结论 / 章节自检 / 证据前 10 条 / 变更文件 / 风险与回滚 / GateResult |
 | 合并 | 默认 squash；PR-only，永不直推默认分支 |
-| 自动合并（决策 3B） | daily 仅当 workspace 显式开启且 Gate 全通过才 auto-merge；weekly/yearly 一律人工 |
+| 自动合并（决策 3B） | daily 仅当 workspace 显式开启且 Gate 全通过才 auto-merge；monthly/yearly 一律人工 |
 | 并发 | 每 workspace 同时最多一个 open delivery PR；专题与索引只在该 PR 内更新 |
 
 ### 8.3 幂等与版本
@@ -835,7 +835,7 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 | 规则 | 检查 | 阻断 |
 |---|---|---|
 | G0 | 证据 document/chunk/review 属于当前 workspace | 是 |
-| G1 | 按 `kind` 对 §5.1 对应子表做**等值**断言：daily 7 / weekly 4 / yearly 5；`section_key` 集合与 `ordinal` 序列完全相等，拒绝多余键与重复 ordinal | 是 |
+| G1 | 按 `kind` 对 §5.1 对应子表做**等值**断言：daily 7 / monthly 4 / yearly 5；`section_key` 集合与 `ordinal` 序列完全相等，拒绝多余键与重复 ordinal | 是 |
 | G2 | JSON schema、字段完整性：`structured_json` 按 `SECTION_SCHEMAS[kind][section_key]`，`fields_json` 按 `ITEM_SCHEMAS[item_type]`，`extra="forbid"` | 是 |
 | G3a | `evidence.snapshot_id == bundle.snapshot_id` | 是 |
 | G3b | 仅对 `source_type ∈ {document, chunk, review, task}`：`document_content_hash` 与冻结文档哈希清单一致；不一致 → `EVIDENCE_STALE`，回 `REVISING → RETRIEVING` 定向补检索，**不得判 FABRICATION**；`stats` 证据改用“口径 + snapshot_id + 参数摘要”的规范载荷哈希 | 是 |
@@ -850,7 +850,7 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 
 “冻结原文”由 `check_citation` 服务解析：Git 源取 snapshot commit 的 blob，ZIP 源取 MinIO 原始包或快照文档副本；Reviewer 不直接读 Git。
 
-哨兵文案集中管理（NFR-8）：daily 共 7 条，与 §5.1 daily 表一一对应：`今日待办：无记录`、`学习内容摘要：本日无学习内容记录`、`日记事件摘要：本日无日记事件记录`、`做错的事：本日无明显错误记录`、`正确方法论：本日无新增方法论记录`、`明日行动：无（未找到可执行依据）`、`一句话总结：本日无可总结内容`；weekly/yearly 的哨兵见 §5.1 对应子表（`本周无记录` / `本年无记录` 变体）。空日是合法输出，`no_evidence_ratio` 进入质量看板。
+哨兵文案集中管理（NFR-8）：daily 共 7 条，与 §5.1 daily 表一一对应：`今日待办：无记录`、`学习内容摘要：本日无学习内容记录`、`日记事件摘要：本日无日记事件记录`、`做错的事：本日无明显错误记录`、`正确方法论：本日无新增方法论记录`、`明日行动：无（未找到可执行依据）`、`一句话总结：本日无可总结内容`；monthly/yearly 的哨兵见 §5.1 对应子表（`本月无记录` / `本年无记录` 变体）。空日是合法输出，`no_evidence_ratio` 进入质量看板。
 
 ### 9.2 Reviewer rubric
 
@@ -873,7 +873,7 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 | fixture | 覆盖 | 断言 |
 |---|---|---|
 | fx_daily_2026-10-27 | REQUIREMENTS §12 第 5 条 | 7/7 章节；≥1 条带 path#L 的错误；顺延/回填正确；覆盖率 1.0 |
-| fx_weekly_W43 | REQUIREMENTS §12 第 6 条 | 与日报同口径；完成率与台账复算一致；重复错误 Top 正确 |
+| fx_monthly_2026_10 | REQUIREMENTS §12 第 6 条 | 与日报同口径；完成率与台账复算一致；重复错误 Top 正确 |
 | fx_yearly_2026 | REQUIREMENTS §12 第 6 条 | 只读下级 rollup；指标可推导 |
 | fx_topic_merge | E10/E11/E14 | 无重复条目；冲突显式；重跑不重复累加 |
 | fx_empty_day | REQUIREMENTS §6.4 | 全哨兵，0 条虚构 claim |
@@ -889,9 +889,9 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 | Planner | 强 | 4k / 1k | 固定章节模板兜底 |
 | Worker | 无生成式 LLM | 0 / 0（仅 embedding 与批处理；可选的查询改写单列为便宜档，不参与证据判断） | 规则优先、20 block/批、block_hash 缓存 |
 | Writer | 强 | 20k / 6k | 按章分段，只传相关 Pack |
-| Reviewer | 强（同族） | 12k / 2k ×1 | 确定性先行，只送可疑项；异构模型仅 Phase 2 的 weekly/yearly 增强（决策 6A） |
+| Reviewer | 强（同族） | 12k / 2k ×1 | 确定性先行，只送可疑项；异构模型仅 Phase 2 的 monthly/yearly 增强（决策 6A） |
 
-**run 级硬上限（已拍板 5B）**：daily 100k / 20k、weekly 300k / 60k、yearly 1M / 200k（输入/输出 token）；每 Workspace 月上限 5M / 1M；80% 告警、100% 硬停。预算**跨重试与修订累计**，每次 LLM 调用前检查，超限终止为 `FAILED/NEEDS_HUMAN`；per-workspace 日/月配额 + `create_review` 限流；单步重试 ≤2 + provider 熔断；输入哈希缓存（temperature=0）。**不输出不符合 REQUIREMENTS §6.2 的“数据版复盘”**；若必须降级，只能输出 daily 完整 7 节且每节明确哨兵的合法复盘，并在 UI 标 degraded。
+**run 级硬上限（已拍板 5B）**：daily 100k / 20k、monthly 300k / 60k、yearly 1M / 200k（输入/输出 token）；每 Workspace 月上限 5M / 1M；80% 告警、100% 硬停。预算**跨重试与修订累计**，每次 LLM 调用前检查，超限终止为 `FAILED/NEEDS_HUMAN`；per-workspace 日/月配额 + `create_review` 限流；单步重试 ≤2 + provider 熔断；输入哈希缓存（temperature=0）。**不输出不符合 REQUIREMENTS §6.2 的“数据版复盘”**；若必须降级，只能输出 daily 完整 7 节且每节明确哨兵的合法复盘，并在 UI 标 degraded。
 
 ## 10. 安全与多租户
 
@@ -925,7 +925,7 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 | minio | ZIP 原件、渲染产物、导出包 | 私有 bucket + SSE + 生命周期 |
 | migrate | Alembic 一次性 | advisory lock，健康后再启动 api/worker |
 
-**调度**：Celery Beat 每分钟 `tick_dispatch`，`SELECT ... FROM workspace_schedules WHERE next_run_at <= now() ORDER BY next_run_at FOR UPDATE SKIP LOCKED LIMIT 50`；按 workspace IANA 时区用 zoneinfo 计算 `next_run_at`，DST 不存在时刻顺延、重复时刻取较早 offset；事务性 outbox 重投，避免 DB 提交后崩溃丢任务；catchup 默认 7 天（`catchup_days` 取值 0–30），超出记 `catchup_window_exceeded` 不批量补生成；同 period 已成功则记 `period_already_succeeded`，两者分列 `workspace_schedules.last_skip_reason`。period 语义：daily 01:00 生成 D-1，weekly 周一 01:30 生成上一 ISO 周，yearly 1/1 02:00 生成上一年。
+**调度**：Celery Beat 每分钟 `tick_dispatch`，`SELECT ... FROM workspace_schedules WHERE next_run_at <= now() ORDER BY next_run_at FOR UPDATE SKIP LOCKED LIMIT 50`；按 workspace IANA 时区用 zoneinfo 计算 `next_run_at`，DST 不存在时刻顺延、重复时刻取较早 offset；事务性 outbox 重投，避免 DB 提交后崩溃丢任务；catchup 默认 7 天（`catchup_days` 取值 0–30），超出记 `catchup_window_exceeded` 不批量补生成；同 period 已成功则记 `period_already_succeeded`，两者分列 `workspace_schedules.last_skip_reason`。period 语义：daily 01:00 生成 D-1，monthly 每月 1 日 01:30 生成上一个月，yearly 1/1 02:00 生成上一年。
 
 **编排运行时**：自研持久化 FSM（转移表 + `agent_runs` 为状态真相）；PydanticAI 只作为每个角色的单次结构化调用运行时（`output_type=Plan/Draft/ReviewVerdict`）；首版不引入 LangGraph。预留升级接口：若状态数 >15 或需动态子图，切换 LangGraph，`thread_id = run_id`，对外 `Orchestrator` 接口不变。
 
@@ -946,11 +946,11 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 | FR-C1~C6 | L1 + L3（§2.6） | retrieval-service、indexer | RRF k=60 三路融合；jieba 两段式；四类过滤器；`SearchResult` 五字段；10k P95<1s |
 | FR-D1~D9 | L2 + L3 + SaaS 面（§2.5 chat / §4.6） | orchestrator、ToolGateway、writer-service、usage_events | SSE 首 token<3s；多轮；引用闭包；六工具；轨迹；无依据哨兵；workspace 强制；计量；FR-D9 三配置项（§5 RunOptions） |
 | FR-E1~E5 | L1 + L3 | task-ledger、document_dates、document_changes、knowledge-linker | 复选框唯一来源、台账首见/末见/完成/行号、顺延回填、日记匹配、学习摘要四要素 |
-| FR-E6~E9 | L3 + L4 | writer-service、reviewer-gate、renderer、path-resolver | §5.1 daily 7 章（含一句话总结）/ weekly 4 / yearly 5、周报聚合、年报分层、中文目录 |
+| FR-E6~E9 | L3 + L4 | writer-service、reviewer-gate、renderer、path-resolver | §5.1 daily 7 章（含一句话总结）/ monthly 4 / yearly 5、月报聚合、年报分层、中文目录 |
 | FR-E10~E14 | L3 + L4（§2.5 review） | topic_items/occurrences、review_citations、delivery-service | 三专题、日期+路径可追溯、手动触发、时区调度、同日覆盖 + 版本历史 |
-| FR-F1 | SaaS 面（§2.5 dashboard） | `latest(kind)` 聚合、60s 缓存 | 最新日报/周报/年报 + 完成率 + 未完成数 |
+| FR-F1 | SaaS 面（§2.5 dashboard） | `latest(kind)` 聚合、60s 缓存 | 最新日报/月报/年报 + 完成率 + 未完成数 |
 | FR-F2 | SaaS 面（§2.5 dashboard） | `tasks` 台账查询 | 未完成 Todo + 首次出现日期 + 已持续天数 |
-| FR-F3 | SaaS 面（§2.5 dashboard） | `calendar(month)` 返回每日有无复盘与状态 | 按日期浏览日报；按周/年浏览周报年报 |
+| FR-F3 | SaaS 面（§2.5 dashboard） | `calendar(month)` 返回每日有无复盘与状态 | 按日期浏览日报；按周/年浏览月报年报 |
 | FR-F4 | SaaS 面（§2.5 search） | 笔记索引 + 复盘独立索引 | 全局搜索笔记与复盘内容 |
 | FR-G1/G2 | SaaS 面（§2.5 settings） | provider_credentials、embedding_profiles、信封加密 | 测试连接；API Key 加密；Embedding 维度可配置；换维走蓝绿迁移（§2.6） |
 | FR-G3/G4 | 全层（§2.5 settings） | workspace_settings、git_connections | 时区/生成时间可改；Git 仓库/分支/凭据/频率 |
@@ -972,7 +972,7 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 | Phase 0 | M0/M1 | 契约包、数据模型、RLS 骨架、Compose、Auth/Workspace、session→RunContext 注入 | 每表跨租户测试通过；session→RunContext→RLS 集成测试通过；跨租户 404；退出所有设备生效；`docker compose up -d` 可用 |
 | Phase 1 | M2 | L1 接入层、documents/chunks/links、混合检索（§2.6）、文档树 | 100+ 篇 Vault 导入成功；搜索 P95<1s；200MB<10min |
 | Phase 2 | M3 | ToolGateway、chat 精简分支（§4.6）、SSE、引用、轨迹 | 首 token<3s；回答带真实引用；无依据返回哨兵 |
-| Phase 3 | M4 | FSM + Planner/Worker/Writer/Reviewer、§5.1 章节契约、task_occurrences、review_citations | fx_daily/fx_weekly/fx_yearly 全绿；日报可生成 2026-10-27 |
+| Phase 3 | M4 | FSM + Planner/Worker/Writer/Reviewer、§5.1 章节契约、task_occurrences、review_citations | fx_daily/fx_monthly/fx_yearly 全绿；日报可生成 2026-10-27 |
 | Phase 4 | M4.5/M5 | Git 交付（先 local/ui_diff 再接 PR）、专题页、调度、仪表盘 | 同日重跑 1 文件 version+1；专题不重复累加；定时按 workspace 时区触发 |
 | Phase 5 | M6 | 管理后台、审计、备份监控、安全加固、export/delete 冷却 | 审计全覆盖；导出 ZIP 可下载；删除冷却可撤销、purge 全链路；恢复演练通过 |
 
@@ -983,7 +983,7 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 | 风险/问题 | 影响 | 缓解 |
 |---|---|---|
 | FR-E9（`wiki/复盘`）与 REQUIREMENTS §6.3（`data/reviews`）路径冲突 | PR 目标、索引、搜索分裂 | **已裁决**：`reviews_root` 默认 `wiki/复盘`；`data/reviews` 仅兼容读取、不双写；需求 v1.1 修正 §6.3 |
-| 月报未定义（FR-E8 提到） | 口径不明 | 不新增月度产物；年度聚合周报，缺失周用日报补齐并记 `coverage_gaps` |
+| 月报未定义（FR-E8 提到） | 口径不明 | 不新增月度产物；年度聚合月报，缺失周用日报补齐并记 `coverage_gaps` |
 | PR 不在需求 FR/NFR 中 | 范围扩张、部署受阻 | **已裁决**：MVP 保留 PR（用户明确要求）作为交付层主路径；默认 `managed` repo；无 Git 连接时对象存储 + 下载为降级，验收第 5 条不依赖 PR |
 | 复盘产物自引用污染 | 模型引用昨天的自己，错误制度化 | `documents.source_type` 区分 user/generated；复盘目录不进 Todo 抽取与普通证据池；历史复盘只作指针 |
 | 历史证据失效（重新分块） | quote_hash 无法复算 | 证据固化 `quote + quote_hash + document_content_hash`；Reviewer 只对冻结文本复算 |
@@ -1009,10 +1009,10 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 |---|---|---|---|
 | 1 | 交付根目录与仓库形态 | **1D**：每 Workspace 可配置；默认 `managed` 输出仓库 + `wiki/复盘`；`data/reviews` 仅兼容读取、不双写 | §8.1、§6 `git_connections`、验收第 5 条 |
 | 2 | Embedding 换模与维度 | **2B**：首配可选模型/维度（默认 BGE-M3 1024 维）；换维走蓝绿迁移，不做在线热切换 | §2.6、§6 `embedding_profiles` |
-| 3 | 日报自动合并 | **3B**：daily 可 opt-in auto-merge（Gate 全通过）；weekly/yearly 默认人工 | §8.2、§16.3 |
+| 3 | 日报自动合并 | **3B**：daily 可 opt-in auto-merge（Gate 全通过）；monthly/yearly 默认人工 | §8.2、§16.3 |
 | 4 | 专题页新增条目确认 | **4B**：首见人工确认；复发/完成回填自动 | §7.3、§16.4 门三 |
-| 5 | 预算数值 | **5B**：daily 100k/20k、weekly 300k/60k、yearly 1M/200k；月上限 5M/1M；80% 告警、100% 硬停 | §9.4 |
-| 6 | Reviewer 异构模型 | **6A**：单 Reviewer（同族）+ 确定性门禁；异构仅 Phase 2 的 weekly/yearly 增强 | §9.4 |
+| 5 | 预算数值 | **5B**：daily 100k/20k、monthly 300k/60k、yearly 1M/200k；月上限 5M/1M；80% 告警、100% 硬停 | §9.4 |
+| 6 | Reviewer 异构模型 | **6A**：单 Reviewer（同族）+ 确定性门禁；异构仅 Phase 2 的 monthly/yearly 增强 | §9.4 |
 | 7 | 删除边界 | **7A**：30 天冷却；清除 DB/MinIO/向量/凭据；Git 历史保留并明确告知 | §14、`deletion_requests`、NFR-9/Q9 |
 
 补充决策（2026-11-06，按建议拍板，详见 `DECISIONS.md`）：
@@ -1032,7 +1032,7 @@ GitHub App 优先（installation token 1h，权限 `Contents:RW`、`Pull request
 - **第 5 条（2026-10-27 日报）**：`ReviewJobRequest(kind=daily, period_key=2026-10-27)` → 快照绑定该日期素材 → Planner 按 §5.1 生成 daily 七章节骨架 → Worker 从 `task_occurrences`（`occurrence_date <= 2026-10-27`）与日记/变更笔记取证 → Writer 逐章写 → G1 断言 `section_key` 集合与 `ordinal` 序列完全等于 §5.1 常量、G4 断言每条错误/方法论带 `source_date + source_path + line_range`、G3 断言 quote/quote_hash 可复算 → Reviewer 通过 → 渲染 `每日复盘/2026/2026-10-27.md`。`fx_daily_2026-10-27` 是验收用例。
 - **第 3 条（搜索）**：搜索页 → `SearchQuery` → §2.6 三路 RRF → `SearchResult` 五字段 + `snippet_html` 高亮。
 - **第 4 条（对话引用）**：chat 精简分支 → `search_notes`（§2.6）→ `EvidenceItem` → G5 引用闭包校验 → `messages.references_json`。
-- **第 6 条（周报/年报）**：`kind=weekly` 从该 ISO 周 7 份日报的 `review_sections/review_entries` 聚合，完成率与台账复算一致；`kind=yearly` 走 daily → weekly aggregates → yearly 分层，只读下级 rollup，错误 Top10 用确定性 SQL 排序，不把全年原文塞进单次上下文。缺失周用日报补齐并记 `coverage_gaps`，不编造月份。
+- **第 6 条（月报/年报）**：`kind=monthly` 从该 自然月 7 份日报的 `review_sections/review_entries` 聚合，完成率与台账复算一致；`kind=yearly` 走 daily → monthly aggregates → yearly 分层，只读下级 rollup，错误 Top10 用确定性 SQL 排序，不把全年原文塞进单次上下文。缺失周用日报补齐并记 `coverage_gaps`，不编造月份。
 - **第 7 条（租户隔离）**：每张租户表参数化 RLS 集成测试，A 会话查询 B 数据必须 0 行；工具层另有跨租户负向测试。
 - **第 8 条（重启恢复）**：`restart: unless-stopped` + dispatcher 启动补算 + outbox 重投 + 租约 sweeper；Redis 丢失后从 `agent_runs` 重建待办。
 - **第 9 条（一键部署）**：Compose + `.env.example` + `make up/migrate/restore`；Caddy 自动 HTTPS；Git 交付为可选配置，不阻断启动。
@@ -1059,9 +1059,9 @@ LLM-Wiki 系最值得吸收的不是"多几个 Agent"，而是三条职责切分
 | `read before work, write after work` | 执行前加载窄范围 context pack，执行后写入有长期价值的结果 | L2 在 PLANNING 前做 preflight 窄查询（只读元数据）；L4 在 Gate 通过后才 postflight 写入长期知识 | FR-E5/E11 |
 | 长期知识四道门：可复用、有来源、获授权/确认、归属明确 | 不同时满足不进入长期库 | 错误/方法论条目入 `review_entries` 与专题页前必须过四道门；模型推测、临时讨论、无法说明来源的中间内容一律不落库 | FR-E11、REQUIREMENTS §6.4 |
 | Wiki 是可选后端，异常不得阻断业务 | runtime 缺失/禁用/异常不能破坏原 Skill 流程 | 知识库或向量库异常时复盘降级为 `evidence_only`，仍产出带哨兵的合法草稿，不整单失败 | NFR-4 |
-| `create_only` / `update_allowed` / `append_only` | 三种受控写入模式 | 日报/周报/年报按 `update_allowed` 覆盖同周期路径；三个专题页按 `append_only` 追加 occurrence；`source_snapshots` 为 `create_only` | FR-E14 |
+| `create_only` / `update_allowed` / `append_only` | 三种受控写入模式 | 日报/月报/年报按 `update_allowed` 覆盖同周期路径；三个专题页按 `append_only` 追加 occurrence；`source_snapshots` 为 `create_only` | FR-E14 |
 | 来源注册表 + checksum + 不可变版本 + 追加式日志 | 证据可追溯、可复算 | `source_snapshots`（commit SHA + 文档哈希清单）、`document_changes`、`run_events`（append-only）、`delivery_events` | FR-E2/E11/E14、NFR-5 |
-| 意图路由只选一个子流程，自身不写文件 | 父 Skill 是 router，不是 writer | L2 的 `intent_router` 一次只选择一个工作流（daily/weekly/yearly/topic/maintain）；chat 由会话端点直接进入 §4.6 精简分支，不经 review 路由；router 本身不写正文、不落盘 | FR-E12/E13 |
+| 意图路由只选一个子流程，自身不写文件 | 父 Skill 是 router，不是 writer | L2 的 `intent_router` 一次只选择一个工作流（daily/monthly/yearly/topic/maintain）；chat 由会话端点直接进入 §4.6 精简分支，不经 review 路由；router 本身不写正文、不落盘 | FR-E12/E13 |
 | 能力声明 vs 实际服务、drift 检测 | 声明的 capability 必须被 gateway 实际提供，否则不可路由 | `ToolGateway` 启动时比对"声明能力清单"与"已实现工具"，缺失即标记 drift，该工具不可被 Planner 规划、不可被 Worker 调用 | FR-D4/D7 |
 | approval class：`plan` 永远 dry-run；读写拆成两个 capability | 计划不产生副作用；审批粒度按能力而非操作 | `create_review` 是唯一写工具，只能由 L2 在用户确认后异步入队；review run 内禁止递归创建 review；`plan` 阶段零副作用 | FR-D4、§4.3 |
 | 结构化事件 + cursor + epoch + heartbeat + degraded | 断线可续、长任务有心跳、降级不静默 | `run_events` 全局单调 `event_id` 作为 SSE cursor；`stream_epoch` 标识进程重启；长阶段发 `heartbeat`；所有降级写 `degraded` 事件并在 UI 可见 | FR-D1/D5、NFR-5 |
@@ -1079,12 +1079,12 @@ LLM-Wiki 系最值得吸收的不是"多几个 Agent"，而是三条职责切分
 review-profile.yml      # 领域契约：复盘领域拥有语义
   sections:
     daily:  与 §5.1 daily 表逐项相等（7 章）
-    weekly: 与 §5.1 weekly 表逐项相等（4 章）
+    monthly: 与 §5.1 monthly 表逐项相等（4 章）
     yearly: 与 §5.1 yearly 表逐项相等（5 章）
   record_types: error | method | action
   write_modes:
     每日复盘: update_allowed
-    每周复盘: update_allowed
+    每月复盘: update_allowed
     年度复盘: update_allowed
     专题: append_only
   sentinels: 各章节的"无记录"文案（集中管理，NFR-8）
@@ -1094,7 +1094,7 @@ delivery-profile.yml    # 交付契约：Git 网关拥有访问
   mode: managed | vault_writeback | separate
   reviews_root: wiki/复盘
   branch_pattern: review/{kind}/{period_key}   # 仅复盘类；chat 不走 Git
-  auto_merge: daily 可配置，weekly/yearly/topic 默认人工
+  auto_merge: daily 可配置，monthly/yearly/topic 默认人工
   approval_class: read_only | propose | apply
 ```
 
@@ -1187,7 +1187,7 @@ GET /api/runs/{run_id}/events?after=<last_event_id>&epoch=<stream_epoch>
 ### 16.10 与验收基线的对接补充
 
 - **REQUIREMENTS §12 第 5 条（日报）**：四道门保证“每条错误带日期与来源路径”；`fx_daily_2026-10-27` 同时断言 `dropped_items` 为空或每条都有 drop 原因。
-- **REQUIREMENTS §12 第 6 条（周报/年报）**：周报只聚合已存在的日报，缺失日显式记 `coverage_gaps`，不编造、不把缺失日的历史结论当作已确认；年报分层 rollup，不塞全年原文。
+- **REQUIREMENTS §12 第 6 条（月报/年报）**：月报只聚合已存在的日报，缺失日显式记 `coverage_gaps`，不编造、不把缺失日的历史结论当作已确认；年报分层 rollup，不塞全年原文。
 - **REQUIREMENTS §12 第 8 条（重启恢复）**：cursor + epoch 保证前端不静默续接错误历史；租约 sweeper 保证 run 可续跑。
 
 ---
@@ -1213,10 +1213,10 @@ GET /api/runs/{run_id}/events?after=<last_event_id>&epoch=<stream_epoch>
 |---|---|---|---|
 | 1 | 交付根目录与仓库形态 | **D（默认 A）** | 每 Workspace 可配置；默认 `managed` 输出仓库 + `wiki/复盘`；`data/reviews` 兼容读取 |
 | 2 | Embedding 换模与维度 | **B** | 首配可选（默认 BGE-M3 1024 维）；换维走蓝绿迁移，不做在线热切换 |
-| 3 | 日报自动合并 | **B** | daily 可 opt-in auto-merge（Gate 全通过）；weekly/yearly 人工 |
+| 3 | 日报自动合并 | **B** | daily 可 opt-in auto-merge（Gate 全通过）；monthly/yearly 人工 |
 | 4 | 专题页新增条目确认 | **B** | 首见人工确认；复发/完成回填自动 |
-| 5 | 预算数值 | **B 标准** | daily 100k/20k、weekly 300k/60k、yearly 1M/200k；月 5M/1M；80% 告警、100% 硬停 |
-| 6 | Reviewer 异构模型 | **A** | 单 Reviewer（同族）+ 确定性门禁；异构仅 Phase 2 的 weekly/yearly 增强 |
+| 5 | 预算数值 | **B 标准** | daily 100k/20k、monthly 300k/60k、yearly 1M/200k；月 5M/1M；80% 告警、100% 硬停 |
+| 6 | Reviewer 异构模型 | **A** | 单 Reviewer（同族）+ 确定性门禁；异构仅 Phase 2 的 monthly/yearly 增强 |
 | 7 | 删除边界 | **A** | 30 天冷却；清除 DB/MinIO/向量/凭据；Git 历史保留并明确告知 |
 
 > 决策依据、备选方案与否决理由见 `DECISIONS.md`。任何变更需更新本文版本号并在此表追加一行。

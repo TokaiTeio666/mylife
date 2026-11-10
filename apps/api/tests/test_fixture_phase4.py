@@ -264,10 +264,10 @@ async def test_fx08_pr_delivery(client, admin_conn, tmp_path):
             client, workspace_id, kind="daily", period_key="2026-10-27"
         )
         assert state == "succeeded", state
-        weekly, weekly_state = await _generate(
-            client, workspace_id, kind="weekly", period_key="2026-W43"
+        monthly, monthly_state = await _generate(
+            client, workspace_id, kind="monthly", period_key="2026-10"
         )
-        assert weekly_state in {"succeeded", "human_gate"}
+        assert monthly_state in {"succeeded", "human_gate"}
 
         daily_row = admin_conn.execute(
             "SELECT branch, commit_sha, pr_number, status, auto_merge FROM delivery_records "
@@ -293,7 +293,7 @@ async def test_fx08_pr_delivery(client, admin_conn, tmp_path):
         assert "wiki/复盘/专题/错误清单.md" in files
         assert "wiki/复盘/索引.md" in files
 
-        # 重跑同 period 复用同一 open PR（daily 只占 1 个 PR；weekly 另 1 个）
+        # 重跑同 period 复用同一 open PR（daily 只占 1 个 PR；monthly 另 1 个）
         daily_prs = [
             item for item in stub.pulls.values()
             if item["head"]["ref"] == "review/daily/2026-10-27"
@@ -308,14 +308,14 @@ async def test_fx08_pr_delivery(client, admin_conn, tmp_path):
         history = _git("--git-dir", str(remote), "log", "--oneline", daily_row[0], cwd=tmp_path)
         assert len(history.splitlines()) >= 2
 
-        # weekly 不自动合并
-        if weekly_state == "succeeded":
-            weekly_row = admin_conn.execute(
+        # monthly 不自动合并
+        if monthly_state == "succeeded":
+            monthly_row = admin_conn.execute(
                 "SELECT auto_merge, status FROM delivery_records "
                 "WHERE workspace_id = %s AND review_id = %s",
-                (workspace_id, weekly["review_id"]),
+                (workspace_id, monthly["review_id"]),
             ).fetchone()
-            assert weekly_row[0] is False
+            assert monthly_row[0] is False
 
         pr = stub.pulls[1]
         for heading in (
@@ -344,7 +344,7 @@ async def test_fx08_pr_delivery(client, admin_conn, tmp_path):
                     "status": daily_row[3],
                     "trailers": trailer_keys,
                 },
-                "weekly_state": weekly_state,
+                "monthly_state": monthly_state,
                 "pr_count": len(stub.pulls),
                 "pr_body_sections": [
                     heading

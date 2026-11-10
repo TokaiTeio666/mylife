@@ -50,7 +50,7 @@ class SettingsSummary(ApiModel):
 
     timezone: str
     daily_at: time
-    weekly_at: time
+    monthly_at: time
     yearly_at: time
     reviews_root: str
 
@@ -86,6 +86,6 @@ class WorkspaceScheduleDefaults(ApiModel):
     """创建 Workspace 时写入的默认调度（FR-E13）。"""
 
     daily_at: time = time(1, 0)
-    weekly_at: time = time(1, 30)
+    monthly_at: time = time(1, 30)
     yearly_at: time = time(2, 0)
     timezone: str = "Asia/Shanghai"

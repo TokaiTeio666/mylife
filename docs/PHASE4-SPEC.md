@@ -60,9 +60,9 @@
 | D7 | 专题冲突字段无落点 | FX-07 | `topic_items` 增 `fields_json/conflicts_json`；物化时比较同 `canonical_key` 字段，差异写入 `conflicts_json`（各值并列），渲染为显式冲突块，不静默择一 |
 | D8 | `confirm(decision=drop)` 语义未定义 | API §3.7.13 | `drop` = tombstone：`status=dropped` + `dropped_at`；复发不自动复活；不计入专题页 |
 | D9 | `topic_items` 无可编辑字段 | API §3.7.13 `edited_fields` | 增 `fields_json jsonb`；`confirm` 的 `edited_fields` 合并进 `fields_json`（白名单：`title` + `SECTION` 字段键），优先级高于物化值 |
-| D10 | `索引.md` 内容/格式未定义 | DIRECTORY §4 | 冻结格式见 §5.5：frontmatter + auto 区；最新日/周/年报各 1 条 + 三个专题链接与 open 计数；确定性排序 |
-| D11 | 专题 frontmatter `kind` 枚举无 topic/index | DIRECTORY §4.3 | 生成文件允许 `kind ∈ daily/weekly/yearly/topic/index` |
-| D12 | `weekly_at=周一 02:30`、`yearly_at=1/1 03:00` 暗示可配置日期 | AC-51 vs API §3.9.7 | MVP **周固定周一、年固定 1 月 1 日**，只允许配置 `HH:MM`；AC-51 的日期是固定语义 |
+| D10 | `索引.md` 内容/格式未定义 | DIRECTORY §4 | 冻结格式见 §5.5：frontmatter + auto 区；最新日/月/年报各 1 条 + 三个专题链接与 open 计数；确定性排序 |
+| D11 | 专题 frontmatter `kind` 枚举无 topic/index | DIRECTORY §4.3 | 生成文件允许 `kind ∈ daily/monthly/yearly/topic/index` |
+| D12 | `monthly_at=每月 1 日 02:30`、`yearly_at=1/1 03:00` 暗示可配置日期 | AC-51 vs API §3.9.7 | MVP **月固定 1 日、年固定 1 月 1 日**，只允许配置 `HH:MM`；AC-51 的日期是固定语义 |
 | D13 | `catchup_days`/`enabled` 存哪 | API §3.9.7 vs DATA-MODEL §4.18/§4.20 | `workspace_settings` 存 timezone/三时间；`workspace_schedules` 存 per-kind `local_time/timezone/catchup_days/enabled/next_run_at`。PUT 同事务写两表；单值 `catchup_days` 应用到三行 |
 | D14 | 停机补算“不批量”与“≤catchup_days” | ARCH §11 vs AC-43 | 生成窗口内**最近 catchup_days 个**周期，按 oldest→newest；更早的只记 `catchup_window_exceeded`，不生成 |
 | D15 | 定时触发无内部认证 | API §3.7.1 | 公开 `POST /reviews` 拒绝 `trigger=schedule`；dispatcher 调用服务层 `admit_scheduled_review()`（内部函数，不经过 HTTP） |
@@ -242,7 +242,7 @@ $$;
 ### 4.6 Auto-merge（AC-67）
 
 - 仅当 `kind=daily` 且 `workspace_settings.auto_merge_daily=true` 且 `verdict.decision=APPROVE`（0 blocking）时 `pr.auto_merge=true` 并调用 merge API；
-- weekly/yearly 恒 false；任何请求（若未来加入字段）为 true 被忽略并审计 `delivery.auto_merge_denied`；
+- monthly/yearly 恒 false；任何请求（若未来加入字段）为 true 被忽略并审计 `delivery.auto_merge_denied`；
 - 每次自动合并写 `audit_logs(action='delivery.auto_merged')`，记录 PR/commit。
 
 ### 4.7 回滚与编辑重评审
@@ -323,7 +323,7 @@ generator: mylife/0.4
 # 复盘索引
 
 - 最新日报：2026-10-27（v2）
-- 最新周报：2026-W43（v1）
+- 最新月报：2026-10（v1）
 - 最新年报：2026（v1）
 
 ## 专题
@@ -333,7 +333,7 @@ generator: mylife/0.4
 <!-- mylife:auto:end -->
 ```
 
-排序固定：日/周/年各取 `period_key desc, version desc` 第一条；专题固定 errors→methods→actions。
+排序固定：日/月/年各取 `period_key desc, version desc` 第一条；专题固定 errors→methods→actions。
 
 ---
 
@@ -345,13 +345,13 @@ generator: mylife/0.4
 
 ```python
 def localize(day: date, at: time, tz: str) -> datetime      # DST：不存在→顺延；歧义→fold=0
-def next_run_at(kind, at, tz, after_utc) -> datetime        # daily/weekly(Mon)/yearly(Jan 1)
-def due_period(kind, run_local_date) -> str                 # daily D-1 / weekly 上一 ISO 周 / yearly 去年
+def next_run_at(kind, at, tz, after_utc) -> datetime        # daily/monthly(1st)/yearly(Jan 1)
+def due_period(kind, run_local_date) -> str                 # daily D-1 / monthly 上一个月 / yearly 去年
 def missed_periods(kind, at, tz, since_utc, now_utc, catchup_days) -> (list, bool)
 ```
 
 - daily：本地日期 + HH:MM。
-- weekly：下一个周一 HH:MM（周固定周一，D12）。
+- monthly：下一个自然月 1 日 HH:MM（D12 已被 Phase 6 取代）。
 - yearly：下一个 1 月 1 日 HH:MM。
 - `missed_periods`：返回窗口内最近 `catchup_days` 个周期（oldest→newest）与 `exceeded` 标志。
 
@@ -387,7 +387,7 @@ def missed_periods(kind, at, tz, since_utc, now_utc, catchup_days) -> (list, boo
 
 | 端点 | 权限 | 行为 |
 |---|---|---|
-| `GET /settings/schedule` | 成员 | 返回 `timezone/daily_at/weekly_at/yearly_at/catchup_days/enabled{3}/next_run_at{3}` |
+| `GET /settings/schedule` | 成员 | 返回 `timezone/daily_at/monthly_at/yearly_at/catchup_days/enabled{3}/next_run_at{3}` |
 | `PUT /settings/schedule` | owner | 校验时区 IANA、时间 `HH:MM`、`catchup_days 0–30`；同事务更新 `workspace_settings` + 三条 `workspace_schedules`；重算 `next_run_at`；审计 `settings.schedule.updated`；活跃 run 不受影响 |
 | `GET /settings/git` | 成员 | `{items:[GitConnectionSummary]}`（凭据只给状态） |
 | `PUT /settings/git` | owner | `role/provider/repo_full_name/base_branch/auth_type/credential?/reviews_root?/mode?/sync_interval_minutes?/auto_merge_daily?/remote_url?/api_base_url?`；先连接测试（`contents:write`），失败不保存并返回 `INGEST_AUTH_FAILED details.reason`；成功后加密存储、`next_sync_at=now+interval`、审计 `settings.git.updated` |
@@ -560,7 +560,7 @@ def missed_periods(kind, at, tz, since_utc, now_utc, catchup_days) -> (list, boo
 | FX | 输入 | 断言 |
 |---|---|---|
 | FX-07 | 三日错误条目（同 canonical_key 2 次、冲突字段 1 处、人工段落 1 段） | 三文件存在；条目唯一；冲突块显式；重跑计数=实际出现；区外文本保留；标记丢失→manual 不覆盖 |
-| FX-08 | 本地裸仓库 + fake GitHub；daily 与 weekly 各 1 | 分支 `review/daily/2026-10-27`；trailer 四项；PR 六段；同 period 复用 PR；无 force push；weekly 不自动合并 |
+| FX-08 | 本地裸仓库 + fake GitHub；daily 与 monthly 各 1 | 分支 `review/daily/2026-10-27`；trailer 四项；PR 六段；同 period 复用 PR；无 force push；monthly 不自动合并 |
 | FX-09 | 过期租约 + dispatcher 启动 | run→retry_wait→succeeded；无重复产物；sweeper 记 `retry_from_state`；启动补算 next_run_at；epoch 变化 |
 
 ---

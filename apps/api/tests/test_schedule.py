@@ -28,10 +28,10 @@ def test_next_run_daily_timezone_change():
     )
 
 
-def test_next_run_weekly_is_monday():
-    after = datetime(2026, 10, 23, 12, 0, tzinfo=UTC)  # 周五
-    value = next_run_at("weekly", time(1, 30), "Asia/Shanghai", after)
-    assert value == datetime(2026, 10, 25, 17, 30, tzinfo=UTC)  # 周一 01:30 CST
+def test_next_run_monthly_is_first_day():
+    after = datetime(2026, 10, 23, 12, 0, tzinfo=UTC)  # 上海 10-23 20:00
+    value = next_run_at("monthly", time(1, 30), "Asia/Shanghai", after)
+    assert value == datetime(2026, 10, 31, 17, 30, tzinfo=UTC)  # 11-01 01:30 CST
 
 
 def test_next_run_yearly_is_jan_first():
@@ -54,7 +54,8 @@ def test_dst_ambiguous_time_takes_earlier_offset():
 
 def test_due_periods():
     assert due_period("daily", date(2026, 10, 28)) == "2026-10-27"
-    assert due_period("weekly", date(2026, 11, 2)) == "2026-W44"
+    assert due_period("monthly", date(2026, 11, 2)) == "2026-10"
+    assert due_period("monthly", date(2027, 1, 1)) == "2026-12"
     assert due_period("yearly", date(2027, 1, 1)) == "2026"
 
 

@@ -17,7 +17,7 @@ from pydantic import Field, field_validator, model_validator
 from mylife_contract.budget import Budget
 from mylife_contract.common import ApiModel, UtcDateTime
 
-RunKind = Literal["daily", "weekly", "yearly"]
+RunKind = Literal["daily", "monthly", "yearly"]
 ReviewStatus = Literal[
     "draft",
     "in_review",
@@ -114,7 +114,7 @@ class OneLineSummarySection(ApiModel):
 
 
 # ---------------------------------------------------------------------------
-# weekly sections
+# monthly sections
 # ---------------------------------------------------------------------------
 
 
@@ -153,7 +153,7 @@ class MethodLandingSection(ApiModel):
     items: list[MethodLandingItem] = Field(default_factory=list)
 
 
-class NextWeekActionsSection(ApiModel):
+class NextMonthActionsSection(ApiModel):
     items: list[ActionItem] = Field(default_factory=list)
 
 
@@ -166,16 +166,16 @@ class LearningMapSection(ApiModel):
     topics: list[str] = Field(default_factory=list)
     concepts: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
-    related_weeks: list[str] = Field(default_factory=list)
+    related_months: list[str] = Field(default_factory=list)
 
-    @field_validator("related_weeks")
+    @field_validator("related_months")
     @classmethod
-    def _weeks(cls, value: list[str]) -> list[str]:
+    def _months(cls, value: list[str]) -> list[str]:
         for item in value:
-            if len(item) != 8 or not item[:4].isdigit() or item[4] != "-" or item[5] != "W":
-                raise ValueError("related_weeks must match YYYY-Www")
-            if not item[6:].isdigit():
-                raise ValueError("related_weeks must match YYYY-Www")
+            if len(item) != 7 or not item[:4].isdigit() or item[4] != "-":
+                raise ValueError("related_months must match YYYY-MM")
+            if not item[5:].isdigit() or not 1 <= int(item[5:]) <= 12:
+                raise ValueError("related_months must match YYYY-MM")
         return value
 
 
@@ -248,11 +248,11 @@ SECTION_SCHEMAS: dict[str, dict[str, type[ApiModel]]] = {
         "tomorrow_actions": TomorrowActionsSection,
         "one_line_summary": OneLineSummarySection,
     },
-    "weekly": {
+    "monthly": {
         "completion_rate": CompletionRateSection,
         "recurring_mistakes": RecurringMistakesSection,
         "method_landing": MethodLandingSection,
-        "next_week_actions": NextWeekActionsSection,
+        "next_month_actions": NextMonthActionsSection,
     },
     "yearly": {
         "learning_map": LearningMapSection,

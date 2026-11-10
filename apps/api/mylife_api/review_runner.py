@@ -10,6 +10,7 @@ Phase 3 的 Writer/Reviewer 是确定性装配 + 门禁，不调用生成式 LLM
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -22,7 +23,25 @@ from uuid import UUID, uuid4
 from mylife_agent.budget import BudgetExceeded, budget_for_kind, evaluate
 from mylife_agent.entry_materializer import materialize_entries
 from mylife_agent.gates import GateContext
+from mylife_agent.llm import (
+    LLMKeyMissing,
+    LLMRequest,
+    LLMUnavailable,
+    MockLLMProvider,
+)
+from mylife_agent.review_writer import (
+    PROMPT_VERSION as WRITER_PROMPT_VERSION,
+)
+from mylife_agent.review_writer import (
+    SemanticWriterError,
+    build_semantic_writer_messages,
+    parse_semantic_response,
+)
+from mylife_agent.review_writer import (
+    semantic_entries as build_semantic_entries,
+)
 from mylife_agent.reviewer import run_review as run_gates
+from mylife_contract.constants import ROLE_BUDGETS
 from mylife_contract.errors import ErrorCode
 from mylife_contract.review import EvidenceItem
 from mylife_delivery.renderer import render_review_markdown, review_path, topic_path
@@ -31,6 +50,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from mylife_api import repo_review as repo
 from mylife_api import review_composer, review_evidence, services_budget
 from mylife_api.db import get_session_factory, set_rls_context
+from mylife_api.errors import AppError
 from mylife_api.review_fsm import TERMINAL_STATES
 from mylife_api.runtime import STREAM_EPOCH
 
@@ -41,6 +61,8 @@ PARSER_VERSION = "mylife-parser-1"
 PROMPT_VERSION = "review-deterministic-v1"
 MAX_EVIDENCE = 80
 MAX_SECTION_EVIDENCE = 12
+#: 语义 Writer 的单次调用上限；超时回退确定性抽取，不阻塞整条复盘。
+WRITER_TIMEOUT_SECONDS = 90.0
 
 
 def _digest(payload: Any) -> str:
@@ -209,10 +231,11 @@ class ReviewRunner:
         if self.kind == "daily":
             day = date.fromisoformat(self.period_key)
             return day, day
-        if self.kind == "weekly":
-            year, week = self.period_key.split("-W")
-            start = date.fromisocalendar(int(year), int(week), 1)
-            return start, start + timedelta(days=6)
+        if self.kind == "monthly":
+            year, month = (int(part) for part in self.period_key.split("-"))
+            start = date(year, month, 1)
+            next_month = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+            return start, next_month - timedelta(days=1)
         year = int(self.period_key)
         return date(year, 1, 1), date(year, 12, 31)
 
@@ -257,21 +280,38 @@ class ReviewRunner:
                 workspace_id=self.workspace_id,
                 period_key=period_start,
             )
+            # 语义 Writer 的候选素材：当天笔记的 chunk，交给模型判断是否有
+            # 错误/方法论；上面的 entries 仅作为模型不可用时的确定性回退。
+            context["semantic_candidates"] = (
+                await review_evidence.collect_semantic_candidates(
+                    session,
+                    workspace_id=self.workspace_id,
+                    period_key=period_start,
+                    reviews_root=reviews_root,
+                    collector=collector,
+                )
+            )
         else:
-            source_kind = "daily" if self.kind == "weekly" else "weekly"
+            # 月报从 daily 条目 rollup；年报从 daily 条目取错误/方法论，
+            # 从 monthly sections 取学习地图与事件线（周/月键不能按日期区间比较）。
+            entry_kind = "daily"
+            section_kind = "daily" if self.kind == "monthly" else "monthly"
             context["entries"] = await review_evidence.collect_entries_for_period(
                 session,
                 workspace_id=self.workspace_id,
-                kind=source_kind,
+                kind=entry_kind,
                 period_start=period_start,
                 period_end=period_end,
             )
             context["source_sections"] = await review_evidence.collect_sections_for_period(
                 session,
                 workspace_id=self.workspace_id,
-                kind=source_kind,
+                kind=section_kind,
                 period_start=period_start,
                 period_end=period_end,
+                period_prefix=(
+                    f"{period_start.year}-%" if self.kind == "yearly" else None
+                ),
             )
             context["prior"] = await review_evidence.collect_prior_reviews(
                 session,
@@ -279,7 +319,7 @@ class ReviewRunner:
                 kind=self.kind,
                 period_key=self.period_key,
                 collector=collector,
-                section_key="completion_rate" if self.kind == "weekly" else "learning_map",
+                section_key="completion_rate" if self.kind == "monthly" else "learning_map",
             )
 
         snapshot_id = self.payload.get("snapshot_id")
@@ -307,7 +347,11 @@ class ReviewRunner:
         context = bundle.get("context") or {}
         period_start, period_end = self._period_bounds()
 
+        selected_entries = self._entries_from_context(context)
         if self.kind == "daily":
+            semantic = await self._semantic_entries(session, context, period_start)
+            if semantic is not None:
+                selected_entries = semantic
             ledger = await _ledger(session, self.workspace_id)
             draft = review_composer.compose_daily(
                 period_key=period_start,
@@ -316,13 +360,13 @@ class ReviewRunner:
                 carried_tasks=context.get("carried") or [],
                 journal_docs=context.get("journal") or [],
                 learning_docs=context.get("learning") or [],
-                entries=self._entries_from_context(context),
+                entries=selected_entries,
             )
             draft.claims = _claims_from_sections(draft)
-        elif self.kind == "weekly":
+        elif self.kind == "monthly":
             ledger = await _ledger(session, self.workspace_id)
             recurring = _recurring(context.get("entries") or [])
-            draft = review_composer.compose_weekly(
+            draft = review_composer.compose_monthly(
                 period_key=self.period_key,
                 collector=collector,
                 ledger=ledger,
@@ -356,7 +400,7 @@ class ReviewRunner:
         # 同一 canonical_key 在一天内可能来自多篇笔记；`materialize_entries`
         # 保留第一条的字段，来源也必须取第一条，保证 path/line 与 quote 一致。
         source_by_key: dict[tuple[str, str], dict[str, Any]] = {}
-        for entry in context.get("entries") or []:
+        for entry in selected_entries:
             source_by_key.setdefault(
                 (entry["item_type"], entry["canonical_key"]),
                 {
@@ -416,8 +460,201 @@ class ReviewRunner:
             "citations": draft.citations,
         }
 
+    async def _semantic_entries(
+        self,
+        session: AsyncSession,
+        context: dict[str, Any],
+        period_start: date,
+    ) -> list[dict[str, Any]] | None:
+        """用 LLM 对当天笔记做错误/方法论语义抽取。
+
+        返回 `None` 表示“未采用语义结果”，调用方回退确定性抽取；返回空列表
+        表示模型明确判断当天没有错误或方法论（章节走哨兵，不覆盖为回退结果）。
+        """
+        candidates = context.get("semantic_candidates") or []
+        if not candidates:
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "no_candidates",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+
+        from mylife_api import services_llm
+
+        try:
+            provider = await services_llm.build_llm_for_workspace(
+                session, workspace_id=self.workspace_id
+            )
+        except (LLMKeyMissing, AppError):
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "llm_not_configured",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+        if isinstance(provider, MockLLMProvider):
+            # 离线/测试环境保持原有确定性行为，不把 mock 文本当语义结果。
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "mock_provider",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+
+        from mylife_contract.budget import Budget
+
+        plan_budget = (self.payload.get("plan") or {}).get("budget")
+        budget = (
+            Budget.model_validate(plan_budget)
+            if plan_budget
+            else budget_for_kind(self.kind)
+        )
+        used = await services_budget.run_budget_usage(
+            session,
+            workspace_id=self.workspace_id,
+            run_id=self.run_id,
+            budget=budget,
+        )
+        decision = evaluate(
+            used_input=used.input_tokens,
+            used_output=used.output_tokens,
+            used_cost=used.cost_usd,
+            budget=budget,
+        )
+        if decision.should_stop:
+            self._degrade("writer_budget_exceeded")
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "budget_exceeded",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+
+        from mylife_agent.injection import scan_injections
+
+        safe_candidates: list[dict[str, Any]] = []
+        blocked = 0
+        for candidate in candidates:
+            text = str(candidate.get("content") or candidate.get("quote") or "")
+            if scan_injections(text):
+                blocked += 1
+                continue
+            safe_candidates.append(candidate)
+        if blocked:
+            self._degrade("writer_prompt_injection_blocked")
+        if not safe_candidates:
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "all_candidates_blocked",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+
+        system_prompt, user_content = build_semantic_writer_messages(
+            period_key=period_start.isoformat(), candidates=safe_candidates
+        )
+        request = LLMRequest(
+            question=user_content,
+            evidence=[],
+            system_prompt=system_prompt,
+            max_tokens=int(ROLE_BUDGETS["writer"]["max_output_tokens"]),
+        )
+
+        async def _collect() -> str:
+            parts: list[str] = []
+            async for delta in provider.stream(request):
+                parts.append(delta)
+            return "".join(parts)
+
+        try:
+            text = await asyncio.wait_for(_collect(), timeout=WRITER_TIMEOUT_SECONDS)
+        except (TimeoutError, LLMUnavailable):
+            self._degrade("writer_llm_unavailable")
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "llm_unavailable",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+        except Exception:  # noqa: BLE001 - 模型异常必须回退，不影响复盘产出
+            logger.warning("semantic writer failed", exc_info=True)
+            self._degrade("writer_llm_unavailable")
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "llm_error",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+
+        usage_obj = provider.usage
+        if usage_obj is not None:
+            user_id = self.payload.get("user_id")
+            if user_id:
+                from mylife_api import repo_chat
+
+                await repo_chat.insert_usage(
+                    session,
+                    workspace_id=self.workspace_id,
+                    user_id=UUID(str(user_id)),
+                    model=usage_obj.model,
+                    prompt_tokens=usage_obj.prompt_tokens,
+                    completion_tokens=usage_obj.completion_tokens,
+                    latency_ms=usage_obj.latency_ms,
+                    degraded=False,
+                    kind="review",
+                    role="writer",
+                    run_id=self.run_id,
+                )
+
+        try:
+            parsed = parse_semantic_response(text)
+        except SemanticWriterError:
+            self._degrade("writer_invalid_json")
+            self.payload["writer"] = {
+                "mode": "deterministic",
+                "reason": "invalid_json",
+                "prompt_version": PROMPT_VERSION,
+            }
+            return None
+
+        evidence_by_id = {
+            str(item["evidence_id"]): item
+            for item in safe_candidates
+            if item.get("evidence_id")
+        }
+        entries, issues = build_semantic_entries(
+            parsed,
+            evidence_by_id=evidence_by_id,
+            period_key=period_start.isoformat(),
+        )
+        self.payload["writer"] = {
+            "mode": "llm",
+            "model": provider.model,
+            "prompt_version": WRITER_PROMPT_VERSION,
+            "mistakes": len(parsed.get("mistakes") or []),
+            "methods": len(parsed.get("methods") or []),
+            "accepted": len(entries),
+            "dropped": len(issues),
+            "blocked_candidates": blocked,
+        }
+        if issues:
+            logger.info("semantic writer dropped %s items", len(issues))
+        if (parsed.get("mistakes") or parsed.get("methods")) and not entries:
+            # 模型给了条目但全部缺少可追溯证据：宁可回退，也不把无来源内容
+            # 写进复盘。
+            self._degrade("writer_invalid_evidence")
+            self.payload["writer"]["mode"] = "deterministic"
+            self.payload["writer"]["reason"] = "invalid_evidence"
+            return None
+        return entries
+
+    def _degrade(self, reason: str) -> None:
+        if reason not in self.degraded_reasons:
+            self.degraded_reasons.append(reason)
+
     def _entries_from_context(self, context: dict[str, Any]) -> list[dict[str, Any]]:
-        """daily 的错误/方法论来自当天笔记的抽取结果（Phase 3 为空则走哨兵）。"""
+        """daily 的错误/方法论确定性回退来源。"""
         return context.get("entries") or []
 
     async def _review(self, session: AsyncSession) -> None:
@@ -555,6 +792,13 @@ class ReviewRunner:
                 for section in draft.get("sections") or []
             ],
         )
+        writer = self.payload.get("writer") or {}
+        review_model = (
+            f"llm-writer:{writer.get('model')}"
+            if writer.get("mode") == "llm" and writer.get("model")
+            else "deterministic-composer"
+        )
+        writer_prompt_version = writer.get("prompt_version") or PROMPT_VERSION
         await repo.insert_version(
             session,
             workspace_id=self.workspace_id,
@@ -562,8 +806,8 @@ class ReviewRunner:
             version=self.version,
             content_md=rendered.content_md,
             content_hash=rendered.content_hash,
-            model="deterministic-composer",
-            prompt_version=PROMPT_VERSION,
+            model=review_model,
+            prompt_version=writer_prompt_version,
             snapshot_id=UUID(self.payload["snapshot_id"])
             if self.payload.get("snapshot_id")
             else None,
@@ -575,7 +819,7 @@ class ReviewRunner:
             version=self.version,
             content_md=rendered.content_md,
             content_hash=rendered.content_hash,
-            model="deterministic-composer",
+            model=review_model,
             git_path=path,
             status="delivered",
             verdict=self.payload.get("verdict"),
@@ -802,7 +1046,7 @@ async def _coverage_gaps(
 ) -> list[dict[str, Any]]:
     from sqlalchemy import text
 
-    if kind == "weekly":
+    if kind == "monthly":
         result = await session.execute(
             text(
                 "SELECT period_key FROM reviews WHERE workspace_id = :ws AND kind = 'daily' "
@@ -826,17 +1070,16 @@ async def _coverage_gaps(
 
     result = await session.execute(
         text(
-            "SELECT period_key FROM reviews WHERE workspace_id = :ws AND kind = 'weekly' "
+            "SELECT period_key FROM reviews WHERE workspace_id = :ws AND kind = 'monthly' "
             "AND status IN ('delivered','approved') AND period_key LIKE :prefix"
         ),
-        {"ws": workspace_id, "prefix": f"{period_start.year}-W%"},
+        {"ws": workspace_id, "prefix": f"{period_start.year}-%"},
     )
     present = {row.period_key for row in result}
-    total_weeks = date(period_start.year, 12, 28).isocalendar().week
     return [
-        {"period_key": f"{period_start.year}-W{week:02d}", "reason": "missing_weekly"}
-        for week in range(1, total_weeks + 1)
-        if f"{period_start.year}-W{week:02d}" not in present
+        {"period_key": f"{period_start.year}-{month:02d}", "reason": "missing_monthly"}
+        for month in range(1, 13)
+        if f"{period_start.year}-{month:02d}" not in present
     ]
 
 
@@ -883,14 +1126,14 @@ def _method_landing(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _learning_map(sections: list[dict[str, Any]]) -> dict[str, list[str]]:
-    """年报学习地图只读下级 rollup：weekly 的 `method_landing`。
+    """年报学习地图只读下级 rollup：monthly 的 `method_landing`。
 
     若存在 daily 形态的 `learning_summary`（用于兼容单元测试），同样并入。
     """
     topics: list[str] = []
     concepts: list[str] = []
     outputs: list[str] = []
-    weeks: list[str] = []
+    months: list[str] = []
 
     def _push(target: list[str], value: Any) -> None:
         text_value = str(value).strip()
@@ -905,17 +1148,17 @@ def _learning_map(sections: list[dict[str, Any]]) -> dict[str, list[str]]:
                 _push(topics, item.get("method"))
                 _push(concepts, item.get("verification_status"))
             period_key = section.get("period_key")
-            if isinstance(period_key, str) and period_key.startswith("20"):
-                _push(weeks, period_key)
+            if isinstance(period_key, str) and len(period_key) == 7 and period_key[4] == "-":
+                _push(months, period_key)
         elif key == "learning_summary":
             _push(topics, structured.get("topic"))
             _push(concepts, structured.get("concept_or_method"))
             _push(outputs, structured.get("output"))
-    return {"topics": topics, "concepts": concepts, "outputs": outputs, "related_weeks": weeks}
+    return {"topics": topics, "concepts": concepts, "outputs": outputs, "related_months": months}
 
 
 def _timeline(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """事件线：优先 daily 的 `journal_events`；年报从 weekly 行动项回填。"""
+    """事件线：优先 daily 的 `journal_events`；年报从 monthly 行动项回填。"""
     rows: list[dict[str, Any]] = []
     for section in sections:
         key = section.get("section_key")
@@ -929,8 +1172,11 @@ def _timeline(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "result": item.get("result", ""),
                     }
                 )
-        elif key == "next_week_actions":
+        elif key == "next_month_actions":
             period_key = section.get("period_key")
+            # 月报周期键是 YYYY-MM；事件线契约要求 date。
+            if isinstance(period_key, str) and len(period_key) == 7:
+                period_key = f"{period_key}-01"
             for item in structured.get("items", []):
                 if period_key:
                     rows.append(
@@ -981,7 +1227,7 @@ def _method_system(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _direction(sections: list[dict[str, Any]]) -> dict[str, str]:
     for section in sections:
-        if section.get("section_key") == "next_week_actions":
+        if section.get("section_key") == "next_month_actions":
             items = (section.get("structured") or {}).get("items") or []
             if items:
                 first = items[0]

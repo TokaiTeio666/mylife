@@ -58,7 +58,7 @@ async def test_six_tools_return_structured_results(client, admin_conn, db_sessio
     admin_conn.execute(
         "INSERT INTO tasks (id, workspace_id, key, text, status, first_seen, last_seen, "
         "done_date, source_path, line_number) VALUES "
-        "(gen_random_uuid(), %s, 'k1', '写周报', 'done', DATE '2026-10-25', DATE '2026-10-27', "
+        "(gen_random_uuid(), %s, 'k1', '写月报', 'done', DATE '2026-10-25', DATE '2026-10-27', "
         " DATE '2026-10-27', 'notes/a.md', 3), "
         "(gen_random_uuid(), %s, 'k2', '读论文', 'open', DATE '2026-10-26', DATE '2026-10-27', "
         " NULL, 'notes/b.md', 4)",

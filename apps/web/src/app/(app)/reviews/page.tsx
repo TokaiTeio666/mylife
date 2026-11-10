@@ -66,7 +66,7 @@ export default function ReviewsPage() {
   const me = useMe();
   const workspaceId = me.data?.active_workspace_id;
   const queryClient = useQueryClient();
-  const [kind, setKind] = React.useState<"daily" | "weekly" | "yearly">("daily");
+  const [kind, setKind] = React.useState<"daily" | "monthly" | "yearly">("daily");
   const [period, setPeriod] = React.useState("");
   const [allowEmpty, setAllowEmpty] = React.useState(false);
 
@@ -104,12 +104,12 @@ export default function ReviewsPage() {
                 id="kind"
                 value={kind}
                 onChange={(event) =>
-                  setKind(event.target.value as "daily" | "weekly" | "yearly")
+                  setKind(event.target.value as "daily" | "monthly" | "yearly")
                 }
                 className="h-10 rounded-md border border-border bg-background px-3 text-small"
               >
                 <option value="daily">{copy.reviews.kindDaily}</option>
-                <option value="weekly">{copy.reviews.kindWeekly}</option>
+                <option value="monthly">{copy.reviews.kindMonthly}</option>
                 <option value="yearly">{copy.reviews.kindYearly}</option>
               </select>
             </div>

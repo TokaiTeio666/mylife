@@ -78,7 +78,7 @@ export interface MeResponse {
 export interface SettingsSummary {
   timezone: string;
   daily_at: string;
-  weekly_at: string;
+  monthly_at: string;
   yearly_at: string;
   reviews_root: string;
 }
@@ -296,7 +296,7 @@ export interface ErrorEnvelope {
 
 export interface ReviewSummary {
   id: string;
-  kind: "daily" | "weekly" | "yearly";
+  kind: "daily" | "monthly" | "yearly";
   period_key: string;
   title: string;
   version: number;
@@ -424,7 +424,7 @@ export interface TaskItem {
 
 export interface DashboardLatest {
   daily: ReviewSummary | null;
-  weekly: ReviewSummary | null;
+  monthly: ReviewSummary | null;
   yearly: ReviewSummary | null;
   generated_at: string;
   completion_rate: number;
@@ -448,8 +448,8 @@ export interface DayCell {
 
 export interface MonthCell {
   month: number;
-  has_weekly: boolean;
-  weekly_period_key: string | null;
+  has_monthly: boolean;
+  monthly_period_key: string | null;
   completion_rate: number | null;
 }
 
@@ -463,7 +463,7 @@ export interface DashboardStats {
   range: string;
   completion_rate: number;
   tasks: { completed: number; total: number; carried_over: number };
-  reviews: { daily: number; weekly: number; yearly: number };
+  reviews: { daily: number; monthly: number; yearly: number };
   no_evidence_ratio: number;
   degraded_rate: number;
   tokens: { prompt: number; completion: number };
@@ -472,11 +472,11 @@ export interface DashboardStats {
 export interface ScheduleSettings {
   timezone: string;
   daily_at: string;
-  weekly_at: string;
+  monthly_at: string;
   yearly_at: string;
   catchup_days: number;
-  enabled: { daily: boolean; weekly: boolean; yearly: boolean };
-  next_run_at: { daily: string | null; weekly: string | null; yearly: string | null };
+  enabled: { daily: boolean; monthly: boolean; yearly: boolean };
+  next_run_at: { daily: string | null; monthly: string | null; yearly: string | null };
 }
 
 export interface GitConnectionSummary {

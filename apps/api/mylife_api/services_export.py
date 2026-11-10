@@ -282,7 +282,7 @@ async def build_export(
         row = (
             await session.execute(
                 text(
-                    "SELECT timezone, daily_at, weekly_at, yearly_at, reviews_root, "
+                    "SELECT timezone, daily_at, monthly_at, yearly_at, reviews_root, "
                     "       retrieval_top_k, context_window_tokens, auto_merge_daily "
                     "FROM workspace_settings WHERE workspace_id = :ws"
                 ),

@@ -32,7 +32,7 @@ async def test_schedule_defaults_and_update(client, admin_conn):
     body = response.json()
     assert body["timezone"] == "Asia/Shanghai"
     assert body["daily_at"].startswith("01:00")
-    assert body["weekly_at"].startswith("01:30")
+    assert body["monthly_at"].startswith("01:30")
     assert body["yearly_at"].startswith("02:00")
     assert body["catchup_days"] == 7
 
@@ -42,10 +42,10 @@ async def test_schedule_defaults_and_update(client, admin_conn):
         {
             "timezone": "Asia/Shanghai",
             "daily_at": "02:00",
-            "weekly_at": "02:30",
+            "monthly_at": "02:30",
             "yearly_at": "03:00",
             "catchup_days": 5,
-            "enabled": {"daily": True, "weekly": True, "yearly": False},
+            "enabled": {"daily": True, "monthly": True, "yearly": False},
         },
     )
     assert updated.status_code == 200, updated.text
@@ -57,7 +57,7 @@ async def test_schedule_defaults_and_update(client, admin_conn):
     assert data["next_run_at"]["yearly"] is None
 
     row = admin_conn.execute(
-        "SELECT timezone, daily_at, weekly_at, yearly_at FROM workspace_settings "
+        "SELECT timezone, daily_at, monthly_at, yearly_at FROM workspace_settings "
         "WHERE workspace_id = %s",
         (workspace_id,),
     ).fetchone()
@@ -83,10 +83,10 @@ async def test_schedule_defaults_and_update(client, admin_conn):
         {
             "timezone": "America/New_York",
             "daily_at": "02:00",
-            "weekly_at": "02:30",
+            "monthly_at": "02:30",
             "yearly_at": "03:00",
             "catchup_days": 7,
-            "enabled": {"daily": True, "weekly": True, "yearly": True},
+            "enabled": {"daily": True, "monthly": True, "yearly": True},
         },
     )
     assert again.status_code == 200
@@ -167,16 +167,16 @@ async def test_dispatch_tick_admits_skips_and_catchup(client, admin_conn, monkey
     # NULL next_run_at（启动补算）
     admin_conn.execute(
         "UPDATE workspace_schedules SET next_run_at = NULL WHERE workspace_id = %s "
-        "AND kind = 'weekly'",
+        "AND kind = 'monthly'",
         (workspace_id,),
     )
     await dispatcher.run_once()
-    weekly_next = admin_conn.execute(
+    monthly_next = admin_conn.execute(
         "SELECT next_run_at FROM workspace_schedules WHERE workspace_id = %s "
-        "AND kind = 'weekly'",
+        "AND kind = 'monthly'",
         (workspace_id,),
     ).fetchone()[0]
-    assert weekly_next is not None
+    assert monthly_next is not None
 
 
 class _PermServer:

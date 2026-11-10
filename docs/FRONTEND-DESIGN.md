@@ -266,7 +266,7 @@ interface ChatMessageProps {
 
 ```ts
 interface ReviewViewerProps {
-  kind: 'daily' | 'weekly' | 'yearly';
+  kind: 'daily' | 'monthly' | 'yearly';
   periodKey: string;
   reviewId: string;
   version: number;
@@ -280,7 +280,7 @@ interface ReviewViewerProps {
 }
 ```
 
-- 章节顺序严格按 `SectionId` / `WeeklySectionId` / `YearlySectionId`。
+- 章节顺序严格按 `SectionId` / `MonthlySectionId` / `YearlySectionId`。
 - 每个错误/方法论条目显示来源日期 + 路径 + 行号；点击跳转原文。
 - `manual` 状态显示“人工编辑，自动重渲染已暂停”。
 - `degraded` 顶部固定横幅，不可关闭。

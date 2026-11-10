@@ -349,7 +349,7 @@ async def latest_reviews_by_kind(
         {"ws": workspace_id},
     )
     rows = {row["kind"]: dict(row) for row in _rows(result)}
-    return {kind: rows.get(kind) for kind in ("daily", "weekly", "yearly")}
+    return {kind: rows.get(kind) for kind in ("daily", "monthly", "yearly")}
 
 
 async def upsert_review_search(

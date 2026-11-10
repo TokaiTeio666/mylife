@@ -11,7 +11,7 @@
 
 | 项 | 状态 |
 |---|---|
-| 后端测试 | **298 passed, 1 skipped**（skip 为 Windows 符号链接用例） |
+| 后端测试 | **306 passed, 1 skipped**（2026-11-09 复跑；新增 6 条语义 Writer 测试；skip 为 Windows 符号链接用例） |
 | Golden fixtures | **11 passed**（`pytest -q -m fixture`：Phase 3 + Phase 4 + FX-11），另加 Phase 0 FX-06、Phase 1 FX-13/14、Phase 2 FX-05 回归全绿 |
 | 前端 `tsc` / `eslint` / `next build` | 通过（23 条路由，含 `/admin/*`、`/privacy`、`/terms`、`/manifest.webmanifest`） |
 | 依赖方向与 i18n 扫描 | `scripts/check_boundaries.py` 通过；`scripts/check_i18n.py` **0 硬编码中文违规** |
@@ -86,7 +86,7 @@
 | FX | 阶段 | 结论 | 证据文件 |
 |---|---|---|---|
 | FX-01 fx_daily_2026-10-27 | Phase 3 | PASS | `docs/evidence/phase3/fx01-daily.json` |
-| FX-02 fx_weekly_W43 | Phase 3 | PASS | `docs/evidence/phase3/fx02-weekly.json` |
+| FX-02 fx_monthly_W43 | Phase 3 | PASS | `docs/evidence/phase3/fx02-monthly.json` |
 | FX-03 fx_yearly_2026 | Phase 3 | PASS | `docs/evidence/phase3/fx03-yearly.json` |
 | FX-04 fx_empty_day | Phase 3 | PASS | `docs/evidence/phase3/fx04-empty-day.json` |
 | FX-05 fx_injection | Phase 2 | PASS | `test_chat.py::test_prompt_injection_detected_and_not_followed` |
@@ -116,7 +116,7 @@
 
 | 项 | 状态 | 说明 |
 |---|---|---|
-| 生成式 LLM Writer | 首版确定性装配器 | 复盘写作保持确定性装配以保证 100% 门禁可复现；LLM 配置、凭据加密、连接测试与 chat 调用链已完整接通 |
+| 生成式 LLM Writer | 错误/方法论已接入语义抽取 | 每日复盘的 `mistakes` / `methods` 由 LLM 语义判断，证据、追溯字段、canonical_key 与门禁仍由确定性代码负责；模型不可用/未配置时回退原装配器。其余章节仍为确定性装配（详见 `IMPLEMENTATION-NOTES.md §2F`） |
 | MinIO 容器镜像 | 本地数据根等效运行 | 本机网络无法拉取 `minio/minio`；导入快照、复盘交付包、用户导出 ZIP 与数据备份统一落在 `MYLIFE_DATA_ROOT` 并全部通过端到端验收 |
 | 英文文案覆盖范围 | 公共壳 + 核心 4 页 | 按 AC-63“至少 3 页变化”要求，覆盖公共布局壳、登录/注册、法务页、仪表盘与设置页；未翻译键自动回落 `zh-CN` |
 | Windows 符号链接用例 | 1 项平台 skip | `test_clone_rejects_symlink` 在无特权 Windows 进程自动 skip，Linux CI 正常执行 |

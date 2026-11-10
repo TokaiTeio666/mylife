@@ -92,7 +92,7 @@ async def test_usage_totals_reconcile_with_db(client, admin_conn):
     ).fetchone()[0]
     succeeded_runs = admin_conn.execute(
         "SELECT count(*) FROM agent_runs WHERE workspace_id = %s "
-        "AND kind IN ('daily','weekly','yearly') AND state = 'succeeded'",
+        "AND kind IN ('daily','monthly','yearly') AND state = 'succeeded'",
         (workspace_id,),
     ).fetchone()[0]
 

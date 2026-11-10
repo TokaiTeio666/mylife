@@ -25,7 +25,7 @@
 ### 1.1 核心枚举
 
 ```text
-run_kind          chat | daily | weekly | yearly
+run_kind          chat | daily | monthly | yearly
 run_state         created | snapshotting | planning | retrieving | drafting |
                   reviewing | revising | human_gate | delivering | succeeded |
                   retry_wait | needs_human | security_abort | failed | cancelled
@@ -197,7 +197,7 @@ CREATE TABLE tasks (
 CREATE TABLE reviews (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  kind text NOT NULL CHECK (kind IN ('daily','weekly','yearly')),
+  kind text NOT NULL CHECK (kind IN ('daily','monthly','yearly')),
   period_key text NOT NULL,
   title text NOT NULL,
   content text NOT NULL,                     -- 当前 version 的 Markdown
@@ -321,7 +321,7 @@ CREATE TABLE job_runs (
 CREATE TABLE agent_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  kind text NOT NULL CHECK (kind IN ('chat','daily','weekly','yearly')),
+  kind text NOT NULL CHECK (kind IN ('chat','daily','monthly','yearly')),
   period_key text,
   conversation_id uuid REFERENCES conversations(id) ON DELETE CASCADE,
   client_turn_id uuid,
@@ -652,7 +652,7 @@ CREATE TABLE delivery_events (
 CREATE TABLE workspace_schedules (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  kind text NOT NULL CHECK (kind IN ('daily','weekly','yearly')),
+  kind text NOT NULL CHECK (kind IN ('daily','monthly','yearly')),
   local_time time NOT NULL,
   timezone text NOT NULL,
   next_run_at timestamptz,
@@ -697,7 +697,7 @@ CREATE TABLE workspace_settings (
   workspace_id uuid PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
   timezone text NOT NULL DEFAULT 'Asia/Shanghai',
   daily_at time NOT NULL DEFAULT '01:00',
-  weekly_at time NOT NULL DEFAULT '01:30',
+  monthly_at time NOT NULL DEFAULT '01:30',
   yearly_at time NOT NULL DEFAULT '02:00',
   reviews_root text NOT NULL DEFAULT 'wiki/复盘',
   delivery_policy_json jsonb NOT NULL DEFAULT '{}',
@@ -811,7 +811,7 @@ ALTER TABLE document_chunks
 -- agent_runs：三把部分唯一索引
 CREATE UNIQUE INDEX uq_runs_review_active
   ON agent_runs (workspace_id, kind, period_key)
-  WHERE kind IN ('daily','weekly','yearly')
+  WHERE kind IN ('daily','monthly','yearly')
     AND state IN ('created','snapshotting','planning','retrieving','drafting',
                   'reviewing','revising','human_gate','delivering',
                   'retry_wait','needs_human');

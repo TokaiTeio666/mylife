@@ -10,7 +10,7 @@ from typing import Any
 
 from mylife_contract.constants import PR_BODY_SECTIONS
 
-KIND_LABELS = {"daily": "每日复盘", "weekly": "每周复盘", "yearly": "年度复盘"}
+KIND_LABELS = {"daily": "每日复盘", "monthly": "每月复盘", "yearly": "年度复盘"}
 
 
 def _one_line_summary(sections: list[dict[str, Any]]) -> str:

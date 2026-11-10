@@ -47,11 +47,11 @@
 | 选项 | 做法 | 优点 | 代价/风险 |
 |---|---|---|---|
 | **A** | 所有复盘都人工合并 PR | 最安全；用户完全掌控 | 每天一个 PR，噪音大；用户可能放弃审阅 |
-| **B** | daily 可 opt-in auto-merge（Gate 全通过才合并）；weekly/yearly 人工 | 降低日常噪音；重要复盘仍人工 | 需要“信任开关”；auto-merge 出错需可回滚 |
+| **B** | daily 可 opt-in auto-merge（Gate 全通过才合并）；monthly/yearly 人工 | 降低日常噪音；重要复盘仍人工 | 需要“信任开关”；auto-merge 出错需可回滚 |
 | **C** | 所有类型 Gate 通过即 auto-merge | 最低摩擦 | 错误内容直接进入长期知识；信任风险最高 |
-| **D** | daily 直推 `reviews` 分支不建 PR；weekly 汇总 PR | 日常零 PR；周报集中审 | daily 出错只能靠回滚；与“提 PR”的用户预期部分偏离 |
+| **D** | daily 直推 `reviews` 分支不建 PR；monthly 汇总 PR | 日常零 PR；月报集中审 | daily 出错只能靠回滚；与“提 PR”的用户预期部分偏离 |
 
-**推荐：B**。理由：daily 是高频低风险，适合 opt-in 自动；weekly/yearly 是聚合与长期结论，必须人工。
+**推荐：B**。理由：daily 是高频低风险，适合 opt-in 自动；monthly/yearly 是聚合与长期结论，必须人工。
 
 **若选 B 的落地改动**：§8.2 增加 `auto_merge` 策略；§16.3 `delivery-profile.yml` 已声明；§14.1 第 3 项标记为已裁决。
 
@@ -78,7 +78,7 @@
 
 **影响**：成本上限、降级触发、用户体验。以下为**每次 run 的 token 上限（输入/输出）**，不是货币；实际费用按所选模型单价换算。
 
-| 选项 | daily | weekly | yearly | 每 Workspace 月上限 | 适用 |
+| 选项 | daily | monthly | yearly | 每 Workspace 月上限 | 适用 |
 |---|---|---|---|---|---|
 | **A 紧凑** | 50k / 10k | 150k / 30k | 500k / 100k | 2M / 400k | 早期验证、低预算 |
 | **B 标准** | 100k / 20k | 300k / 60k | 1M / 200k | 5M / 1M | 推荐；覆盖 2–3 轮修订 |
@@ -99,10 +99,10 @@
 |---|---|---|---|
 | **A** | 单 Reviewer（同族）+ 确定性门禁 | 成本低；确定性门禁才是 blocking，LLM 只 advisory | 同族模型可能共享盲区 |
 | **B** | 双 Reviewer（同族、不同 prompt） | 比单评审多一层自洽检查 | 成本翻倍；同族盲区仍在 |
-| **C** | 异构 Reviewer（不同 provider/model）用于 weekly/yearly | 独立性最好；适合高价值产物 | 需第二 provider 与密钥；接口兼容性风险 |
-| **D** | weekly/yearly 只人工评审，不做 LLM Reviewer | 质量最高 | 人工成本高；自动化程度低 |
+| **C** | 异构 Reviewer（不同 provider/model）用于 monthly/yearly | 独立性最好；适合高价值产物 | 需第二 provider 与密钥；接口兼容性风险 |
+| **D** | monthly/yearly 只人工评审，不做 LLM Reviewer | 质量最高 | 人工成本高；自动化程度低 |
 
-**推荐：A 作为 MVP；C 仅用于 weekly/yearly 作为 Phase 2 增强**。理由：FR-G1 只保证 OpenAI 兼容接口，不保证有第二个模型族；确定性门禁（G0–G9）已经承担 blocking，LLM judge 不应成为单点。
+**推荐：A 作为 MVP；C 仅用于 monthly/yearly 作为 Phase 2 增强**。理由：FR-G1 只保证 OpenAI 兼容接口，不保证有第二个模型族；确定性门禁（G0–G9）已经承担 blocking，LLM judge 不应成为单点。
 
 **若选 A 的落地改动**：§9.4 Reviewer 行保留“强（异族）”改为“强（同族）”；§14.1 第 6 项标记；Phase 2 再加 C。
 
@@ -131,7 +131,7 @@
 1D 2B 3B 4B 5B 6A 7A
 ```
 
-含义：交付默认 managed 仓库 + `wiki/复盘`（可配置）；Embedding 首配 + 蓝绿迁移；daily 可 opt-in 自动合并、weekly/yearly 人工；专题首见人工、复发自动；标准预算；单 Reviewer + 确定性门禁；30 天冷却且 Git 历史保留。
+含义：交付默认 managed 仓库 + `wiki/复盘`（可配置）；Embedding 首配 + 蓝绿迁移；daily 可 opt-in 自动合并、monthly/yearly 人工；专题首见人工、复发自动；标准预算；单 Reviewer + 确定性门禁；30 天冷却且 Git 历史保留。
 
 ---
 
@@ -141,10 +141,10 @@
 |---|---|---|---|---|
 | 1 | 交付根目录与仓库形态 | **D（默认 A）** | 2026-11-06 | 每 Workspace 可配置；默认 `managed` 输出仓库 + `wiki/复盘`；`data/reviews` 仅兼容读取 |
 | 2 | Embedding 换模与维度 | **B** | 2026-11-06 | 首配可选模型/维度；换维走蓝绿迁移，不做在线热切换 |
-| 3 | 日报自动合并 | **B** | 2026-11-06 | daily 可 opt-in auto-merge（Gate 全通过）；weekly/yearly 人工 |
+| 3 | 日报自动合并 | **B** | 2026-11-06 | daily 可 opt-in auto-merge（Gate 全通过）；monthly/yearly 人工 |
 | 4 | 专题页新增条目确认 | **B** | 2026-11-06 | 首见人工确认；复发/完成回填自动 |
-| 5 | 预算数值 | **B 标准** | 2026-11-06 | daily 100k/20k、weekly 300k/60k、yearly 1M/200k；月上限 5M/1M；80% 告警、100% 硬停 |
-| 6 | Reviewer 异构模型 | **A** | 2026-11-06 | 单 Reviewer（同族）+ 确定性门禁；异构仅 Phase 2 的 weekly/yearly 增强 |
+| 5 | 预算数值 | **B 标准** | 2026-11-06 | daily 100k/20k、monthly 300k/60k、yearly 1M/200k；月上限 5M/1M；80% 告警、100% 硬停 |
+| 6 | Reviewer 异构模型 | **A** | 2026-11-06 | 单 Reviewer（同族）+ 确定性门禁；异构仅 Phase 2 的 monthly/yearly 增强 |
 | 7 | 删除边界 | **A** | 2026-11-06 | 30 天冷却；清除 DB/MinIO/向量/凭据；Git 历史保留并明确告知 |
 
 ### 补充决策（2026-11-06，按建议拍板）

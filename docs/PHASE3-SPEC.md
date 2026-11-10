@@ -59,10 +59,10 @@
 | D6 | `POST /reviews` 请求体没有 `confirmation_token` 字段，无法证明“已 confirm” | AC-25 vs API-CONTRACTS §3.7.1/§5.7.2 | 请求体增加**可选** `confirmation_token: string`（`extra=forbid` 仍拒绝其它未知字段）；有 token 时校验签名/TTL/未消费；无 token 时视为人工显式确认（手动触发）。登记 `IMPLEMENTATION-NOTES §2C` | AC-25 |
 | D7 | §5.1 只给中文必填字段名，未给英文键名与类型；`SECTION_SCHEMAS`/`ITEM_SCHEMAS` 未定义 | ARCHITECTURE §5.1/§9.1 | 采用 §5 的 `SECTION_SCHEMAS`/`ITEM_SCHEMAS`（详见 §5.2/§5.3），字段名与类型**在此冻结**；`review-profile.yml` 是镜像，启动时逐项校验 | AC-36/37/38、G1/G2 |
 | D8 | 复盘执行位置文档写 worker-review（Celery），但 Phase 3 无该 worker 容器 | ARCHITECTURE §11/§13 | Phase 3 用 **API 进程内 `asyncio`**（与 chat 同模式，`review_runner.py`），持久化事件与状态不变；Phase 4 迁 worker-review。登记 `IMPLEMENTATION-NOTES §2C` | 全部复盘 run |
-| D9 | `RunOptions.require_human` 默认 true，但 AC-42 要求 daily 成功自动完成 | ARCHITECTURE §5/§4.5 | 语义收敛为：`yearly` 默认进 `human_gate`；`daily/weekly` 在 G0–G9 无 blocking 时直接 `delivering`；`require_human=true` 仅对 `yearly` 生效（或 gate 失败升级人工） | AC-36/37/38/42 |
+| D9 | `RunOptions.require_human` 默认 true，但 AC-42 要求 daily 成功自动完成 | ARCHITECTURE §5/§4.5 | 语义收敛为：`yearly` 默认进 `human_gate`；`daily/monthly` 在 G0–G9 无 blocking 时直接 `delivering`；`require_human=true` 仅对 `yearly` 生效（或 gate 失败升级人工） | AC-36/37/38/42 |
 | D10 | `carried` 在 REQUIREMENTS §6.1 列为状态，DATA-MODEL §10.2 用查询派生 | REQUIREMENTS §6.1 vs DATA-MODEL §10.2 | `tasks.status` 只写 `open/done`；`carried` 一律按 `status='open' AND first_seen < period_start` 派生；`dropped` Phase 3 不写 | AC-32/33 |
 | D11 | `tasks.key` 是归一化原文还是 sha256 | REQUIREMENTS §6.1 vs DATA-MODEL §3.7/§7.3 | 取**归一化原文**（`normalize_task_text`），便于人工排障；`canonical_key` 仅用于 `review_entries`/专题 | AC-31/32 |
-| D12 | `coverage_gaps` 无存储落点 | ARCHITECTURE §9.1 G8、AC-37/38 | 存在 `review_sections.structured_json.coverage_gaps`（weekly/yearly 对应章节）并同步写一条 `run_events`（`event=review.coverage_gap`）；不新增表 | AC-37/38、FX-02/03 |
+| D12 | `coverage_gaps` 无存储落点 | ARCHITECTURE §9.1 G8、AC-37/38 | 存在 `review_sections.structured_json.coverage_gaps`（monthly/yearly 对应章节）并同步写一条 `run_events`（`event=review.coverage_gap`）；不新增表 | AC-37/38、FX-02/03 |
 | D13 | `reviews` 缺 ReviewDetail 所需列（`snapshot_id`/`degraded`/`degraded_reasons`/`verdict`） | API-CONTRACTS §3.7.3 vs DATA-MODEL §3.8 | 迁移 0004 增列：`snapshot_id uuid`、`degraded boolean default false`、`degraded_reasons text[] default '{}'`、`verdict_json jsonb` | AC-36…38 |
 | D14 | `run_events` 缺 `stream_epoch`（API §7.2 要求） | API-CONTRACTS §7.2 vs migrations 0003 | 迁移 0004 增 `stream_epoch int`；写入时取 `runtime.STREAM_EPOCH` | AC-60、SSE |
 | D15 | `documents` 无日期冲突 warning 落点 | AC-34 只说“记 warning” | 迁移 0004 增 `documents.parse_warnings jsonb default '[]'`，并写结构化日志 + `job_runs.counters_json.date_conflicts` | AC-34 |
@@ -242,7 +242,7 @@ $$;
 
 ### 4.6 修订循环
 
-- `REVISION_LIMIT = {daily:2, weekly:2, yearly:3}`。
+- `REVISION_LIMIT = {daily:2, monthly:2, yearly:3}`。
 - 继续修订必须**同时**满足：`round < limit`、违规集合指纹变化、blocking 数下降；否则 `ESCALATE → human_gate`。
 - `fingerprint = sha256(排序后的 (gate,code,section_key,claim_id,evidence_id))`。
 
@@ -271,7 +271,7 @@ $$;
 
 - `SENTINELS` 16 条精确文案；`DAILY_SECTIONS` 7 / `WEEKLY_SECTIONS` 4 / `YEARLY_SECTIONS` 5（含 ordinal、中文名、单章上限）。
 - `MAX_EVIDENCE_PER_RUN = 80`。
-- 单章上限：daily 每章 12（`one_line_summary` 为 1）；weekly 每章 12；yearly 每章 20（`next_year_direction` 为 10）。
+- 单章上限：daily 每章 12（`one_line_summary` 为 1）；monthly 每章 12；yearly 每章 20（`next_year_direction` 为 10）。
 
 ### 5.2 `SECTION_SCHEMAS`（冻结）
 
@@ -289,7 +289,7 @@ $$;
 | `tomorrow_actions` | `items: list[ActionItem]`；`ActionItem{text,trigger,verification}` |
 | `one_line_summary` | `summary:str` |
 
-**weekly**
+**monthly**
 
 | section_key | 模型字段 |
 |---|---|
@@ -439,7 +439,7 @@ WHERE t.id = agg.task_id AND t.workspace_id = :ws;
 | G5 | 代码 | 每个非哨兵 claim 绑定 ≥1 evidence_id；citation_indexes 1..n 可解析 | blocking | `→revising` | `UNSUPPORTED_CLAIM` |
 | G6 | 代码 | 行动行匹配 `^- \[ \] .+` 且 trigger/verification 非空 | blocking | `→revising` | `ACTION_NOT_EXECUTABLE` |
 | G7 | 代码 | 无证据章节逐字等于哨兵；有证据章节不含哨兵 | blocking | `→revising` | `SENTINEL_VIOLATION` |
-| G8 | 代码 | weekly 7 天 / yearly 周覆盖缺口记 `coverage_gaps` | warning | 继续 | `COVERAGE_GAP` |
+| G8 | 代码 | monthly 7 天 / yearly 周覆盖缺口记 `coverage_gaps` | warning | 继续 | `COVERAGE_GAP` |
 | G9 | 代码 | 路径白名单 + content_hash + 分支预检（Phase 3 本地目标） | blocking | `→needs_human` | `PATH_NOT_ALLOWED`/`CONTENT_HASH_MISMATCH` |
 
 - **FABRICATION 边界**：仅“不可解析的引用被当作事实输出且无法通过定向补检索修复”才 `SECURITY_ABORT`；单纯哈希不一致/定位失败走 `EVIDENCE_STALE`/`QUOTE_NOT_FOUND`。
@@ -458,7 +458,7 @@ WHERE t.id = agg.task_id AND t.workspace_id = :ws;
 | kind | 输入 | 输出 |
 |---|---|---|
 | daily | 100,000 | 20,000 |
-| weekly | 300,000 | 60,000 |
+| monthly | 300,000 | 60,000 |
 | yearly | 1,000,000 | 200,000 |
 | chat | 32,000 | 4,000（D22 待拍板） |
 | workspace 月 | 5,000,000 | 1,000,000 |

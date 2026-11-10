@@ -96,7 +96,7 @@
 | P3-15 | 租约续租 | runner 内迁移时续租；独立 sweeper 留 Phase 4 | 单进程内不存在僵尸 run；多副本需 beat |
 | P3-16 | fixture 目录 | `apps/api/tests/fixtures/`，pytest marker `fixture` | ACCEPTANCE §4.1 写仓库根 `tests/fixtures/`（D16） |
 | P3-17 | `coverage_gaps` | 存 `review_sections.structured_json` + `run_events`，不新增表 | 文档未定义落点（D12） |
-| P3-18 | 年报学习地图 | 从 weekly `method_landing` 聚合，而非 daily `learning_summary` | 只读下级 rollup（AC-38）；无周报时为哨兵 |
+| P3-18 | 年报学习地图 | 从 monthly `method_landing` 聚合，而非 daily `learning_summary` | 只读下级 rollup（AC-38）；无月报时为哨兵 |
 | P3-19 | 专题 topic 取值 | DB 英文枚举，API 中文 ↔ 英文双向映射 | DATA-MODEL §4.14 vs API §3.7.13（D17） |
 | P3-20 | `review_entries` 行号 | DB `line_start/line_end`，API 序列化为 `line_range` | 两处文档命名不一致（D18） |
 | P3-21 | `estimated_tokens` | 对象 `{input,output}`，并与 kind 预算比较 | §11.6 示例 vs 原 `int`（D19） |
@@ -127,7 +127,7 @@
 | P4-16 | 跨租户调度扫描 | `SECURITY DEFINER` 函数（`mylife_dispatch` 角色），只暴露调度列 | FORCE RLS 下普通 SELECT 返回 0 行（D26） |
 | P4-17 | 续跑扫描 | `dispatch_resumable_review_runs` 返回 `has_review`；调用方不得再 JOIN `agent_runs` | 外部 JOIN 会重新受 RLS（迁移 0007） |
 | P4-18 | `catchup_days`/`enabled` 落点 | `workspace_schedules` 每行；PUT 同时写 `workspace_settings` | 两表职责分工（D13） |
-| P4-19 | 周/年日期 | 周固定周一、年固定 1 月 1 日，仅时间可配 | 表结构无 weekday 列（D12） |
+| P4-19 | 月/年日期 | 月固定 1 日、年固定 1 月 1 日，仅时间可配 | 表结构无 weekday 列（D12） |
 | P4-20 | `agent_runs.trigger_type` | 新增列；调度 run 写 `schedule` | 原表无调度来源（D25） |
 | P4-21 | outbox / heartbeat | 新增 `outbox_events`、`dispatcher_heartbeats` | ARCH §11/§16.6 无落点（D27） |
 | P4-22 | Celery 投递时机 | 导入任务在事务提交后投递（after_commit） | 提交前投递会被 worker 读成 job not found（静默丢失） |
@@ -136,7 +136,7 @@
 | P4-25 | `delivery_records.status` | DB 保留并集；服务层只写 API 子集，`conflict→blocked`、`committing→pending` | 两处枚举并集（D41） |
 | P4-26 | 编辑重评审 | `edited_content_md` 按 `## 标题` 拆分并重跑 G0–G9；通过后更新章节再交付 | 章节映射按 §5.1 标题（D35） |
 | P4-27 | 回滚 | 生成 version+1（复制目标版本内容与子表），再交付 | 单行指针模型下无法直接改回（D34） |
-| P4-28 | `索引.md` 格式 | 冻结为 frontmatter + auto 区：最新日/周/年 + 三专题 open 计数 | 文档未定义内容（D10） |
+| P4-28 | `索引.md` 格式 | 冻结为 frontmatter + auto 区：最新日/月/年 + 三专题 open 计数 | 文档未定义内容（D10） |
 | P4-29 | 专题 `stale` 自动迁移 | 未实现，只有人工/显式操作产生 | N/TTL 未定义（D30） |
 | P4-30 | 删除 purge 表集合 | 取 API §3.11.7 与 DATA-MODEL §9.2 并集，补 `git_connections/workspace_schedules/job_runs/...`；`sessions` 按 owner 删除 | 两份清单不一致（D19）；`sessions` 无 `workspace_id` |
 | P4-31 | 跨租户后台扫描 | 调度/续跑/删除/outbox 四个 `SECURITY DEFINER` 函数（owner=`mylife_dispatch`，只暴露必要列） | FORCE RLS 下普通 SELECT 恒 0 行（D26）；JOIN 回 `agent_runs` 会重新受 RLS（迁移 0007） |
@@ -164,6 +164,44 @@
 | P5-11 | 禁用账号状态码 | 被禁用账号登录与存量会话请求均返回 `401 AUTH_ACCOUNT_DISABLED` | 以 AC-54 为准（D33） |
 | P5-12 | SVG 资产代理清洗 | `GET /documents/{id}/asset` 对 `.svg` 剥离 `<script>`/`<foreignObject>`/`on*`/`javascript:` 并加 `Content-Security-Policy: sandbox` + `nosniff` | 严格满足 SEC-21“代理 + sanitize；不执行” |
 | P5-13 | 数据根备份 | `scripts/backup_data.sh` 对 `MYLIFE_DATA_ROOT/workspaces` 归档加密，清单标 `minio: not_applicable` | 与本地存储降级路径一致，不伪造 MinIO 对象计数（D22/D23） |
+
+---
+
+## 2F. 复盘 Writer 语义抽取（2026-11-09）
+
+Phase 3 的 Writer 原本完全确定性：错误/方法论通过“做错的事 / 正确方法论”
+标题与固定字段格式解析。该方式只能识别结构化笔记，无法覆盖自由叙述。现在改为：
+
+| 项 | 现状 |
+|---|---|
+| 判定主体 | 每日复盘的 `mistakes` / `methods` 由配置的 LLM 做语义判断；标题和字段格式不再是必要条件 |
+| 候选素材 | 当天 `occurred_on` 或发生 `document_changes` 的用户笔记，按 chunk 取证；宽泛线索仅用于在超长一天里排序召回，最终是否成条由模型决定 |
+| 上下文预算 | 最多 20 个 chunk / 12,000 字符；每条 chunk 正文最多 800 字符，证据 quote 仍为 500 字符 |
+| 追溯性 | 模型只能返回证据 ID；`source_path` / `source_date` / `line_range` 由服务端从证据行回填，`canonical_key` 由确定性哈希计算 |
+| 门禁 | G2 / G4 / G5 / G3c 不变；无合法证据的模型条目会被丢弃 |
+| 用量 | 写 `usage_events(kind='review', role='writer', run_id=...)`，计入 run 预算 |
+| 失败回退 | 模型未配置、mock、超时、非法 JSON、全部证据非法时回退原确定性抽取；真实模型失败标记 `degraded` |
+| 月/年复盘 | 不直接读原文，继续从 daily 的 `review_entries` / `review_sections` rollup，自动继承语义条目 |
+
+实现落点：`packages/agent/mylife_agent/review_writer.py`、`apps/api/mylife_api/review_evidence.py::collect_semantic_candidates`、`apps/api/mylife_api/review_runner.py::_semantic_entries`。
+
+---
+
+## 2G. 周复盘改为月复盘（2026-11-10）
+
+产品周期从 `daily / weekly / yearly` 调整为 `daily / monthly / yearly`：
+
+| 项 | 现状 |
+|---|---|
+| 周期键 | `monthly` 使用 `YYYY-MM`；每月 1 日调度生成上一个月 |
+| 调度 | `workspace_settings.weekly_at` → `monthly_at`；现有 weekly 调度行迁移为 monthly，清空 `next_run_at` 由 dispatcher 重算下一个月 1 日 |
+| 章节 | `next_week_actions` → `next_month_actions`；标题/哨兵改为“本月 / 下月” |
+| 交付 | 目录 `每月复盘/` → `每月复盘/`；索引、manifest、PR 正文标签同步 |
+| 年复盘 | 学习地图/事件线读 monthly sections；Top10 错误/方法论体系改读全年 daily `review_entries`，避免只依赖月报物化条目 |
+| 兼容 | DB 的 `reviews` / `agent_runs` / `review_confirmations` 仍允许历史 `monthly` 行，但应用不再生成或展示 monthly |
+
+迁移：`apps/api/migrations/versions/0013_phase6_monthly_review.py`。
+真实模型验证：`scripts/e2e_realmodel_reviews.py`（7 日复盘 → 月复盘 → 年复盘，证据写入 `docs/evidence/phase5/realmodel-reviews.json`）。
 
 ---
 
@@ -239,3 +277,5 @@
 | v0.1 | 2026-11-07 | Phase 0 初版：记录 6 项文档冲突裁决、8 项范围裁剪、5 条运行时注意事项 |
 | v0.4 | 2026-11-08 | Phase 4：新增 §2D（33 项实现偏差）、安全实现要点补充 |
 | v0.5 | 2026-11-08 | Phase 5：新增 §2E（13 项实现偏差）、SEC-21/28/29/30 安全落点补充 |
+| v0.6 | 2026-11-09 | 复盘 Writer：错误/方法论改为 LLM 语义抽取 + 确定性回退，新增 §2F |
+| v0.7 | 2026-11-10 | 周复盘改为月复盘；年复盘 rollup 修复；新增 §2G |

@@ -1,0 +1,466 @@
+{
+  "generated_at": "2026-11-10T11:41:07+0800",
+  "base_url": "http://localhost:8000/api/v1",
+  "model_note": "LLM 走本机 magpie 反代，Embedding 走本机 Ollama；容器内用 host.docker.internal。",
+  "workspace_id": "01a1c38b-97a1-73f1-8294-a00e42055294",
+  "email": "realmodel-reviews-db4b7b49@example.com",
+  "ingest": {
+    "status": "succeeded",
+    "counters": {
+      "created": 7,
+      "updated": 0,
+      "unchanged": 0,
+      "skipped": 0,
+      "failed": 0,
+      "task_occurrences": 0,
+      "tasks_skipped_no_date": 0,
+      "date_conflicts": 0
+    },
+    "failed_items": []
+  },
+  "daily": [
+    {
+      "kind": "daily",
+      "period_key": "2026-10-05",
+      "run_id": "01a1c38b-be01-7205-9611-4a6ea697e71b",
+      "states": [
+        "snapshotting",
+        "drafting",
+        "succeeded"
+      ],
+      "approved_human_gate": false,
+      "final_state": "succeeded",
+      "degraded": false,
+      "degraded_reasons": [],
+      "writer": {
+        "mode": "llm",
+        "model": "auto/minimax-m3.1-flash",
+        "dropped": 0,
+        "methods": 1,
+        "accepted": 2,
+        "mistakes": 1,
+        "prompt_version": "review-llm-extract-v1",
+        "blocked_candidates": 0
+      },
+      "usage": [
+        {
+          "kind": "review",
+          "role": "writer",
+          "model": "auto/minimax-m3.1-flash",
+          "prompt_tokens": 794,
+          "completion_tokens": 577,
+          "latency_ms": 9070
+        }
+      ],
+      "sections": [
+        "today_tasks",
+        "learning_summary",
+        "journal_events",
+        "mistakes",
+        "methods",
+        "tomorrow_actions",
+        "one_line_summary"
+      ],
+      "entries": 2,
+      "delivery": {
+        "target": "object_store",
+        "status": "committed",
+        "path": "wiki/复盘/每日复盘/2026/2026-10-05.md",
+        "markdown_bytes": 2055
+      },
+      "markdown_preview": "---\nmylife: true\nkind: daily\nperiod_key: 2026-10-05\nreview_id: 01a1c38b-bdff-74d9-bc10-c64db68011fc\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:41:26Z\"\ngenerator: mylife/0.4\n---\n\n## 今日待办\n\n今日待办：无记录\n\n## 学习内容摘要\n\n学习内容摘要：本日无学习内容记录\n\n## 日记事件摘要\n\n- 10-05 周一（日记/2026/2026-10-05.md）\n\n## 做错的事\n\n1. 发布 v0.4 时为了图快，修改配置后直接上线，没有先备份数据库；迁移脚本因索引名写错导致服务启动后查询报错，只能回滚，并花了一个小时重新导入测试数据。（日记/2026/2026-10-05.md#L3）\n   - root_cause：发布清单中没有备份步骤，凭记忆操作。\n   - cost：服务查询报错并需要回滚；因没有备份，重新导入测试数据额外花了一个小时。\n   - correct_action：任何会改数据的发布，先完成数据库备份并记录时间，再执行迁移；迁移失败时使用备份恢复，不在现场修数据。\n   - recurrence_trigger：任何会改数据的发布，或在没有确认备份的情况下凭记忆直接上线。\n\n## 正确方法论\n\n1. 改数据发布前备份并准备回滚（日记/2026/2026-10-05.md#L3）\n   - source：未提及\n   - applicable_scenario：任何会改数据的发布。\n   - steps：发布前先完成数据库备份，并记录备份时间。、备份完成后再执行迁移。、迁移失败时直接使用备份恢复，不在现场修数据。\n   - boundaries：只适用于会改数据的发布；迁移失败时不在现场修数据。\n   - landing_action：在发布清单中加入“备份数据库并记录时间”步骤，迁移失败时按备份恢复流程处理。\n   - verification_criteria：确认数据库备份已完成且时间已记录；迁移后查询不再报错；发生失败时能够使用备份恢复。\n\n## 明日行动\n\n明日行动：无（未找到可执行依据）\n\n## 一句话总结\n\n本日要点：- 10-05 周一（日记/2026/2026-10-05.md）\n"
+    },
+    {
+      "kind": "daily",
+      "period_key": "2026-10-06",
+      "run_id": "01a1c38b-e39e-7e24-801b-b7e558db52a5",
+      "states": [
+        "snapshotting",
+        "drafting",
+        "succeeded"
+      ],
+      "approved_human_gate": false,
+      "final_state": "succeeded",
+      "degraded": false,
+      "degraded_reasons": [],
+      "writer": {
+        "mode": "llm",
+        "model": "auto/minimax-m3.1-flash",
+        "dropped": 0,
+        "methods": 1,
+        "accepted": 2,
+        "mistakes": 1,
+        "prompt_version": "review-llm-extract-v1",
+        "blocked_candidates": 0
+      },
+      "usage": [
+        {
+          "kind": "review",
+          "role": "writer",
+          "model": "auto/minimax-m3.1-flash",
+          "prompt_tokens": 796,
+          "completion_tokens": 591,
+          "latency_ms": 7988
+        }
+      ],
+      "sections": [
+        "today_tasks",
+        "learning_summary",
+        "journal_events",
+        "mistakes",
+        "methods",
+        "tomorrow_actions",
+        "one_line_summary"
+      ],
+      "entries": 2,
+      "delivery": {
+        "target": "object_store",
+        "status": "committed",
+        "path": "wiki/复盘/每日复盘/2026/2026-10-06.md",
+        "markdown_bytes": 1932
+      },
+      "markdown_preview": "---\nmylife: true\nkind: daily\nperiod_key: 2026-10-06\nreview_id: 01a1c38b-e39d-7303-b64d-efcd7e97962e\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:41:35Z\"\ngenerator: mylife/0.4\n---\n\n## 今日待办\n\n今日待办：无记录\n\n## 学习内容摘要\n\n学习内容摘要：本日无学习内容记录\n\n## 日记事件摘要\n\n- 10-06 周二（日记/2026/2026-10-06.md）\n\n## 做错的事\n\n1. 排查搜索接口慢时，直接凭感觉将 HNSW 参数从 16 调到 64，结果延迟反而升高。（日记/2026/2026-10-06.md#L3）\n   - root_cause：未先测量基线并隔离变量，导致无法归因观测结果；后来发现实际瓶颈是查询向量被重复计算。\n   - cost：延迟反而更高。\n   - correct_action：先记录基线 P95，再每次只修改一个变量复测并记录数据。\n   - recurrence_trigger：遇到慢查询或性能问题时，未经基线测量和逐项验证就直接调整参数。\n\n## 正确方法论\n\n1. 慢查询单变量归因排查法（日记/2026/2026-10-06.md#L3）\n   - source：2026-10-06 日记中的搜索接口排查经验\n   - applicable_scenario：排查搜索接口或其他系统的慢查询、延迟升高问题。\n   - steps：记录当前性能基线，包括 P95 延迟。、列出可能的瓶颈原因。、每次只修改一个变量进行复测。、记录每次复测的数据。、根据测试结果定位实际瓶颈，例如本次发现查询向量重复计算。\n   - boundaries：未提及\n   - landing_action：以后遇到慢查询，先记录基线、列出候选原因，再逐项验证并写下每次复测的数据。\n   - verification_criteria：每次复测均只改变一个变量，并保留基线及各次复测数据，以便明确性能变化的原因。\n\n## 明日行动\n\n明日行动：无（未找到可执行依据）\n\n## 一句话总结\n\n本日要点：- 10-06 周二（日记/2026/2026-10-06.md）\n"
+    },
+    {
+      "kind": "daily",
+      "period_key": "2026-10-07",
+      "run_id": "01a1c38c-0525-746e-92a0-c5d676da036e",
+      "states": [
+        "snapshotting",
+        "drafting",
+        "succeeded"
+      ],
+      "approved_human_gate": false,
+      "final_state": "succeeded",
+      "degraded": false,
+      "degraded_reasons": [],
+      "writer": {
+        "mode": "llm",
+        "model": "auto/minimax-m3.1-flash",
+        "dropped": 0,
+        "methods": 1,
+        "accepted": 2,
+        "mistakes": 1,
+        "prompt_version": "review-llm-extract-v1",
+        "blocked_candidates": 0
+      },
+      "usage": [
+        {
+          "kind": "review",
+          "role": "writer",
+          "model": "auto/minimax-m3.1-flash",
+          "prompt_tokens": 766,
+          "completion_tokens": 503,
+          "latency_ms": 6791
+        }
+      ],
+      "sections": [
+        "today_tasks",
+        "learning_summary",
+        "journal_events",
+        "mistakes",
+        "methods",
+        "tomorrow_actions",
+        "one_line_summary"
+      ],
+      "entries": 2,
+      "delivery": {
+        "target": "object_store",
+        "status": "committed",
+        "path": "wiki/复盘/每日复盘/2026/2026-10-07.md",
+        "markdown_bytes": 1746
+      },
+      "markdown_preview": "---\nmylife: true\nkind: daily\nperiod_key: 2026-10-07\nreview_id: 01a1c38c-0524-7e96-93ae-9f3a0846b873\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:41:42Z\"\ngenerator: mylife/0.4\n---\n\n## 今日待办\n\n今日待办：无记录\n\n## 学习内容摘要\n\n学习内容摘要：本日无学习内容记录\n\n## 日记事件摘要\n\n- 10-07 周三（日记/2026/2026-10-07.md）\n\n## 做错的事\n\n1. 需求评审时未让产品写出验收例子，擅自将“导出”理解为“导出全部”，开发三天后才发现实际需求是按筛选条件导出，导致返工。（日记/2026/2026-10-07.md#L3）\n   - root_cause：未澄清导出范围，脑补了“导出全部”的含义。\n   - cost：浪费三天开发时间并需要返工。\n   - correct_action：动手前写出三个典型输入和期望输出组成的验收样例，与双方确认后再写代码。\n   - recurrence_trigger：未提及\n\n## 正确方法论\n\n1. 开发前编写验收样例并确认（日记/2026/2026-10-07.md#L3）\n   - source：本人复盘\n   - applicable_scenario：需求存在歧义、需要明确输入和输出结果的开发任务。\n   - steps：在动手开发前写出三个典型输入。、为每个典型输入写出期望输出，形成验收样例。、与产品双方确认验收样例。、确认完成后再开始写代码。\n   - boundaries：未提及\n   - landing_action：开发前完成验收样例并取得双方确认。\n   - verification_criteria：三个典型输入及对应期望输出均已写出，且双方确认后再进入代码开发。\n\n## 明日行动\n\n明日行动：无（未找到可执行依据）\n\n## 一句话总结\n\n本日要点：- 10-07 周三（日记/2026/2026-10-07.md）\n"
+    },
+    {
+      "kind": "daily",
+      "period_key": "2026-10-08",
+      "run_id": "01a1c38c-229f-760a-9968-b4e3a376a3c2",
+      "states": [
+        "snapshotting",
+        "drafting",
+        "succeeded"
+      ],
+      "approved_human_gate": false,
+      "final_state": "succeeded",
+      "degraded": false,
+      "degraded_reasons": [],
+      "writer": {
+        "mode": "llm",
+        "model": "auto/minimax-m3.1-flash",
+        "dropped": 0,
+        "methods": 2,
+        "accepted": 3,
+        "mistakes": 1,
+        "prompt_version": "review-llm-extract-v1",
+        "blocked_candidates": 0
+      },
+      "usage": [
+        {
+          "kind": "review",
+          "role": "writer",
+          "model": "auto/minimax-m3.1-flash",
+          "prompt_tokens": 783,
+          "completion_tokens": 653,
+          "latency_ms": 7235
+        }
+      ],
+      "sections": [
+        "today_tasks",
+        "learning_summary",
+        "journal_events",
+        "mistakes",
+        "methods",
+        "tomorrow_actions",
+        "one_line_summary"
+      ],
+      "entries": 3,
+      "delivery": {
+        "target": "object_store",
+        "status": "committed",
+        "path": "wiki/复盘/每日复盘/2026/2026-10-08.md",
+        "markdown_bytes": 2557
+      },
+      "markdown_preview": "---\nmylife: true\nkind: daily\nperiod_key: 2026-10-08\nreview_id: 01a1c38c-229e-73a4-80a6-cad284f5d644\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:41:50Z\"\ngenerator: mylife/0.4\n---\n\n## 今日待办\n\n今日待办：无记录\n\n## 学习内容摘要\n\n学习内容摘要：本日无学习内容记录\n\n## 日记事件摘要\n\n- 10-08 周四（日记/2026/2026-10-08.md）\n\n## 做错的事\n\n1. 上线前将两个失败的测试注释掉，其中一个测试实际覆盖了空数据分支，导致线上出现空列表 500。（日记/2026/2026-10-08.md#L3）\n   - root_cause：主观判断失败测试与本次改动无关，没有确认测试所覆盖的分支。\n   - cost：修复 bug 用了二十分钟，但排查和道歉花了半天。\n   - correct_action：不注释失败测试；要么修复测试，要么明确记录原因并建立任务。修复 bug 后，补一条能够复现该问题的回归测试。\n   - recurrence_trigger：遇到失败测试时，如果未经确认便认定其与当前改动无关，可能会再次注释测试并遗漏真实问题。\n\n## 正确方法论\n\n1. 失败测试不注释处理规则（日记/2026/2026-10-08.md#L3）\n   - source：自己设定的规矩\n   - applicable_scenario：遇到失败测试，尤其是上线前需要处理测试失败时。\n   - steps：不要直接注释失败测试。、确认测试失败的具体原因。、能够修复时直接修复测试；不能立即修复时，明确记录原因并建立任务。\n   - boundaries：如果失败测试暂时不能修复，可以明确记录原因并建任务，但不能直接注释掉。\n   - landing_action：将失败测试的处理落实为“修复，或记录原因并建任务”。\n   - verification_criteria：不存在被无理由注释掉的失败测试；无法立即修复的失败测试均有明确原因和对应任务。\n2. Bug 修复后补回归测试（日记/2026/2026-10-08.md#L3）\n   - source：自己设定的规矩\n   - applicable_scenario：修复一个 bug 后。\n   - steps：修复 bug。、补充一条能够复现该 bug 的回归测试。、运行新增的回归测试，确认能够覆盖并验证该问题。\n   - boundaries：未提及\n   - landing_action：每修复一个 bug，都同步增加一条能够复现它的回归测试。\n   - verification_criteria：每个已修复的 bug 都有对应的回归测试。\n\n## 明日行动\n\n明日行动：无（未找到可执行依据）\n\n## 一句话总结\n\n本日要点：- 10-08 周四（日记/2026/2026-10-08.md）\n"
+    },
+    {
+      "kind": "daily",
+      "period_key": "2026-10-09",
+      "run_id": "01a1c38c-4214-7990-8a8b-403f0b47523e",
+      "states": [
+        "snapshotting",
+        "drafting",
+        "succeeded"
+      ],
+      "approved_human_gate": false,
+      "final_state": "succeeded",
+      "degraded": false,
+      "degraded_reasons": [],
+      "writer": {
+        "mode": "llm",
+        "model": "auto/minimax-m3.1-flash",
+        "dropped": 0,
+        "methods": 1,
+        "accepted": 1,
+        "mistakes": 0,
+        "prompt_version": "review-llm-extract-v1",
+        "blocked_candidates": 0
+      },
+      "usage": [
+        {
+          "kind": "review",
+          "role": "writer",
+          "model": "auto/minimax-m3.1-flash",
+          "prompt_tokens": 776,
+          "completion_tokens": 363,
+          "latency_ms": 4593
+        }
+      ],
+      "sections": [
+        "today_tasks",
+        "learning_summary",
+        "journal_events",
+        "mistakes",
+        "methods",
+        "tomorrow_actions",
+        "one_line_summary"
+      ],
+      "entries": 1,
+      "delivery": {
+        "target": "object_store",
+        "status": "committed",
+        "path": "wiki/复盘/每日复盘/2026/2026-10-09.md",
+        "markdown_bytes": 1477
+      },
+      "markdown_preview": "---\nmylife: true\nkind: daily\nperiod_key: 2026-10-09\nreview_id: 01a1c38c-4214-7cfc-92a6-01fca95258fb\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:41:56Z\"\ngenerator: mylife/0.4\n---\n\n## 今日待办\n\n今日待办：无记录\n\n## 学习内容摘要\n\n学习内容摘要：本日无学习内容记录\n\n## 日记事件摘要\n\n- 10-09 周五（日记/2026/2026-10-09.md）\n\n## 做错的事\n\n做错的事：本日无明显错误记录\n\n## 正确方法论\n\n1. Feature Flag 渐进式放量（日记/2026/2026-10-09.md#L3）\n   - source：日记/2026/2026-10-09.md\n   - applicable_scenario：新功能上线并逐步向用户开放\n   - steps：通过 feature flag 默认关闭新功能、先对内部白名单账号开放、按 1% → 10% → 50% → 全量的顺序逐步放量、每一档至少观察一天并记录错误率和延迟等指标、确认错误率和延迟稳定后再进入下一档\n   - boundaries：每一档至少观察一天，且错误率和延迟稳定后才能继续放量\n   - landing_action：将新功能置于 feature flag 后，按阶段逐步放量，并保留通过关闭开关回滚的能力\n   - verification_criteria：各放量阶段观察至少一天且指标稳定；全量后可通过改一个开关回滚，使回滚成本从重新发版降为修改开关\n\n## 明日行动\n\n明日行动：无（未找到可执行依据）\n\n## 一句话总结\n\n本日要点：- 10-09 周五（日记/2026/2026-10-09.md）\n"
+    },
+    {
+      "kind": "daily",
+      "period_key": "2026-10-10",
+      "run_id": "01a1c38c-57a0-7875-a5f9-654b3acb565d",
+      "states": [
+        "snapshotting",
+        "drafting",
+        "delivering",
+        "succeeded"
+      ],
+      "approved_human_gate": false,
+      "final_state": "succeeded",
+      "degraded": false,
+      "degraded_reasons": [],
+      "writer": {
+        "mode": "llm",
+        "model": "auto/minimax-m3.1-flash",
+        "dropped": 0,
+        "methods": 1,
+        "accepted": 1,
+        "mistakes": 0,
+        "prompt_version": "review-llm-extract-v1",
+        "blocked_candidates": 0
+      },
+      "usage": [
+        {
+          "kind": "review",
+          "role": "writer",
+          "model": "auto/minimax-m3.1-flash",
+          "prompt_tokens": 761,
+          "completion_tokens": 885,
+          "latency_ms": 10166
+        }
+      ],
+      "sections": [
+        "today_tasks",
+        "learning_summary",
+        "journal_events",
+        "mistakes",
+        "methods",
+        "tomorrow_actions",
+        "one_line_summary"
+      ],
+      "entries": 1,
+      "delivery": {
+        "target": "object_store",
+        "status": "committed",
+        "path": "wiki/复盘/每日复盘/2026/2026-10-10.md",
+        "markdown_bytes": 1391
+      },
+      "markdown_preview": "---\nmylife: true\nkind: daily\nperiod_key: 2026-10-10\nreview_id: 01a1c38c-579f-7270-8594-018f7f4d6a35\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:42:07Z\"\ngenerator: mylife/0.4\n---\n\n## 今日待办\n\n今日待办：无记录\n\n## 学习内容摘要\n\n学习内容摘要：本日无学习内容记录\n\n## 日记事件摘要\n\n- 10-10 周六（日记/2026/2026-10-10.md）\n\n## 做错的事\n\n做错的事：本日无明显错误记录\n\n## 正确方法论\n\n1. 布隆过滤器前置防穿透并验证性能（日记/2026/2026-10-10.md#L3）\n   - source：缓存设计资料\n   - applicable_scenario：需要防止缓存穿透的场景\n   - steps：理解布隆过滤器只能判断“一定不存在”，不能判断“一定存在”、将布隆过滤器放在缓存前面，用于降低缓存穿透风险、保留权限校验，不以布隆过滤器替代权限校验、用一百万随机 key 进行实验，测量误判率和内存占用\n   - boundaries：布隆过滤器不能判断元素“一定存在”，也不能替代权限校验\n   - landing_action：下一步用一百万随机 key 测试误判率和内存占用\n   - verification_criteria：实验完成并得到误判率和内存占用结果\n\n## 明日行动\n\n明日行动：无（未找到可执行依据）\n\n## 一句话总结\n\n本日要点：- 10-10 周六（日记/2026/2026-10-10.md）\n"
+    },
+    {
+      "kind": "daily",
+      "period_key": "2026-10-11",
+      "run_id": "01a1c38c-82fb-77f7-874d-f57a61657fb3",
+      "states": [
+        "snapshotting",
+        "drafting",
+        "reviewing",
+        "succeeded"
+      ],
+      "approved_human_gate": false,
+      "final_state": "succeeded",
+      "degraded": false,
+      "degraded_reasons": [],
+      "writer": {
+        "mode": "llm",
+        "model": "auto/minimax-m3.1-flash",
+        "dropped": 0,
+        "methods": 1,
+        "accepted": 2,
+        "mistakes": 1,
+        "prompt_version": "review-llm-extract-v1",
+        "blocked_candidates": 0
+      },
+      "usage": [
+        {
+          "kind": "review",
+          "role": "writer",
+          "model": "auto/minimax-m3.1-flash",
+          "prompt_tokens": 767,
+          "completion_tokens": 406,
+          "latency_ms": 4028
+        }
+      ],
+      "sections": [
+        "today_tasks",
+        "learning_summary",
+        "journal_events",
+        "mistakes",
+        "methods",
+        "tomorrow_actions",
+        "one_line_summary"
+      ],
+      "entries": 2,
+      "delivery": {
+        "target": "object_store",
+        "status": "committed",
+        "path": "wiki/复盘/每日复盘/2026/2026-10-11.md",
+        "markdown_bytes": 1713
+      },
+      "markdown_preview": "---\nmylife: true\nkind: daily\nperiod_key: 2026-10-11\nreview_id: 01a1c38c-82fb-79be-9b30-0121fafeeb7a\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:42:12Z\"\ngenerator: mylife/0.4\n---\n\n## 今日待办\n\n今日待办：无记录\n\n## 学习内容摘要\n\n学习内容摘要：本日无学习内容记录\n\n## 日记事件摘要\n\n- 10-11 周日（日记/2026/2026-10-11.md）\n\n## 做错的事\n\n1. 本周做研究时，原本只想看一篇论文，却顺着引用读了一整天，导致原定的月报和复盘都拖到晚上。（日记/2026/2026-10-11.md#L3）\n   - root_cause：没有给探索任务设截止时间。\n   - cost：原定的月报和复盘都拖到晚上。\n   - correct_action：给探索类任务设置时间盒；到点后记录当前结论和下一步，再决定是否继续。\n   - recurrence_trigger：探索类任务没有设置时间盒或截止时间。\n\n## 正确方法论\n\n1. 探索任务时间盒（日记/2026/2026-10-11.md#L3）\n   - source：未提及\n   - applicable_scenario：研究、论文阅读等可能不断顺着引用延伸的探索类任务。\n   - steps：开始任务前设置45分钟时间盒。、到达时间盒后，停止阅读并记录当前结论。、记录下一步，再决定是否继续任务。\n   - boundaries：未提及\n   - landing_action：为探索类任务设置45分钟时间盒，到点必须记录当前结论和下一步。\n   - verification_criteria：45分钟时间盒结束时，已记录当前结论和下一步，并据此作出是否继续的决定。\n\n## 明日行动\n\n明日行动：无（未找到可执行依据）\n\n## 一句话总结\n\n本日要点：- 10-11 周日（日记/2026/2026-10-11.md）\n"
+    }
+  ],
+  "monthly": {
+    "kind": "monthly",
+    "period_key": "2026-10",
+    "run_id": "01a1c38c-9659-7083-ae4c-7c69184d729a",
+    "states": [
+      "snapshotting",
+      "succeeded"
+    ],
+    "approved_human_gate": false,
+    "final_state": "succeeded",
+    "degraded": false,
+    "degraded_reasons": [],
+    "writer": {},
+    "usage": [],
+    "sections": [
+      "completion_rate",
+      "recurring_mistakes",
+      "method_landing",
+      "next_month_actions"
+    ],
+    "entries": 0,
+    "delivery": {
+      "target": "object_store",
+      "status": "committed",
+      "path": "wiki/复盘/每月复盘/2026/2026-10.md",
+      "markdown_bytes": 973
+    },
+    "markdown_preview": "---\nmylife: true\nkind: monthly\nperiod_key: 2026-10\nreview_id: 01a1c38c-9658-7ef6-9858-11742cb2477a\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:42:13Z\"\ngenerator: mylife/0.4\n---\n\n## 任务完成率\n\n- 已完成：0\n- 总数：0\n- 完成率：0.00%\n\n## 重复错误\n\n重复错误：本月无记录\n\n## 方法论落地\n\n- 失败测试不注释处理规则：行动 0 项，状态 pending\n- 慢查询单变量归因排查法：行动 0 项，状态 pending\n- 布隆过滤器前置防穿透并验证性能：行动 0 项，状态 pending\n- Feature Flag 渐进式放量：行动 0 项，状态 pending\n- 改数据发布前备份并准备回滚：行动 0 项，状态 pending\n- 开发前编写验收样例并确认：行动 0 项，状态 pending\n- 探索任务时间盒：行动 0 项，状态 pending\n- Bug 修复后补回归测试：行动 0 项，状态 pending\n\n## 下月行动\n\n下月行动：无（未找到可执行依据）\n"
+  },
+  "yearly": {
+    "kind": "yearly",
+    "period_key": "2026",
+    "run_id": "01a1c38c-99cb-7f2a-80b2-7630a7c71da4",
+    "states": [
+      "snapshotting",
+      "succeeded"
+    ],
+    "approved_human_gate": false,
+    "final_state": "succeeded",
+    "degraded": false,
+    "degraded_reasons": [],
+    "writer": {},
+    "usage": [],
+    "sections": [
+      "learning_map",
+      "event_timeline",
+      "top_mistakes",
+      "method_system",
+      "next_year_direction"
+    ],
+    "entries": 0,
+    "delivery": {
+      "target": "object_store",
+      "status": "committed",
+      "path": "wiki/复盘/年度复盘/2026.md",
+      "markdown_bytes": 1958
+    },
+    "markdown_preview": "---\nmylife: true\nkind: yearly\nperiod_key: 2026\nreview_id: 01a1c38c-99ca-7db4-bae1-1ebe49e36916\nversion: 1\nsnapshot_id: 01a1c38b-bc45-7d42-85c6-df5272ccd6a7\ngenerated_at: \"2026-11-10T03:42:14Z\"\ngenerator: mylife/0.4\n---\n\n## 年度学习地图\n\n- 失败测试不注释处理规则\n- 慢查询单变量归因排查法\n- 布隆过滤器前置防穿透并验证性能\n- Feature Flag 渐进式放量\n- 改数据发布前备份并准备回滚\n- 开发前编写验收样例并确认\n- 探索任务时间盒\n- Bug 修复后补回归测试\n\n## 事件线\n\n事件线：本年无记录\n\n## 错误 Top10\n\n1. 发布 v0.4 时为了图快，修改配置后直接上线，没有先备份数据库；迁移脚本因索引名写错导致服务启动后查询报错，只能回滚，并花了一个小时重新导入测试数据。：1 次\n2. 需求评审时未让产品写出验收例子，擅自将“导出”理解为“导出全部”，开发三天后才发现实际需求是按筛选条件导出，导致返工。：1 次\n3. 排查搜索接口慢时，直接凭感觉将 HNSW 参数从 16 调到 64，结果延迟反而升高。：1 次\n4. 本周做研究时，原本只想看一篇论文，却顺着引用读了一整天，导致原定的月报和复盘都拖到晚上。：1 次\n5. 上线前将两个失败的测试注释掉，其中一个测试实际覆盖了空数据分支，导致线上出现空列表 500。：1 次\n\n## 方法论体系\n\n- 自己设定的规矩：失败测试不注释处理规则\n- 2026-10-06 日记中的搜索接口排查经验：慢查询单变量归因排查法\n- 缓存设计资料：布隆过滤器前置防穿透并验证性能\n- 日记/2026/2026-10-09.md：Feature Flag 渐进式放量\n- 未提及：改数据发布前备份并准备回滚\n- 本人复盘：开发前编写验收样例并确认\n- 未提及：探索任务时间盒\n- 自己设定的规矩：Bug 修复后补回归测试\n\n## 下一年方向\n\n下一年方向：本年无记录\n"
+  },
+  "summary": {
+    "daily_days": 7,
+    "daily_llm_days": [
+      "2026-10-05",
+      "2026-10-06",
+      "2026-10-07",
+      "2026-10-08",
+      "2026-10-09",
+      "2026-10-10",
+      "2026-10-11"
+    ],
+    "writer_usage_runs": 7,
+    "monthly_ok": true,
+    "yearly_ok": true
+  },
+  "findings": {
+    "period_change": "weekly 已替换为 monthly：周期键 YYYY-MM，每月 1 日生成上月，章节 next_month_actions。",
+    "daily_writer": "7/7 日复盘使用 magpie 反代真实 LLM 语义抽取，writer.mode=llm，usage_events(role=writer) 均落在对应 run。",
+    "monthly_rollup": "月复盘从 daily rollup；method_landing 汇总出 8 条语义方法，comp/重复错误为空是因为测试数据无任务与重复错误。",
+    "yearly_rollup": "年复盘学习地图读 monthly sections；Top10 错误/方法论体系读全年 daily review_entries，已不再为空。",
+    "monthly_markdown_bytes": 973,
+    "yearly_markdown_bytes": 1958,
+    "monthly_has_methods": true,
+    "yearly_has_top_mistakes": true
+  }
+}

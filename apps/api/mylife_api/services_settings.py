@@ -66,17 +66,17 @@ async def get_schedule(session: AsyncSession, *, workspace_id: UUID) -> Schedule
     return ScheduleSettings(
         timezone=settings_row.get("timezone") or daily.get("timezone") or "Asia/Shanghai",
         daily_at=settings_row.get("daily_at") or daily.get("local_time") or "01:00",
-        weekly_at=settings_row.get("weekly_at") or "01:30",
+        monthly_at=settings_row.get("monthly_at") or "01:30",
         yearly_at=settings_row.get("yearly_at") or "02:00",
         catchup_days=int(daily.get("catchup_days") or 7),
         enabled=ScheduleEnabled(
             daily=bool((rows.get("daily") or {}).get("enabled", True)),
-            weekly=bool((rows.get("weekly") or {}).get("enabled", True)),
+            monthly=bool((rows.get("monthly") or {}).get("enabled", True)),
             yearly=bool((rows.get("yearly") or {}).get("enabled", True)),
         ),
         next_run_at=ScheduleNextRun(
             daily=(rows.get("daily") or {}).get("next_run_at"),
-            weekly=(rows.get("weekly") or {}).get("next_run_at"),
+            monthly=(rows.get("monthly") or {}).get("next_run_at"),
             yearly=(rows.get("yearly") or {}).get("next_run_at"),
         ),
     )
@@ -96,20 +96,20 @@ async def put_schedule(
     await session.execute(
         text(
             "UPDATE workspace_settings SET timezone = :tz, daily_at = :daily, "
-            "  weekly_at = :weekly, yearly_at = :yearly, updated_at = now() "
+            "  monthly_at = :monthly, yearly_at = :yearly, updated_at = now() "
             "WHERE workspace_id = :ws"
         ),
         {
             "tz": payload.timezone,
             "daily": payload.daily_at,
-            "weekly": payload.weekly_at,
+            "monthly": payload.monthly_at,
             "yearly": payload.yearly_at,
             "ws": workspace_id,
         },
     )
     values = {
         "daily": (payload.daily_at, payload.enabled.daily),
-        "weekly": (payload.weekly_at, payload.enabled.weekly),
+        "monthly": (payload.monthly_at, payload.enabled.monthly),
         "yearly": (payload.yearly_at, payload.enabled.yearly),
     }
     for kind, (local_time, enabled) in values.items():
@@ -147,7 +147,7 @@ async def put_schedule(
         detail={
             "timezone": payload.timezone,
             "daily_at": payload.daily_at.strftime("%H:%M"),
-            "weekly_at": payload.weekly_at.strftime("%H:%M"),
+            "monthly_at": payload.monthly_at.strftime("%H:%M"),
             "yearly_at": payload.yearly_at.strftime("%H:%M"),
             "catchup_days": payload.catchup_days,
         },
@@ -505,7 +505,7 @@ async def get_usage(
         await session.execute(
             text(
                 "SELECT count(*) FROM agent_runs WHERE workspace_id = :ws "
-                "AND kind IN ('daily','weekly','yearly') AND state = 'succeeded' "
+                "AND kind IN ('daily','monthly','yearly') AND state = 'succeeded' "
                 "AND created_at >= :from_ts AND created_at < :to_ts"
             ),
             {"ws": workspace_id, "from_ts": from_ts, "to_ts": to_ts},

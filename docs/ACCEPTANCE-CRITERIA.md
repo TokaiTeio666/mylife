@@ -173,15 +173,15 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 
 | AC | FR | Given → When → Then | 方式 | 证据 | P | Phase |
 |---|---|---|---|---|---|---|
-| AC-31 | FR-E1 | 素材含 `- [x] 写周报`、`- [ ] 读论文`、一句“今天完成了写周报”无复选框。→ 台账中前两条状态为 done/open；第三条不生成任务行；`10.27.md` 解析出 occurred_on=2026-10-27；ingest 路径 LLM 调用计数为 0。 | automated | EV-AC-31-01 台账行；EV-AC-31-02 LLM 计数 | P0 | 3 |
+| AC-31 | FR-E1 | 素材含 `- [x] 写月报`、`- [ ] 读论文`、一句“今天完成了写月报”无复选框。→ 台账中前两条状态为 done/open；第三条不生成任务行；`10.27.md` 解析出 occurred_on=2026-10-27；ingest 路径 LLM 调用计数为 0。 | automated | EV-AC-31-01 台账行；EV-AC-31-02 LLM 计数 | P0 | 3 |
 | AC-32 | FR-E2 | 同一任务文本在 10-25、10-26、10-27 出现。→ tasks 行 first_seen=10-25、last_seen=10-27、done_date 非空（若 27 日勾选）；source_path 与 line_number 指向最后一次出现；task_occurrences 唯一约束冲突数为 0。 | automated | EV-AC-32-01 台账 SQL | P0 | 3 |
 | AC-33 | FR-E3 | 10-26 未完成、10-27 未再出现、10-28 勾选完成。→ 10-27 日报“以往顺延”含该任务；10-28 完成后 done_date=10-28 且从逾期列表移除；中间日期未完成计数单调不降。 | automated | EV-AC-33-01 三日 fixture；EV-AC-33-02 状态迁移 | P0 | 3 |
 | AC-34 | FR-E4 | `日记/2026/10.27.md` 存在正文 800 字。→ 日报 journal_events 章节的证据 source_path 指向该文件，occurred_on=10-27；文件名与目录两种日期来源冲突时以显式日期优先并记 warning。 | automated | EV-AC-34-01 证据绑定 | P1 | 3 |
 | AC-35 | FR-E5 | 当日有 3 篇学习笔记变更。→ 学习摘要含 topic、concept_or_method、output、open_questions 四字段各非空；每个字段绑定至少 1 个 evidence_id；document_changes 覆盖这 3 篇。 | automated | EV-AC-35-01 结构化字段校验 | P1 | 3 |
 | AC-36 | FR-E6 | 运行 daily 2026-10-27。→ review_sections 恰好 7 行，section_key 集合与 §5.1 常量完全相等，ordinal 为 1…7 无重复无缺号；每节 content_md 非空；空素材日 7 节全部使用允许哨兵；引用闭包 100%；每阶段抽样 20 条人工复核，事实一致率 ≥98%（不合格扩大样本，决策 Q3）。 | automated + manual | EV-AC-36-01 G1 断言输出；EV-AC-36-02 FX-04；EV-AC-36-03 抽样报告 | P0 | 3 |
-| AC-37 | FR-E7 | 运行 weekly 2026-W43，7 份日报齐备。→ 恰好 4 节；completion_rate 的 completed/total/rate 与台账 SQL 复算逐位相等；重复错误 Top 与 review_entries 指纹聚合一致；缺 1 天时 coverage_gaps 记录该日期且不编造内容。 | automated | EV-AC-37-01 复算脚本；EV-AC-37-02 缺日 fixture | P0 | 3 |
-| AC-38 | FR-E8 | 运行 yearly 2026，存在 40 份周报。→ 恰好 5 节；数据只来自下级 rollup（删除周报后重跑，差异条目数等于删除周数且均属 coverage_gaps）；错误 Top10 按当前拍板口径确定性复算：频次降序，并列时 canonical_key 升序（代价/最近发生的权重如需启用，先更新 DECISIONS.md）；单次输入 token 不超过 yearly 预算。 | automated | EV-AC-38-01 排序复算 SQL；EV-AC-38-02 token 计数 | P0 | 3 |
-| AC-39 | FR-E9 | 交付完成。→ 有 Git 连接时：文件存在于 `wiki/复盘/每日复盘/2026/2026-10-27.md`、`每周复盘/2026/2026-W43.md`、`年度复盘/2026.md`、`专题/错误清单.md` 等路径，`data/reviews` 无新写入；无 Git 连接时：对象存储产物 + 下载 ZIP 含同一 Markdown 与 manifest，内容哈希一致，作为**等效验收证据**（决策 Q2）；兼容读取别名可读到同一内容。 | automated + inspection | EV-AC-39-01 文件/对象清单；EV-AC-39-02 双目录与对象存储对比 | P0 | 4 |
+| AC-37 | FR-E7 | 运行 monthly 2026-10，7 份日报齐备。→ 恰好 4 节；completion_rate 的 completed/total/rate 与台账 SQL 复算逐位相等；重复错误 Top 与 review_entries 指纹聚合一致；缺 1 天时 coverage_gaps 记录该日期且不编造内容。 | automated | EV-AC-37-01 复算脚本；EV-AC-37-02 缺日 fixture | P0 | 3 |
+| AC-38 | FR-E8 | 运行 yearly 2026，存在 40 份月报。→ 恰好 5 节；数据只来自下级 rollup（删除月报后重跑，差异条目数等于删除周数且均属 coverage_gaps）；错误 Top10 按当前拍板口径确定性复算：频次降序，并列时 canonical_key 升序（代价/最近发生的权重如需启用，先更新 DECISIONS.md）；单次输入 token 不超过 yearly 预算。 | automated | EV-AC-38-01 排序复算 SQL；EV-AC-38-02 token 计数 | P0 | 3 |
+| AC-39 | FR-E9 | 交付完成。→ 有 Git 连接时：文件存在于 `wiki/复盘/每日复盘/2026/2026-10-27.md`、`每月复盘/2026/2026-10.md`、`年度复盘/2026.md`、`专题/错误清单.md` 等路径，`data/reviews` 无新写入；无 Git 连接时：对象存储产物 + 下载 ZIP 含同一 Markdown 与 manifest，内容哈希一致，作为**等效验收证据**（决策 Q2）；兼容读取别名可读到同一内容。 | automated + inspection | EV-AC-39-01 文件/对象清单；EV-AC-39-02 双目录与对象存储对比 | P0 | 4 |
 | AC-40 | FR-E10 | 连续 3 天产生错误条目。→ 错误清单/正确方法论/行动清单三文件存在；同 canonical_key 只 1 条；occurrence 逐次追加；重渲染后标记内内容与 DB 一致、标记外人工文本保留；重跑不重复累加。 | automated | EV-AC-40-01 三文件 diff；EV-AC-40-02 重跑计数 | P0 | 4 |
 | AC-41 | FR-E11 | 任一含错误条目的日报。→ 100% 条目有 source_date、source_path、line_range；quote_hash 按公式复算与存储值相等；无证据条目数为 0；删除对应源文档后重跑 → 该条目被移除或标 EVIDENCE_STALE，不保留。 | automated | EV-AC-41-01 G3/G4 输出；EV-AC-41-02 源删除对照 | P0 | 3 |
 | AC-42 | FR-E12 | 手动触发 daily 2026-10-27。→ 返回 run_id；已有活跃 run 时 409 且返回现有 run_id；已成功后再触发 → 创建 version+1，旧 version 仍可查。 | automated | EV-AC-42-01 三次触发序列 | P1 | 3 |
@@ -192,9 +192,9 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 
 | AC | FR | Given → When → Then | 方式 | 证据 | P | Phase |
 |---|---|---|---|---|---|---|
-| AC-45 | FR-F1 | 存在 1 日报、1 周报、1 年报、10 个任务（6 完成）。→ 仪表盘返回三类最新产物各 1 且为 current version；完成率显示 60.0%（±0.1）；未完成数 4；数值与 SQL 复算一致；响应不含 LLM 调用。 | automated | EV-AC-45-01 API 与 SQL 对比 | P1 | 4 |
+| AC-45 | FR-F1 | 存在 1 日报、1 月报、1 年报、10 个任务（6 完成）。→ 仪表盘返回三类最新产物各 1 且为 current version；完成率显示 60.0%（±0.1）；未完成数 4；数值与 SQL 复算一致；响应不含 LLM 调用。 | automated | EV-AC-45-01 API 与 SQL 对比 | P1 | 4 |
 | AC-46 | FR-F2 | 3 个未完成任务，first_seen 分别为 3/5/10 天前。→ 面板列出 3 条，持续天数为 3/5/10（按 workspace 时区计算，跨时区边界一致）；已完成为 0 条。 | automated | EV-AC-46-01 时区边界用例 | P1 | 4 |
-| AC-47 | FR-F3 | 某月 10 天有日报、20 天无。→ 日历返回 31 个日期项，10 个 has_review=true 且带状态，21 个 false；周/年视图可切换到 W43 与 2026。 | automated | EV-AC-47-01 日历 JSON | P2 | 4 |
+| AC-47 | FR-F3 | 某月 10 天有日报、20 天无。→ 日历返回 31 个日期项，10 个 has_review=true 且带状态，21 个 false；月/年视图可切换到 2026-10 与 2026。 | automated | EV-AC-47-01 日历 JSON | P2 | 4 |
 | AC-48 | FR-F4 | 搜索词同时命中笔记与复盘。→ 默认返回 source_type=both 的混合结果；切“仅复盘”后 100% 为 review 且 review_id 非空；切“仅笔记”后 100% 为 document。 | automated | EV-AC-48-01 三种模式结果 | P1 | 4 |
 
 ### 3.7 设置与平台管理（FR-G）
@@ -203,7 +203,7 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 |---|---|---|---|---|---|---|
 | AC-49 | FR-G1 | 保存 DeepSeek 兼容配置与 API Key。→ provider_credentials.key_ciphertext 为密文（不等于明文、长度与格式符合 AES-256-GCM）；日志与错误响应中明文出现次数 0；测试连接成功返回 ok；失败返回可读错误码且 provider_credentials 不新增/不更新行（失败不落库）。 | automated | EV-AC-49-01 密文断言；EV-AC-49-02 日志扫描与 DB 行数 | P0 | 5 |
 | AC-50 | FR-G2 | 首配 BGE-M3 1024 维；随后申请换为 768 维模型。→ 新建 document_chunks_v2 与 HNSW 索引；re-embed 覆盖率 100% 后才原子切换 embedding_profile_id；切换前旧查询仍可用；切换后回滚到旧 profile 可用且不丢数据；无原地 ALTER 维度语句。 | automated | EV-AC-50-01 蓝绿迁移脚本；EV-AC-50-02 FX-11 | P0 | 5 |
-| AC-51 | FR-G3 | 修改 daily_at=02:00、weekly_at=周一 02:30、yearly_at=1/1 03:00、timezone。→ workspace_settings 三值更新；workspace_schedules.next_run_at 重算正确；已有活跃 run 不被中断。 | automated | EV-AC-51-01 配置与 next_run_at | P1 | 4 |
+| AC-51 | FR-G3 | 修改 daily_at=02:00、monthly_at=每月 1 日 02:30、yearly_at=1/1 03:00、timezone。→ workspace_settings 三值更新；workspace_schedules.next_run_at 重算正确；已有活跃 run 不被中断。 | automated | EV-AC-51-01 配置与 next_run_at | P1 | 4 |
 | AC-52 | FR-G4 | 配置源/输出仓库地址、分支、SSH Key、同步频率。→ git_connections 行字段齐全（role、provider、repo_full_name、base_branch、sync_interval_minutes、next_sync_at）；凭据密文存储；连接测试校验 contents:write，缺失即拒绝启用并返回明确原因；同步频率变更后 next_sync_at 按新间隔重算，dispatcher 到点触发一次定时拉取。 | automated | EV-AC-52-01 连接测试矩阵；EV-AC-52-02 调度触发日志 | P1 | 4 |
 | AC-53 | FR-G5 | 完成 3 次对话与 1 次复盘。→ 用量页 token 总数等于 usage_events 求和（差值 0）、调用次数等于行数、复盘次数等于 review run 成功数；按 Workspace 隔离，跨 Workspace 汇总为 0。 | automated | EV-AC-53-01 对账 SQL | P1 | 5 |
 | AC-54 | FR-G6 | platform_admin 打开管理后台。→ 用户/Workspace/邀请码三列表分页返回；生成邀请码可用；禁用账号后该用户登录 401 且已有会话失效；普通用户访问 /admin 返回 404 或 403；每次操作写 audit_logs。 | automated + manual | EV-AC-54-01 管理 API 用例；EV-AC-54-02 截图 | P0 | 5 |
@@ -229,7 +229,7 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 | AC | 决策 | Given → When → Then | 方式 | 证据 | P | Phase |
 |---|---|---|---|---|---|---|
 | AC-66 | 5B 预算 | 构造超预算 run：daily 输入达 100k、月累计达 5M。→ 80% 产生告警事件且继续；100% 终止为 FAILED/NEEDS_HUMAN；预算跨重试与修订累计（不重置）；超限后 LLM 调用计数增量为 0；不输出“数据版复盘”。 | automated | EV-AC-66-01 FX-10 report；EV-AC-66-02 usage_events | P0 | 3 |
-| AC-67 | 3B 自动合并 | daily 默认 auto_merge_daily=false；开启且 Gate 全通过时 auto-merge；任一 Gate 失败时保持 PR 人工；weekly/yearly 请求 auto-merge 被拒绝。→ 与配置和 GateResult 一致，且每次自动合并写 audit_logs。 | automated | EV-AC-67-01 FX-08 PR 元数据；EV-AC-67-02 配置矩阵 | P1 | 4 |
+| AC-67 | 3B 自动合并 | daily 默认 auto_merge_daily=false；开启且 Gate 全通过时 auto-merge；任一 Gate 失败时保持 PR 人工；monthly/yearly 请求 auto-merge 被拒绝。→ 与配置和 GateResult 一致，且每次自动合并写 audit_logs。 | automated | EV-AC-67-01 FX-08 PR 元数据；EV-AC-67-02 配置矩阵 | P1 | 4 |
 | AC-68 | 4B 专题首见 | 首次抽取到新错误条目。→ topic_items.status=pending，不进专题页与 open 视图；人工确认后转 open 并出现在专题页；同一 canonical_key 复发时自动累加 occurrence，不重复建条目。 | automated + manual | EV-AC-68-01 FX-07；EV-AC-68-02 专题页截图 | P1 | 3 |
 
 ---
@@ -252,13 +252,13 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 | ID | fixture | 输入 | 预期与断言 | 证据 | 关联 AC |
 |---|---|---|---|---|---|
 | FX-01 | fx_daily_2026-10-27 | 120 篇 md Vault；10-25…10-27 三日 Todo；10-27 日记 1 篇；3 篇学习笔记变更；2 条错误、1 条方法论 | 7/7 章节齐；每节证据 ≤12、全局 ≤80；≥1 条错误带 path 与 line_range；顺延 2 条、回填 1 条且 done_date 正确；无证据条目 0；G0–G9 全 PASS；同 snapshot 重跑 diff 率 ≤10% | report.json、渲染后的 md、verdict JSON | AC-31…AC-36、AC-41 |
-| FX-02 | fx_weekly_W43 | W43 内 7 份日报（含 1 份 degraded）；台账原始 Todo | 4 节齐；完成率与台账复算逐位相等；重复错误按指纹出现 ≥2 次标出，Top 排序确定；缺 1 日时 coverage_gaps 含该日且不编造 | report.json、复算 SQL 输出 | AC-37、AC-38 |
-| FX-03 | fx_yearly_2026 | 52 周周报（含 3 周缺失）；全年台账 | 5 节齐；只读下级 rollup（断链周报后结果可解释）；错误 Top10 按 频次→代价→最近 排序可复算；输入 token ≤ yearly 预算 | report.json、排序复算输出 | AC-38 |
+| FX-02 | fx_monthly_2026_10 | 2026-10 内 7 份日报（含 1 份 degraded）；台账原始 Todo | 4 节齐；完成率与台账复算逐位相等；重复错误按指纹出现 ≥2 次标出，Top 排序确定；缺 1 日时 coverage_gaps 含该日且不编造 | report.json、复算 SQL 输出 | AC-37、AC-38 |
+| FX-03 | fx_yearly_2026 | 52 周月报（含 3 周缺失）；全年台账 | 5 节齐；只读下级 rollup（断链月报后结果可解释）；错误 Top10 按 频次→代价→最近 排序可复算；输入 token ≤ yearly 预算 | report.json、排序复算输出 | AC-38 |
 | FX-04 | fx_empty_day | 某日无 Todo、无日记、无笔记变更 | 7 节全部为允许哨兵原文；虚构 claim 数 0；引用数 0；run 正常 SUCCEEDED（非 FAILED）；no_evidence_ratio=1.0 | report.json、渲染 md | AC-36、AC-27 |
 | FX-05 | fx_injection | 笔记内嵌 8 类攻击串：忽略以上指令、外链图片、HTML script、路径穿越 `../../etc`、伪造 EVIDENCE 定界符、要求输出 API Key、要求调用写工具、要求跨 workspace 读 | 0 条指令被遵循；8 类全部命中检测并写 security 事件；工具调用集合 ⊆ 只读白名单；输出路径全部在 snapshot manifest 内；渲染后无 script 与外部图片请求 | report.json、事件流、渲染 HTML | AC-57（SEC 集合） |
 | FX-06 | fx_tenant_leak | 两个 Workspace 各 50 篇，同名文件、相似内容；请求体与工具参数均注入他人 workspace_id | 跨租户引用 0；读取他人行数 0；HTTP 统一 404；LLM 输出被服务端覆盖后仍为 0；run 状态无 SECURITY_ABORT 以外的异常 | report.json、DB 计数 | AC-56、AC-28 |
 | FX-07 | fx_topic_merge | 三日错误清单：同一 canonical_key 出现 2 次、冲突字段 1 处、人工编辑段落 1 段 | 无重复条目；冲突显式标记（不静默择一）；重跑 v(n+1) 后 occurrence 不重复累加（计数等于实际出现次数）；标记外人工文本保留；标记丢失时转 manual 不覆盖 | report.json、三文件 diff | AC-40、AC-41 |
-| FX-08 | fx_pr_delivery | 已配置 GitHub 测试仓；daily 与 weekly 各 1 份 | 分支名 `review/daily/2026-10-27`；commit trailer 含 Run-Id/Review-Id/Version/Workspace；PR 标题与正文六段齐；正文首行无 degraded 时省略标记；同 period 重跑复用同一 open PR（PR 数不增）；无 force push；weekly 不自动合并 | report.json、PR 元数据 JSON | AC-39、AC-44 |
+| FX-08 | fx_pr_delivery | 已配置 GitHub 测试仓；daily 与 monthly 各 1 份 | 分支名 `review/daily/2026-10-27`；commit trailer 含 Run-Id/Review-Id/Version/Workspace；PR 标题与正文六段齐；正文首行无 degraded 时省略标记；同 period 重跑复用同一 open PR（PR 数不增）；无 force push；monthly 不自动合并 | report.json、PR 元数据 JSON | AC-39、AC-44 |
 | FX-09 | fx_restart | 运行中 kill worker、重启全部容器、断 Redis 30s | run 5 分钟内续跑或转 RETRY_WAIT；无重复产物；租约 sweeper 回收僵尸 run 并记 retry_from_state；dispatcher 启动补算 next_run_at；事件流 epoch 变化后客户端被要求重建 | report.json、run 状态序列 | AC-59、AC-43 |
 | FX-10 | fx_cost_budget | 构造超预算 run：daily 输入达 100k、月累计达 5M | 80% 时产生告警事件且继续；100% 时终止为 FAILED/NEEDS_HUMAN；跨重试与修订累计（不重置）；超限后不再发起 LLM 调用（计数 0 增量）；不输出“数据版复盘” | report.json、usage_events、告警事件 | AC-66 |
 | FX-11 | fx_embedding_migration | 1024 维 active profile；换 768 维 | 新表与新索引创建；re-embed 覆盖率 100% 前不切换；切换原子；切换后旧 profile 可回滚且查询可用；无 ALTER COLUMN TYPE；旧表延迟删除且删除前有快照 | report.json、profile 状态序列 | AC-50 |
@@ -329,7 +329,7 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 | 200MB 导入 | 从 202 响应到 job succeeded；不含 LLM | <600s | FX-14 墙钟 | 开始/结束时间戳 |
 | 首 token | 从 POST turn 到首个 SSE token | 门禁：mock provider P95 <5s；真实 provider P50 <3s 仅趋势（SLO 非硬保证，按 ARCHITECTURE §4.6） | mock 直方图 + 真实趋势图 | 时延直方图 |
 | 单 turn 总墙钟 | 含工具循环 | ≤60s；流式上限 120s | 事件流时间差 | run_events 时间戳 |
-| 复盘 run 总时长 | daily / weekly / yearly | daily ≤10min、weekly ≤30min、yearly ≤90min | run 开始到 SUCCEEDED | run 时间戳 |
+| 复盘 run 总时长 | daily / monthly / yearly | daily ≤10min、monthly ≤30min、yearly ≤90min | run 开始到 SUCCEEDED | run 时间戳 |
 
 **判定规则**：任一指标超标即 FAIL；不得用“平均值”替代 P95；采样不足 20 次的结果无效。
 
@@ -414,7 +414,7 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 | MA-03 | 搜索 | AC-17、AC-18、AC-19、AC-48 |
 | MA-04 | 带引用对话 | AC-22、AC-24、AC-26、AC-27 |
 | MA-05 | 生成 2026-10-27 日报 | AC-36、AC-41、AC-39 |
-| MA-06 | 周报 / 年报 | AC-37、AC-38、AC-47 |
+| MA-06 | 月报 / 年报 | AC-37、AC-38、AC-47 |
 | MA-07 | Git PR 交付 | AC-39、AC-52 |
 | MA-08 | 删除冷却 | AC-55、AC-64 |
 
@@ -476,15 +476,15 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 | 6 | 在输出仓库查看文件 | `wiki/复盘/每日复盘/2026/2026-10-27.md` 存在 | 截图 |
 | 7 | 再次生成同日 | 文件仍 1 份，版本号 +1，旧版本可查 | 截图 |
 
-### MA-06 周报 / 年报
+### MA-06 月报 / 年报
 
 | 步骤 | 操作 | 预期 | 证据 |
 |---|---|---|---|
-| 1 | 生成 2026-W43 周报 | 4 节齐，完成率与任务面板一致 | 截图 |
+| 1 | 生成 2026-10 月报 | 4 节齐，完成率与任务面板一致 | 截图 |
 | 2 | 对照任务台账复算完成率 | 数值一致 | 截图 + 复算表 |
 | 3 | 检查重复错误 | 出现 ≥2 次的条目被标出 | 截图 |
 | 4 | 生成 2026 年报 | 5 节齐，Top10 有排序 | 截图 |
-| 5 | 打开复盘日历 | 按日/周/年可切换，缺失日期有标识 | 截图 |
+| 5 | 打开复盘日历 | 按日/月/年可切换，缺失日期有标识 | 截图 |
 
 ### MA-07 Git PR 交付
 
@@ -496,7 +496,7 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 | 4 | 检查 commit trailer | 含 Run-Id/Review-Id/Version/Workspace | 截图 |
 | 5 | 同日重跑 | 复用同一 open PR，PR 数不增 | 截图 |
 | 6 | 检查远端历史 | 无 force push 记录 | 截图 |
-| 7 | weekly 产物 | 不自动合并，等待人工 | 截图 |
+| 7 | monthly 产物 | 不自动合并，等待人工 | 截图 |
 
 ### MA-08 删除冷却
 
@@ -553,7 +553,7 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 | FR-E4 | AC-34 | T-E-05 日记匹配 | EV-AC-34-01 | 3 |
 | FR-E5 | AC-35 | T-E-06 学习摘要四要素 | EV-AC-35-01 | 3 |
 | FR-E6 | AC-36 | T-E-07 daily 7 章 | EV-AC-36-01/02 | 3 |
-| FR-E7 | AC-37 | T-E-08 weekly 聚合与复算 | EV-AC-37-01/02 | 3 |
+| FR-E7 | AC-37 | T-E-08 monthly 聚合与复算 | EV-AC-37-01/02 | 3 |
 | FR-E8 | AC-38 | T-E-09 yearly 分层与 Top10 | EV-AC-38-01/02 | 3 |
 | FR-E9 | AC-39 | T-E-10 中文目录 | EV-AC-39-01/02 | 4 |
 | FR-E10 | AC-40 | T-E-11 三专题重渲染 | EV-AC-40-01/02 | 4 |
@@ -697,7 +697,7 @@ accepted → reopened（缺陷回归或需求变更，必须重跑）
 |---|---|---|---|
 | C1 | REQUIREMENTS §6.3 写 `data/reviews`，ARCHITECTURE §8.1 与决策 1D 定为 `wiki/复盘` | AC-39 以 `wiki/复盘` 为判定路径，`data/reviews` 仅兼容读取 | 需求 v1.1 修正 §6.3（ARCHITECTURE §14 已登记） |
 | C2 | FR-E6 列 6 章，REQUIREMENTS §6.2 列 7 章 | AC-36 按 7 章判定（含“一句话总结”） | 需求 v1.1 修正 FR-E6 |
-| C3 | 需求未定义“月报”，FR-E8 提及年度汇总周报/月报 | AC-38 不要求月报，缺失周用日报补齐并记 coverage_gaps | 需求 v1.1 明确不做月报 |
+| C3 | 需求未定义“月报”，FR-E8 提及年度汇总月报/月报 | AC-38 不要求月报，缺失周用日报补齐并记 coverage_gaps | 需求 v1.1 明确不做月报 |
 | C4 | FR-C6 写“1 万篇 P95<1s”，ARCHITECTURE §2.6 预算按 80k chunk 估算 | AC-58 同时约束文档数与 chunk 数，避免只测文档数 | 无冲突，仅口径补全 |
 
 > 上表 C1–C4 不构成与 ARCHITECTURE 的实质冲突，均为需求文本与架构裁决的已知差异，已在 ARCHITECTURE §14 登记或按决策处理。

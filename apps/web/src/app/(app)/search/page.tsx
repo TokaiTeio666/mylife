@@ -239,8 +239,8 @@ export default function SearchPage() {
                       href={
                         item.source_type === "review"
                           ? `/reviews/${
-                              item.path.includes("每周复盘") /* i18n-ignore */
-                                ? "weekly"
+                              item.path.includes("每月复盘") /* i18n-ignore */
+                                ? "monthly"
                                 : item.path.includes("年度复盘") /* i18n-ignore */
                                   ? "yearly"
                                   : "daily"

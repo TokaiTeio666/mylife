@@ -36,7 +36,7 @@
 | AC-48 搜索三模式 | PASS | `test_dashboard.py::test_search_three_source_modes`（both 同时含 document/review；review 模式 `review_id` 非空；document 模式全为 document） |
 | AC-51 调度配置 | PASS | `test_settings_schedule.py::test_schedule_defaults_and_update`（三时间 + catchup 落库、next_run_at 重算、活跃 run 不中断） |
 | AC-52 Git 配置 | PASS | `test_settings_schedule.py::test_git_settings_connection_matrix`（role/provider/repo/branch/interval/next_sync_at 齐全、凭据密文、缺 `contents:write` 拒绝且不落库、间隔变更重算） |
-| AC-67 auto-merge | PASS | `test_delivery_git.py::test_auto_merge_matrix_and_audit`（daily + 开关 + Gate 通过 → merged 且写 `delivery.auto_merged`；weekly 不自动合并） |
+| AC-67 auto-merge | PASS | `test_delivery_git.py::test_auto_merge_matrix_and_audit`（daily + 开关 + Gate 通过 → merged 且写 `delivery.auto_merged`；monthly 不自动合并） |
 
 补充：
 
@@ -62,7 +62,7 @@
 | FX | 结论 | 证据 |
 |---|---|---|
 | FX-07 fx_topic_merge | PASS | `docs/evidence/phase4/fx07-topic-merge.json`：1 条 canonical_key、occurrence 3 次、冲突字段 `cost` 两值并列、人工段落保留、重跑计数 3 |
-| FX-08 fx_pr_delivery | PASS | `fx08-pr-delivery.json`：分支 `review/daily/2026-10-27`、四个 trailer、PR 六段、同 period 复用 PR、weekly 不自动合并 |
+| FX-08 fx_pr_delivery | PASS | `fx08-pr-delivery.json`：分支 `review/daily/2026-10-27`、四个 trailer、PR 六段、同 period 复用 PR、monthly 不自动合并 |
 | FX-09 fx_restart | PASS | `fx09-restart.json`：过期租约→`retry_wait`（`retry_from_state=drafting`、`lease_expired` 事件）、dispatcher 启动补算 `next_run_at` |
 
 复现：`cd apps/api && uv run pytest -q -m fixture`（Phase 3 + Phase 4）。

@@ -1,6 +1,6 @@
 """`索引.md` 渲染（DIRECTORY-CONSTRAINTS §4；PHASE4-SPEC §5.5）。
 
-排序固定：日报/周报/年报各取最新一条；专题固定 errors → methods → actions。
+排序固定：日报/月报/年报各取最新一条；专题固定 errors → methods → actions。
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ def render_index_inner(
     topic_counts: dict[str, int],
 ) -> str:
     lines = ["# 复盘索引", ""]
-    labels = {"daily": "最新日报", "weekly": "最新周报", "yearly": "最新年报"}
-    for kind in ("daily", "weekly", "yearly"):
+    labels = {"daily": "最新日报", "monthly": "最新月报", "yearly": "最新年报"}
+    for kind in ("daily", "monthly", "yearly"):
         row = latest.get(kind)
         if row is None:
             lines.append(f"- {labels[kind]}：暂无")

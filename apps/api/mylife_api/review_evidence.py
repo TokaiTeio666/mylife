@@ -393,6 +393,154 @@ async def collect_learning_changes(
     return rows
 
 
+#: 语义 Writer 召回：只做候选筛选，最终“是不是错误/方法论”仍由模型判断。
+#: 这些词不是章节标题，也不要求固定格式；命中只用于在超长的一天里把更可能
+#: 有内容的 chunk 排到模型输入预算内。
+SEMANTIC_HINTS: tuple[str, ...] = (
+    "错",
+    "漏",
+    "失误",
+    "教训",
+    "根因",
+    "原因",
+    "代价",
+    "正确做法",
+    "下次",
+    "避免",
+    "方法",
+    "步骤",
+    "验证",
+    "边界",
+    "落地",
+    "复盘",
+)
+
+SEMANTIC_MAX_CANDIDATES = 20
+SEMANTIC_MAX_CHARS = 12_000
+SEMANTIC_SCAN_LIMIT = 300
+
+
+def _semantic_hint_score(text: str) -> int:
+    return sum(1 for hint in SEMANTIC_HINTS if hint in (text or ""))
+
+
+async def collect_semantic_candidates(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    period_key: date,
+    reviews_root: str,
+    collector: EvidenceCollector,
+    max_candidates: int = SEMANTIC_MAX_CANDIDATES,
+    max_chars: int = SEMANTIC_MAX_CHARS,
+) -> list[dict[str, Any]]:
+    """当天笔记的语义写作素材（错误 / 方法论由模型判断，不按标题解析）。
+
+    选材范围是“当天发生变更或 occurred_on=当天”的用户笔记，按 chunk 粒度
+    取证，以便模型引用后仍有 path / line_range 可供 G4 追溯。召回只按宽泛
+    线索排序以控制上下文预算，不要求“做错的事 / 正确方法论”标题或固定字段。
+    """
+    from mylife_api.chunk_tables import resolve_chunk_table
+
+    table = await resolve_chunk_table(session, workspace_id=workspace_id)
+    result = await session.execute(
+        text(
+            f"SELECT c.id AS chunk_id, c.document_id, c.heading, c.content, "
+            f"       c.chunk_ordinal, d.path, d.title, d.content_hash, "
+            f"       d.occurred_on, d.content AS document_content, "
+            f"       EXISTS ("
+            f"         SELECT 1 FROM document_changes ch "
+            f"         WHERE ch.workspace_id = :ws AND ch.document_id = d.id "
+            f"           AND ch.source_date = CAST(:period AS date) "
+            f"           AND ch.change_type IN ('added','modified')"
+            f"       ) AS changed_on_period "
+            f"FROM {table} c JOIN documents d ON d.id = c.document_id "
+            f"WHERE c.workspace_id = :ws AND d.workspace_id = :ws "
+            f"  AND d.source_type = 'user' "
+            f"  AND (d.occurred_on = CAST(:period AS date) OR EXISTS ("
+            f"        SELECT 1 FROM document_changes ch "
+            f"        WHERE ch.workspace_id = :ws AND ch.document_id = d.id "
+            f"          AND ch.source_date = CAST(:period AS date) "
+            f"          AND ch.change_type IN ('added','modified'))) "
+            f"  AND d.path NOT LIKE :review_prefix "
+            f"  AND length(c.content) > 0 "
+            f"ORDER BY d.path ASC, c.chunk_ordinal ASC "
+            f"LIMIT :scan_limit"
+        ),
+        {
+            "ws": workspace_id,
+            "period": period_key,
+            "review_prefix": f"{reviews_root.rstrip('/')}/%",
+            "scan_limit": SEMANTIC_SCAN_LIMIT,
+        },
+    )
+
+    rows = sorted(
+        result,
+        key=lambda row: (
+            -_semantic_hint_score(row.content or ""),
+            -int(bool(row.changed_on_period)),
+            -len(row.content or ""),
+            row.path,
+            row.chunk_ordinal,
+        ),
+    )
+
+    candidates: list[dict[str, Any]] = []
+    used_chars = 0
+    for row in rows:
+        if len(candidates) >= max_candidates:
+            break
+        content = row.content or ""
+        projected = min(len(content), 800)
+        if candidates and used_chars + projected > max_chars:
+            continue
+        body = row.document_content or ""
+        # chunk 的 line_start/line_end 是文件绝对行号（含 frontmatter），而
+        # G3c 用去 frontmatter 后的正文行号复算；这里按 chunk 内容在正文中的
+        # 实际位置换算出正文相对行号。找不到原文的 chunk 不进入 Writer，
+        # 避免不可复算的引用把整条复盘卡在门禁上。
+        offset = body.find(content)
+        if not content or offset < 0:
+            continue
+        line_start = body.count("\n", 0, offset) + 1
+        line_end = line_start + content.count("\n")
+        line_range = [line_start, line_end]
+        evidence_id = collector.add(
+            "mistakes",
+            source_type="chunk",
+            quote=content[:MAX_QUOTE_CHARS],
+            source_path=row.path,
+            source_date=row.occurred_on or period_key,
+            occurred_on=row.occurred_on,
+            document_content_hash=row.content_hash,
+            heading=row.heading,
+            line_range=line_range,
+            document_id=row.document_id,
+            chunk_id=row.chunk_id,
+            title=row.title,
+        )
+        if evidence_id is None:
+            break
+        used_chars += projected
+        candidates.append(
+            {
+                "evidence_id": evidence_id,
+                "path": row.path,
+                "title": row.title,
+                "heading": row.heading,
+                "line_range": line_range,
+                "source_date": str(row.occurred_on or period_key),
+                "quote": content[:MAX_QUOTE_CHARS],
+                # 模型可看到比证据 quote 稍多的上下文，但引用仍绑定上面的 quote。
+                "content": content[:800],
+                "document_id": row.document_id,
+                "chunk_id": row.chunk_id,
+            }
+        )
+    return candidates
+
+
 async def collect_prior_reviews(
     session: AsyncSession,
     *,
@@ -433,23 +581,31 @@ async def collect_entries_for_period(
     kind: str,
     period_start: date,
     period_end: date,
+    period_prefix: str | None = None,
 ) -> list[dict[str, Any]]:
-    """周/年 rollup 只读 current version 的 review_entries。"""
+    """月/年 rollup 只读 current version 的 review_entries。
+
+    `period_prefix` 用于 `YYYY-MM` 这类不能按日期区间比较的周期键。
+    """
+    prefix_sql = " OR r.period_key LIKE :prefix" if period_prefix else ""
+    params: dict[str, Any] = {
+        "ws": workspace_id,
+        "kind": kind,
+        "start": period_start.isoformat(),
+        "end": period_end.isoformat(),
+    }
+    if period_prefix:
+        params["prefix"] = period_prefix
     result = await session.execute(
         text(
             "SELECT e.section_key, e.item_type, e.canonical_key, e.fields_json, "
             "       e.source_path, e.line_start, e.line_end, e.source_date "
             "FROM review_entries e JOIN reviews r ON r.id = e.review_id "
             "WHERE e.workspace_id = :ws AND r.kind = :kind "
-            "  AND r.period_key BETWEEN :start AND :end "
+            f"  AND (r.period_key BETWEEN :start AND :end{prefix_sql}) "
             "  AND e.version = r.version AND r.superseded_by IS NULL"
         ),
-        {
-            "ws": workspace_id,
-            "kind": kind,
-            "start": period_start.isoformat(),
-            "end": period_end.isoformat(),
-        },
+        params,
     )
     rows = []
     for row in result:
@@ -467,21 +623,26 @@ async def collect_sections_for_period(
     kind: str,
     period_start: date,
     period_end: date,
+    period_prefix: str | None = None,
 ) -> list[dict[str, Any]]:
+    prefix_sql = " OR r.period_key LIKE :prefix" if period_prefix else ""
+    params: dict[str, Any] = {
+        "ws": workspace_id,
+        "kind": kind,
+        "start": period_start.isoformat(),
+        "end": period_end.isoformat(),
+    }
+    if period_prefix:
+        params["prefix"] = period_prefix
     result = await session.execute(
         text(
             "SELECT s.section_key, s.structured_json, r.period_key "
             "FROM review_sections s JOIN reviews r ON r.id = s.review_id "
             "WHERE s.workspace_id = :ws AND r.kind = :kind "
-            "  AND r.period_key BETWEEN :start AND :end "
+            f"  AND (r.period_key BETWEEN :start AND :end{prefix_sql}) "
             "  AND s.version = r.version AND r.superseded_by IS NULL"
         ),
-        {
-            "ws": workspace_id,
-            "kind": kind,
-            "start": period_start.isoformat(),
-            "end": period_end.isoformat(),
-        },
+        params,
     )
     rows = []
     for row in result:

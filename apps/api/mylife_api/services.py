@@ -448,7 +448,7 @@ async def workspace_detail(
     summary = SettingsSummary(
         timezone=settings_row["timezone"] if settings_row else DEFAULT_TIMEZONE,
         daily_at=settings_row["daily_at"] if settings_row else time(1, 0),
-        weekly_at=settings_row["weekly_at"] if settings_row else time(1, 30),
+        monthly_at=settings_row["monthly_at"] if settings_row else time(1, 30),
         yearly_at=settings_row["yearly_at"] if settings_row else time(2, 0),
         reviews_root=settings_row["reviews_root"] if settings_row else "wiki/复盘",
     )

@@ -78,7 +78,7 @@ def plan_tool_calls(question: str, *, top_k: int) -> list[dict[str, Any]]:
         )
     period = _extract_period(question)
     if period is not None and any(
-        keyword in question for keyword in ("复盘", "日报", "周报", "年报")
+        keyword in question for keyword in ("复盘", "日报", "月报", "年报")
     ):
         calls.append(
             {
@@ -99,7 +99,7 @@ def should_read_note(question: str, has_hits: bool) -> bool:
 
 _PERIOD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("daily", re.compile(r"\d{4}-\d{2}-\d{2}")),
-    ("weekly", re.compile(r"\d{4}-W\d{2}")),
+    ("monthly", re.compile(r"\d{4}-(0[1-9]|1[0-2])")),
     ("yearly", re.compile(r"\b(19|20)\d{2}\b")),
 )
 

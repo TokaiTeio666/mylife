@@ -18,8 +18,8 @@ from mylife_worker.markdown import (
 
 
 def test_normalize_text_rules():
-    assert normalize_text("  写　周报  ") == "写 周报"
-    assert normalize_text("写周报。") == "写周报."
+    assert normalize_text("  写　月报  ") == "写 月报"
+    assert normalize_text("写月报。") == "写月报."
     assert normalize_text("A，B！C？") == "A,B!C?"
     assert normalize_text("Report") == "Report"  # 默认不改大小写
     assert normalize_text("Report", lowercase=True) == "report"

@@ -17,7 +17,7 @@ SECTION_ITEM_TYPES: dict[str, str] = {
     "mistakes": "error",
     "methods": "method",
     "tomorrow_actions": "action",
-    "next_week_actions": "action",
+    "next_month_actions": "action",
 }
 
 #: 每种条目用于 canonical_key 的标题字段。
@@ -25,6 +25,14 @@ TITLE_FIELDS: dict[str, tuple[str, ...]] = {
     "error": ("root_cause", "event"),
     "method": ("name",),
     "action": ("text",),
+}
+
+#: 语义抽取允许用占位词表达“原文没写”；它不能作为 canonical_key 的依据，
+#: 否则所有未写根因的错误会被合并成同一条。
+TITLE_PLACEHOLDERS: dict[str, frozenset[str]] = {
+    "error": frozenset({"未提及", "未说明", "未知", "无", "不适用", "-", "—"}),
+    "method": frozenset({"未提及", "未说明", "未知", "无", "不适用", "-", "—"}),
+    "action": frozenset({"未提及", "未说明", "未知", "无", "不适用", "-", "—"}),
 }
 
 
@@ -43,10 +51,11 @@ class MaterializedEntry:
 
 
 def _title_for(item_type: str, fields: dict[str, Any]) -> str:
+    placeholders = TITLE_PLACEHOLDERS.get(item_type, frozenset())
     for key in TITLE_FIELDS.get(item_type, ()):
         value = fields.get(key)
-        if isinstance(value, str) and value.strip():
-            return value
+        if isinstance(value, str) and value.strip() and value.strip() not in placeholders:
+            return value.strip()
     return ""
 
 
@@ -107,7 +116,10 @@ def materialize_entries(
                     source_date=source_date,
                     root_cause_fingerprint=(
                         root_cause_fingerprint(str(fields.get("root_cause")))
-                        if item_type == "error" and fields.get("root_cause")
+                        if item_type == "error"
+                        and str(fields.get("root_cause") or "").strip()
+                        and str(fields.get("root_cause")).strip()
+                        not in TITLE_PLACEHOLDERS["error"]
                         else None
                     ),
                 )

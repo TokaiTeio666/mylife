@@ -28,23 +28,23 @@ def fx_daily() -> dict[str, Any]:
             day=DAILY_PERIOD - timedelta(days=index % 5),
         )
 
-    # 三日 Todo：写周报 10-25 open、10-26 open、10-27 done；读论文 10-25 open
+    # 三日 Todo：写月报 10-25 open、10-26 open、10-27 done；读论文 10-25 open
     files["日记/2026/10.25.md"] = _note(
         "日记/2026/10.25.md",
         "10-25",
-        "- [ ] 写周报\n- [ ] 读论文",
+        "- [ ] 写月报\n- [ ] 读论文",
         day=date(2026, 10, 25),
     )
     files["日记/2026/10.26.md"] = _note(
         "日记/2026/10.26.md",
         "10-26",
-        "- [ ] 写周报",
+        "- [ ] 写月报",
         day=date(2026, 10, 26),
     )
     files["日记/2026/10.27.md"] = _note(
         "日记/2026/10.27.md",
         "10-27",
-        "- [x] 写周报\n\n今天复盘了缓存穿透问题，决定先补布隆过滤器。",
+        "- [x] 写月报\n\n今天复盘了缓存穿透问题，决定先补布隆过滤器。",
         day=DAILY_PERIOD,
     )
 
@@ -71,27 +71,27 @@ def fx_daily() -> dict[str, Any]:
     return files
 
 
-def fx_weekly() -> dict[str, Any]:
+def fx_monthly() -> dict[str, Any]:
     """FX-02：W43 的 7 份日报 + 台账。"""
     files: dict[str, str] = {}
-    start = date(2026, 10, 19)  # 2026-W43 周一
+    start = date(2026, 10, 19)  # 2026-10 周一
     for offset in range(7):
         day = start + timedelta(days=offset)
-        checked = "- [x] 写周报" if offset % 2 == 0 else "- [ ] 写周报"
+        checked = "- [x] 写月报" if offset % 2 == 0 else "- [ ] 写月报"
         files[f"日记/2026/{day.month}.{day.day}.md"] = _note(
             f"日记/2026/{day.month}.{day.day}.md",
             day.isoformat(),
             f"{checked}\n\n当日记录。",
             day=day,
         )
-    files["notes/weekly.md"] = _note(
-        "notes/weekly.md", "周记", "缓存与检索的周度总结。", day=date(2026, 10, 19)
+    files["notes/monthly.md"] = _note(
+        "notes/monthly.md", "周记", "缓存与检索的周度总结。", day=date(2026, 10, 19)
     )
     return files
 
 
 def fx_yearly() -> dict[str, Any]:
-    """FX-03：全年每周一份日报（含 3 周缺失）+ 台账。"""
+    """FX-03：全年每月一份日报（含 3 周缺失）+ 台账。"""
     files: dict[str, str] = {}
     day = date(2026, 1, 5)
     week = 0

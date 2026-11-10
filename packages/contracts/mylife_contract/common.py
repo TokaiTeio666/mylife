@@ -154,7 +154,7 @@ def is_valid_uuid(value: str) -> bool:
 
 
 _DAILY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_WEEKLY_RE = re.compile(r"^\d{4}-W\d{2}$")
+_MONTHLY_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 _YEARLY_RE = re.compile(r"^\d{4}$")
 
 
@@ -168,10 +168,8 @@ def is_valid_period_key(kind: str, value: str) -> bool:
         except ValueError:
             return False
         return True
-    if kind == "weekly":
-        if not _WEEKLY_RE.match(value):
-            return False
-        return 1 <= int(value[-2:]) <= 53
+    if kind == "monthly":
+        return bool(_MONTHLY_RE.match(value))
     if kind == "yearly":
         if not _YEARLY_RE.match(value):
             return False

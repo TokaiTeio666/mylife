@@ -1,0 +1,14 @@
+{
+  "sections": [
+    "completion_rate",
+    "recurring_mistakes",
+    "method_landing",
+    "next_month_actions"
+  ],
+  "ledger": {
+    "completed": 1,
+    "total": 1,
+    "rate": 1.0
+  },
+  "state": "succeeded"
+}

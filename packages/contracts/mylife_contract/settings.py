@@ -13,20 +13,20 @@ from mylife_contract.common import ApiModel, UtcDateTime
 
 class ScheduleEnabled(ApiModel):
     daily: bool = True
-    weekly: bool = True
+    monthly: bool = True
     yearly: bool = True
 
 
 class ScheduleNextRun(ApiModel):
     daily: UtcDateTime | None = None
-    weekly: UtcDateTime | None = None
+    monthly: UtcDateTime | None = None
     yearly: UtcDateTime | None = None
 
 
 class ScheduleSettings(ApiModel):
     timezone: str
     daily_at: time
-    weekly_at: time
+    monthly_at: time
     yearly_at: time
     catchup_days: int = Field(default=7, ge=0, le=30)
     enabled: ScheduleEnabled = Field(default_factory=ScheduleEnabled)
@@ -36,7 +36,7 @@ class ScheduleSettings(ApiModel):
 class ScheduleUpdate(ApiModel):
     timezone: str = Field(min_length=1, max_length=64)
     daily_at: time
-    weekly_at: time
+    monthly_at: time
     yearly_at: time
     catchup_days: int = Field(default=7, ge=0, le=30)
     enabled: ScheduleEnabled = Field(default_factory=ScheduleEnabled)

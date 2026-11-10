@@ -34,7 +34,7 @@ date: 2026-10-27
 - 事件：缓存问题 | 根因：未加布隆过滤器 | 代价：2h | 正确做法：加保护 | 复发触发：大促
 
 ## 正确方法论
-- 名称：布隆过滤器 | 来源：实践 | 场景：缓存 | 步骤：估算容量;分层校验 | 边界：删除场景 | 落地：本周接入 | 验证：压测通过
+- 名称：布隆过滤器 | 来源：实践 | 场景：缓存 | 步骤：估算容量;分层校验 | 边界：删除场景 | 落地：本月接入 | 验证：压测通过
 """
 
 
@@ -192,10 +192,10 @@ def main(invite: str) -> int:
             json={
                 "timezone": "Asia/Shanghai",
                 "daily_at": "02:00",
-                "weekly_at": "02:30",
+                "monthly_at": "02:30",
                 "yearly_at": "03:00",
                 "catchup_days": 7,
-                "enabled": {"daily": True, "weekly": True, "yearly": True},
+                "enabled": {"daily": True, "monthly": True, "yearly": True},
             },
             headers={"X-CSRF-Token": token},
         )

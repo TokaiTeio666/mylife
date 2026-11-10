@@ -22,7 +22,7 @@ pytestmark = pytest.mark.db
 
 FILES = {
     "日记/2026/10.27.md": "---\ndate: 2026-10-27\n---\n# 10-27\n今天复盘缓存。\n",
-    "日记/2026/10.26.md": "---\ndate: 2026-10-26\n---\n# 10-26\n- [ ] 写周报\n",
+    "日记/2026/10.26.md": "---\ndate: 2026-10-26\n---\n# 10-26\n- [ ] 写月报\n",
 }
 
 
@@ -404,18 +404,18 @@ async def test_auto_merge_matrix_and_audit(client, admin_conn, tmp_path, fake_gi
     ).fetchone()[0]
     assert audit == 1
 
-    # weekly 不自动合并
-    weekly, weekly_state = await _generate(
-        client, workspace_id, kind="weekly", period_key="2026-W43"
+    # monthly 不自动合并
+    monthly, monthly_state = await _generate(
+        client, workspace_id, kind="monthly", period_key="2026-10"
     )
-    assert weekly_state in {"succeeded", "needs_human"}, weekly_state
-    if weekly_state == "succeeded":
-        weekly_row = admin_conn.execute(
+    assert monthly_state in {"succeeded", "needs_human"}, monthly_state
+    if monthly_state == "succeeded":
+        monthly_row = admin_conn.execute(
             "SELECT status, auto_merge FROM delivery_records WHERE workspace_id = %s "
             "AND review_id = %s",
-            (workspace_id, weekly["review_id"]),
+            (workspace_id, monthly["review_id"]),
         ).fetchone()
-        assert weekly_row == ("pr_open", False)
+        assert monthly_row == ("pr_open", False)
 
 
 @pytest.mark.asyncio

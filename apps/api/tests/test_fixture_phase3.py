@@ -109,15 +109,15 @@ async def test_fx01_daily(client, admin_conn):
 
 
 @pytest.mark.asyncio
-async def test_fx02_weekly(client, admin_conn):
+async def test_fx02_monthly(client, admin_conn):
     workspace_id, _ = await helpers.prepare_workspace_with_docs(
-        client, admin_conn, email="fx02@example.com", files=vaults.fx_weekly()
+        client, admin_conn, email="fx02@example.com", files=vaults.fx_monthly()
     )
     # 先补齐 7 份日报
     for day in range(19, 26):
         await _generate(client, workspace_id, kind="daily", period_key=f"2026-10-{day:02d}")
 
-    body, state = await _generate(client, workspace_id, kind="weekly", period_key="2026-W43")
+    body, state = await _generate(client, workspace_id, kind="monthly", period_key="2026-10")
     assert state in {"succeeded", "human_gate"}, state
 
     rows = _sections(admin_conn, workspace_id, body["review_id"], body["version"])
@@ -125,7 +125,7 @@ async def test_fx02_weekly(client, admin_conn):
         "completion_rate",
         "recurring_mistakes",
         "method_landing",
-        "next_week_actions",
+        "next_month_actions",
     ]
     completion = rows[0][3]
     from mylife_api import repo_chat
@@ -141,7 +141,7 @@ async def test_fx02_weekly(client, admin_conn):
     assert abs(completion["rate"] - ledger["rate"]) < 1e-9
 
     _report(
-        "fx02-weekly",
+        "fx02-monthly",
         {
             "sections": [row[0] for row in rows],
             "ledger": ledger,
@@ -155,7 +155,7 @@ async def test_fx03_yearly(client, admin_conn):
     workspace_id, _ = await helpers.prepare_workspace_with_docs(
         client, admin_conn, email="fx03@example.com", files=vaults.fx_yearly()
     )
-    # 年报只读下级 rollup：无周报时各节应为哨兵（不编造）。
+    # 年报只读下级 rollup：无月报时各节应为哨兵（不编造）。
     # 素材来自下级 rollup 而非全年原文，因此这里显式 allow_empty。
     body, state = await _generate(
         client, workspace_id, kind="yearly", period_key="2026", allow_empty=True
@@ -172,7 +172,7 @@ async def test_fx03_yearly(client, admin_conn):
     ]
     from mylife_contract.constants import SENTINELS
 
-    # 没有周报 → 全部哨兵（只读 rollup，不回读全年原文）
+    # 没有月报 → 全部哨兵（只读 rollup，不回读全年原文）
     assert all(row[2] == SENTINELS[row[0]] for row in rows)
 
     _report(
@@ -182,19 +182,19 @@ async def test_fx03_yearly(client, admin_conn):
 
 
 @pytest.mark.asyncio
-async def test_fx03_yearly_reads_weekly_rollup(client, admin_conn):
-    """有下级周报时，年报必须从 rollup 取数而不是回读全年原文。"""
+async def test_fx03_yearly_reads_monthly_rollup(client, admin_conn):
+    """有下级月报时，年报必须从 rollup 取数而不是回读全年原文。"""
     workspace_id, _ = await helpers.prepare_workspace_with_docs(
-        client, admin_conn, email="fx03b@example.com", files=vaults.fx_weekly()
+        client, admin_conn, email="fx03b@example.com", files=vaults.fx_monthly()
     )
     for day in range(19, 26):
         await _generate(
             client, workspace_id, kind="daily", period_key=f"2026-10-{day:02d}"
         )
-    weekly, weekly_state = await _generate(
-        client, workspace_id, kind="weekly", period_key="2026-W43"
+    monthly, monthly_state = await _generate(
+        client, workspace_id, kind="monthly", period_key="2026-10"
     )
-    assert weekly_state in {"succeeded", "human_gate"}
+    assert monthly_state in {"succeeded", "human_gate"}
 
     yearly, state = await _generate(
         client, workspace_id, kind="yearly", period_key="2026", allow_empty=True
@@ -205,20 +205,20 @@ async def test_fx03_yearly_reads_weekly_rollup(client, admin_conn):
     from mylife_contract.constants import SENTINELS
 
     learning = next(row for row in rows if row[0] == "learning_map")
-    # 周报的 method_landing 为空 → learning_map 仍为哨兵，但不得编造
+    # 月报的 method_landing 为空 → learning_map 仍为哨兵，但不得编造
     if learning[3].get("topics"):
         assert learning[2] != SENTINELS["learning_map"]
     else:
         assert learning[2] == SENTINELS["learning_map"]
 
-    # 年报 run 的 rollup 查询确实读到了周报（source_kind=weekly）
-    weekly_count = admin_conn.execute(
-        "SELECT count(*) FROM reviews WHERE workspace_id = %s AND kind = 'weekly' "
-        "AND period_key = '2026-W43'",
+    # 年报 run 的 rollup 查询确实读到了月报（source_kind=monthly）
+    monthly_count = admin_conn.execute(
+        "SELECT count(*) FROM reviews WHERE workspace_id = %s AND kind = 'monthly' "
+        "AND period_key = '2026-10'",
         (workspace_id,),
     ).fetchone()[0]
-    assert weekly_count == 1
-    assert weekly["review_id"] != yearly["review_id"]
+    assert monthly_count == 1
+    assert monthly["review_id"] != yearly["review_id"]
 
 
 @pytest.mark.asyncio

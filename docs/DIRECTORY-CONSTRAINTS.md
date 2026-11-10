@@ -115,9 +115,9 @@ CI 使用 `import-linter`（或 `eslint-plugin-boundaries`）执行上述方向�
 ├─ 每日复盘/
 │  └─ 2026/
 │     └─ 2026-10-27.md
-├─ 每周复盘/
+├─ 每月复盘/
 │  └─ 2026/
-│     └─ 2026-W43.md
+│     └─ 2026-10.md
 ├─ 年度复盘/
 │  └─ 2026.md
 ├─ 专题/
@@ -139,14 +139,14 @@ CI 使用 `import-linter`（或 `eslint-plugin-boundaries`）执行上述方向�
 | 最大长度 | 单段 ≤ 120 字符；完整路径 ≤ 240 字符 |
 | 允许字符 | 中文、字母、数字、空格、`- _ . ( ) （ ）`；禁止尖括号、冒号、引号、问号、星号、竖线、控制字符 |
 | 大小写 | 保留原样；冲突检测按 NFC + casefold 比较，防止 macOS/Windows 大小写冲突 |
-| 生成文件 | 只能落在 `每日复盘/`、`每周复盘/`、`年度复盘/`、`专题/`、`索引.md` 白名单内 |
+| 生成文件 | 只能落在 `每日复盘/`、`每月复盘/`、`年度复盘/`、`专题/`、`索引.md` 白名单内 |
 
 ### 4.2 文件命名
 
 | 产物 | 文件名 | 示例 |
 |---|---|---|
 | 日报 | `YYYY-MM-DD.md` | `2026-10-27.md` |
-| 周报 | `YYYY-Www.md`（ISO 周） | `2026-W43.md` |
+| 月报 | `YYYY-MM.md`（自然月） | `2026-10.md` |
 | 年报 | `YYYY.md` | `2026.md` |
 | 专题 | 固定名 | `错误清单.md` |
 | 索引 | `索引.md` | — |
@@ -156,7 +156,7 @@ CI 使用 `import-linter`（或 `eslint-plugin-boundaries`）执行上述方向�
 ```yaml
 ---
 mylife: true
-kind: daily            # daily | weekly | yearly
+kind: daily            # daily | monthly | yearly
 period_key: "2026-10-27"
 review_id: "uuid"
 version: 2
@@ -269,7 +269,7 @@ Thumbs.db
 | 模式 | 适用 | 语义 |
 |---|---|---|
 | `create_only` | `source_snapshots`、首次生成 | 已存在则失败/跳过，不覆盖 |
-| `update_allowed` | 日/周/年复盘 | 同 period 覆盖同一路径；version 递增 |
+| `update_allowed` | 日/月/年复盘 | 同 period 覆盖同一路径；version 递增 |
 | `append_only` | `run_events`、`delivery_events`、`audit_logs` | 只追加，不修改/删除 |
 
 ### 7.4 路径白名单
@@ -296,7 +296,7 @@ Thumbs.db
 
 | 路径/区域 | 归属 | 规则 |
 |---|---|---|
-| `每日复盘/`、`每周复盘/`、`年度复盘/` | mylife | 整个文件为生成物；auto 标记内可重写，标记外保留 |
+| `每日复盘/`、`每月复盘/`、`年度复盘/` | mylife | 整个文件为生成物；auto 标记内可重写，标记外保留 |
 | `专题/` | mylife + 用户 | DB 全量重渲染；auto 标记外人工内容保留 |
 | `索引.md` | mylife | 生成；不手改 |
 | source vault 其他文件 | 用户 | 只读；不写回（除非 `vault_writeback` opt-in） |

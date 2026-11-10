@@ -14,7 +14,7 @@ pytestmark = pytest.mark.db
 
 DAILY_FILES = {
     "日记/2026/10.27.md": "---\ndate: 2026-10-27\n---\n# 10-27\n今天整理了缓存方案。\n",
-    "日记/2026/10.26.md": "---\ndate: 2026-10-26\n---\n# 10-26\n- [ ] 写周报\n",
+    "日记/2026/10.26.md": "---\ndate: 2026-10-26\n---\n# 10-26\n- [ ] 写月报\n",
     "notes/cache.md": "---\ndate: 2026-10-27\n---\n# 缓存\n缓存穿透与布隆过滤器。\n",
 }
 
@@ -63,7 +63,7 @@ async def test_daily_review_generates_seven_sections(client, admin_conn):
         (workspace_id, body["review_id"]),
     ).fetchone()[0]
     assert structured["carried_over"]
-    assert structured["carried_over"][0]["text"] == "写周报"
+    assert structured["carried_over"][0]["text"] == "写月报"
 
 
 @pytest.mark.asyncio

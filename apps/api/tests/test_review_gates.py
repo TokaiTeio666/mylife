@@ -193,7 +193,7 @@ def test_g7_sentinel_must_be_exact():
 
 def test_g8_coverage_gap_is_warning_only():
     verdict = evaluate_gates(
-        _ctx(kind="weekly", sections=_sections("weekly"), coverage_gaps=[{"date": "2026-10-24"}])
+        _ctx(kind="monthly", sections=_sections("monthly"), coverage_gaps=[{"date": "2026-10-24"}])
     )
     assert any(issue.gate == "G8" and issue.severity == "warning" for issue in verdict.warnings)
     assert not any(issue.gate == "G8" for issue in verdict.blocking)
@@ -204,8 +204,8 @@ def test_g9_path_whitelist():
     assert any(issue.code == "PATH_NOT_ALLOWED" for issue in verdict.blocking)
 
 
-def test_weekly_and_yearly_contracts():
-    for kind in ("weekly", "yearly"):
+def test_monthly_and_yearly_contracts():
+    for kind in ("monthly", "yearly"):
         verdict = evaluate_gates(
             _ctx(kind=kind, sections=_sections(kind, sentinel_all=True), target_paths=())
         )
@@ -301,7 +301,7 @@ def test_materializer_is_idempotent_and_binds_evidence():
 def test_review_profile_matches_constants():
     profile = load_review_profile()
     validate_review_profile(profile)
-    assert set(profile.sections) == {"daily", "weekly", "yearly"}
+    assert set(profile.sections) == {"daily", "monthly", "yearly"}
 
 
 def test_review_profile_fails_fast_on_drift(tmp_path):

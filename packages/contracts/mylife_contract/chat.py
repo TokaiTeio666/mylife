@@ -140,7 +140,7 @@ class RunStepView(ApiModel):
 
 class RunDetail(ApiModel):
     run_id: UUID
-    kind: Literal["chat", "daily", "weekly", "yearly"]
+    kind: Literal["chat", "daily", "monthly", "yearly"]
     state: str
     period_key: str | None
     conversation_id: UUID | None

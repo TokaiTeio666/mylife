@@ -154,9 +154,13 @@ def compose_daily(
         elif key == "journal_events":
             section = _journal_events(draft, collector, ordinal, key, title, journal_docs)
         elif key == "mistakes":
-            section = _item_section(draft, ordinal, key, title, entries, "error")
+            section = _item_section(
+                draft, collector, ordinal, key, title, entries, "error"
+            )
         elif key == "methods":
-            section = _item_section(draft, ordinal, key, title, entries, "method")
+            section = _item_section(
+                draft, collector, ordinal, key, title, entries, "method"
+            )
         elif key == "tomorrow_actions":
             section = _action_section(draft, ordinal, key, title, entries, "action")
         else:  # one_line_summary
@@ -361,6 +365,7 @@ def _journal_events(
 
 def _item_section(
     draft: ComposedDraft,
+    collector: EvidenceCollector,
     ordinal: int,
     key: str,
     title: str,
@@ -372,6 +377,7 @@ def _item_section(
         return _sentinel_section(ordinal, key, title)
     lines: list[str] = []
     structured_items: list[dict[str, Any]] = []
+    evidence_ids: list[str] = []
     for index, entry in enumerate(rows, start=1):
         fields = entry.get("fields") or {}
         structured_items.append(fields)
@@ -387,12 +393,29 @@ def _item_section(
             if isinstance(value, list):
                 value = "、".join(str(item) for item in value)
             lines.append(f"   - {field_name}：{value}")
+        if entry.get("evidence_id") and entry["evidence_id"] not in evidence_ids:
+            evidence_ids.append(entry["evidence_id"])
+
+    claim_ids: list[str] = []
+    if evidence_ids:
+        claim_id = _claim(
+            draft,
+            section_key=key,
+            text=f"本日{title}共 {len(rows)} 条",
+            evidence_ids=evidence_ids,
+            claim_type="entry",
+        )
+        for evidence_id in evidence_ids:
+            _cite(draft, collector, claim_id=claim_id, evidence_id=evidence_id)
+        claim_ids.append(claim_id)
+
     return ComposedSection(
         section_key=key,
         ordinal=ordinal,
         title=title,
         content_md="\n".join(lines),
         structured={"items": structured_items},
+        claim_ids=claim_ids,
     )
 
 
@@ -444,11 +467,11 @@ def _one_line_summary(draft: ComposedDraft, ordinal: int, key: str, title: str) 
 
 
 # ---------------------------------------------------------------------------
-# weekly / yearly
+# monthly / yearly
 # ---------------------------------------------------------------------------
 
 
-def compose_weekly(
+def compose_monthly(
     *,
     period_key: str,
     collector: EvidenceCollector,
@@ -459,7 +482,7 @@ def compose_weekly(
     coverage_gaps: list[dict[str, Any]],
 ) -> ComposedDraft:
     draft = ComposedDraft(sections=[], coverage_gaps=coverage_gaps)
-    for ordinal, key, title, _cap in _section_meta("weekly"):
+    for ordinal, key, title, _cap in _section_meta("monthly"):
         if key == "completion_rate":
             structured = {
                 "completed": ledger["completed"],

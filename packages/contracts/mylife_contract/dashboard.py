@@ -17,7 +17,7 @@ TaskStatus = Literal["open", "done", "carried", "dropped"]
 
 class DashboardLatest(ApiModel):
     daily: ReviewSummary | None = None
-    weekly: ReviewSummary | None = None
+    monthly: ReviewSummary | None = None
     yearly: ReviewSummary | None = None
     generated_at: UtcDateTime
     completion_rate: float = 0.0
@@ -60,8 +60,8 @@ class DayCell(ApiModel):
 
 class MonthCell(ApiModel):
     month: int
-    has_weekly: bool = False
-    weekly_period_key: str | None = None
+    has_monthly: bool = False
+    monthly_period_key: str | None = None
     completion_rate: float | None = None
 
 
@@ -79,7 +79,7 @@ class DashboardTaskStats(ApiModel):
 
 class DashboardReviewStats(ApiModel):
     daily: int = 0
-    weekly: int = 0
+    monthly: int = 0
     yearly: int = 0
 
 

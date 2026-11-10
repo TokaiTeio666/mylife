@@ -44,11 +44,11 @@ export default function SettingsPage() {
   const [form, setForm] = React.useState({
     timezone: "Asia/Shanghai",
     daily_at: "01:00",
-    weekly_at: "01:30",
+    monthly_at: "01:30",
     yearly_at: "02:00",
     catchup_days: 7,
     enabled_daily: true,
-    enabled_weekly: true,
+    enabled_monthly: true,
     enabled_yearly: true,
   });
   const [gitForm, setGitForm] = React.useState({
@@ -68,11 +68,11 @@ export default function SettingsPage() {
     setForm({
       timezone: schedule.data.timezone,
       daily_at: schedule.data.daily_at.slice(0, 5),
-      weekly_at: schedule.data.weekly_at.slice(0, 5),
+      monthly_at: schedule.data.monthly_at.slice(0, 5),
       yearly_at: schedule.data.yearly_at.slice(0, 5),
       catchup_days: schedule.data.catchup_days,
       enabled_daily: schedule.data.enabled.daily,
-      enabled_weekly: schedule.data.enabled.weekly,
+      enabled_monthly: schedule.data.enabled.monthly,
       enabled_yearly: schedule.data.enabled.yearly,
     });
   }, [schedule.data]);
@@ -82,12 +82,12 @@ export default function SettingsPage() {
       api.putSchedule({
         timezone: form.timezone,
         daily_at: form.daily_at,
-        weekly_at: form.weekly_at,
+        monthly_at: form.monthly_at,
         yearly_at: form.yearly_at,
         catchup_days: form.catchup_days,
         enabled: {
           daily: form.enabled_daily,
-          weekly: form.enabled_weekly,
+          monthly: form.enabled_monthly,
           yearly: form.enabled_yearly,
         },
       }),
@@ -187,10 +187,10 @@ export default function SettingsPage() {
             [
               ["daily_at", "enabled_daily", copy.settings.dailyAt, copy.settings.enabledDaily],
               [
-                "weekly_at",
-                "enabled_weekly",
-                copy.settings.weeklyAt,
-                copy.settings.enabledWeekly,
+                "monthly_at",
+                "enabled_monthly",
+                copy.settings.monthlyAt,
+                copy.settings.enabledMonthly,
               ],
               [
                 "yearly_at",

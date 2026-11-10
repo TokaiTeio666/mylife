@@ -161,15 +161,15 @@ def test_daily_sections_and_sentinels():
 def test_review_section_schemas_cover_all_sections():
     from mylife_contract.constants import (
         DAILY_SECTIONS,
+        MONTHLY_SECTIONS,
         SENTINELS,
-        WEEKLY_SECTIONS,
         YEARLY_SECTIONS,
     )
     from mylife_contract.review import ITEM_SCHEMAS, SECTION_SCHEMAS
 
     expected = {
         "daily": [row[1] for row in DAILY_SECTIONS],
-        "weekly": [row[1] for row in WEEKLY_SECTIONS],
+        "monthly": [row[1] for row in MONTHLY_SECTIONS],
         "yearly": [row[1] for row in YEARLY_SECTIONS],
     }
     for kind, keys in expected.items():
@@ -190,9 +190,9 @@ def test_budget_defaults_match_decision_5b():
         "max_input_tokens": 100_000,
         "max_output_tokens": 20_000,
     }
-    assert DEFAULT_BUDGET_BY_KIND["weekly"]["max_input_tokens"] == 300_000
+    assert DEFAULT_BUDGET_BY_KIND["monthly"]["max_input_tokens"] == 300_000
     assert DEFAULT_BUDGET_BY_KIND["yearly"]["max_output_tokens"] == 200_000
-    assert REVISION_LIMIT == {"daily": 2, "weekly": 2, "yearly": 3}
+    assert REVISION_LIMIT == {"daily": 2, "monthly": 2, "yearly": 3}
 
     budget = Budget(max_input_tokens=10, max_output_tokens=5)
     assert budget.warn_ratio == 0.8 and budget.hard_stop_ratio == 1.0

@@ -150,7 +150,7 @@ export default function DashboardPage() {
             {latest.data ? (
               <ul className="flex flex-col gap-2">
                 <LatestRow label={copy.reviews.kindDaily} review={latest.data.daily} />
-                <LatestRow label={copy.reviews.kindWeekly} review={latest.data.weekly} />
+                <LatestRow label={copy.reviews.kindMonthly} review={latest.data.monthly} />
                 <LatestRow label={copy.reviews.kindYearly} review={latest.data.yearly} />
               </ul>
             ) : (
@@ -200,11 +200,11 @@ export default function DashboardPage() {
                 <div
                   key={month.month}
                   className={`flex h-12 items-center justify-center rounded-md border text-caption ${
-                    month.has_weekly
+                    month.has_monthly
                       ? "border-accent/40 bg-accent/10 text-accent"
                       : "border-border text-muted-foreground"
                   }`}
-                  title={month.weekly_period_key ?? ""}
+                  title={month.monthly_period_key ?? ""}
                 >
                   {month.month}{copy.dashboard.monthSuffix}
                 </div>

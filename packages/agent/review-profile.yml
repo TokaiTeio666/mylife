@@ -49,36 +49,36 @@ sections:
       required_fields: [summary]
       sentinel: 一句话总结：本日无可总结内容
       max_evidence: 1
-  weekly:
+  monthly:
     - section_key: completion_rate
       ordinal: 1
       title: 任务完成率
       required_fields: [completed, total, rate, ledger_recalc]
-      sentinel: 本周完成率：无记录
+      sentinel: 本月完成率：无记录
       max_evidence: 12
     - section_key: recurring_mistakes
       ordinal: 2
       title: 重复错误
       required_fields: [canonical_key, top_n, occurrences, first_seen, last_seen]
-      sentinel: 重复错误：本周无记录
+      sentinel: 重复错误：本月无记录
       max_evidence: 12
     - section_key: method_landing
       ordinal: 3
       title: 方法论落地
       required_fields: [method, action_count, verification_status]
-      sentinel: 方法论落地：本周无记录
+      sentinel: 方法论落地：本月无记录
       max_evidence: 12
-    - section_key: next_week_actions
+    - section_key: next_month_actions
       ordinal: 4
-      title: 下周行动
+      title: 下月行动
       required_fields: [text, trigger, verification]
-      sentinel: 下周行动：无（未找到可执行依据）
+      sentinel: 下月行动：无（未找到可执行依据）
       max_evidence: 12
   yearly:
     - section_key: learning_map
       ordinal: 1
       title: 年度学习地图
-      required_fields: [topics, concepts, outputs, related_weeks]
+      required_fields: [topics, concepts, outputs, related_months]
       sentinel: 年度学习地图：本年无记录
       max_evidence: 20
     - section_key: event_timeline
@@ -110,7 +110,7 @@ record_types: [error, method, action]
 
 write_modes:
   每日复盘: update_allowed
-  每周复盘: update_allowed
+  每月复盘: update_allowed
   年度复盘: update_allowed
   专题: append_only
 
@@ -122,10 +122,10 @@ sentinels:
   methods: 正确方法论：本日无新增方法论记录
   tomorrow_actions: 明日行动：无（未找到可执行依据）
   one_line_summary: 一句话总结：本日无可总结内容
-  completion_rate: 本周完成率：无记录
-  recurring_mistakes: 重复错误：本周无记录
-  method_landing: 方法论落地：本周无记录
-  next_week_actions: 下周行动：无（未找到可执行依据）
+  completion_rate: 本月完成率：无记录
+  recurring_mistakes: 重复错误：本月无记录
+  method_landing: 方法论落地：本月无记录
+  next_month_actions: 下月行动：无（未找到可执行依据）
   learning_map: 年度学习地图：本年无记录
   event_timeline: 事件线：本年无记录
   top_mistakes: 错误 Top10：本年无记录

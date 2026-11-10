@@ -205,7 +205,7 @@ async def insert_default_schedules(session: AsyncSession, workspace_id: UUID) ->
     now = datetime.now(UTC)
     defaults = (
         ("daily", time(1, 0)),
-        ("weekly", time(1, 30)),
+        ("monthly", time(1, 30)),
         ("yearly", time(2, 0)),
     )
     for kind, local_time in defaults:
@@ -276,7 +276,7 @@ async def rename_workspace(session: AsyncSession, workspace_id: UUID, name: str)
 async def get_settings(session: AsyncSession, workspace_id: UUID) -> dict[str, Any] | None:
     result = await session.execute(
         text(
-            "SELECT workspace_id, timezone, daily_at, weekly_at, yearly_at, reviews_root, "
+            "SELECT workspace_id, timezone, daily_at, monthly_at, yearly_at, reviews_root, "
             "       retrieval_top_k, context_window_tokens, web_search_enabled, "
             "       auto_merge_daily, delivery_policy_json, embedding_profile_id "
             "FROM workspace_settings WHERE workspace_id = :ws"

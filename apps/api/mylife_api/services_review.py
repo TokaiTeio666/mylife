@@ -40,8 +40,8 @@ _tasks: set[asyncio.Task[Any]] = set()
 def _title(kind: str, period_key: str) -> str:
     if kind == "daily":
         return f"{period_key} 每日复盘"
-    if kind == "weekly":
-        return f"{period_key} 每周复盘"
+    if kind == "monthly":
+        return f"{period_key} 每月复盘"
     return f"{period_key} 年度复盘"
 
 
@@ -78,11 +78,12 @@ def _validate_period(payload: ReviewCreateRequest, *, timezone: str, now: dateti
         return target
     if payload.kind == "yearly":
         return date(int(payload.period_key), 1, 1)
-    year, week = payload.period_key.split("-W")
-    try:
-        return date.fromisocalendar(int(year), int(week), 1)
-    except ValueError as exc:
-        raise AppError(ErrorCode.REVIEW_PERIOD_INVALID) from exc
+    year, month = (int(part) for part in payload.period_key.split("-"))
+    target = date(year, month, 1)
+    local_today = now.astimezone(_zone(timezone)).date()
+    if target >= local_today.replace(day=1):
+        raise AppError(ErrorCode.REVIEW_PERIOD_INVALID, details={"reason": "FUTURE_PERIOD"})
+    return target
 
 
 def _zone(name: str):
@@ -117,7 +118,8 @@ async def _has_source_data(
                 "SELECT count(*) FROM reviews WHERE workspace_id = :ws "
                 "AND kind = :kind AND status IN ('delivered','approved')"
             ),
-            {"ws": workspace_id, "kind": "daily" if kind == "weekly" else "weekly"},
+            {"ws": workspace_id, "kind": "daily" if kind == "monthly" else "monthly"},
+
         )
     return int(result.scalar_one()) > 0
 

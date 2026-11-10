@@ -32,7 +32,7 @@ MAX_EVIDENCE_SECTION = 12
 #: 允许的 section 证据上限覆盖（§5.1 子表）。
 SECTION_CAPS: dict[str, dict[str, int]] = {
     "daily": {key: cap for _, key, _, cap in SECTION_ORDINALS["daily"]},
-    "weekly": {key: cap for _, key, _, cap in SECTION_ORDINALS["weekly"]},
+    "monthly": {key: cap for _, key, _, cap in SECTION_ORDINALS["monthly"]},
     "yearly": {key: cap for _, key, _, cap in SECTION_ORDINALS["yearly"]},
 }
 
@@ -375,7 +375,7 @@ def gate_g5(ctx: GateContext) -> list[GateIssue]:
 
 def gate_g6(ctx: GateContext) -> list[GateIssue]:
     issues: list[GateIssue] = []
-    targets = {"tomorrow_actions", "next_week_actions"}
+    targets = {"tomorrow_actions", "next_month_actions"}
     for section in ctx.sections:
         if section.get("section_key") not in targets:
             continue
@@ -453,7 +453,7 @@ def gate_g8(ctx: GateContext) -> list[GateIssue]:
     ]
 
 
-ALLOWED_PATH_PREFIXES = ("每日复盘/", "每周复盘/", "年度复盘/", "专题/")
+ALLOWED_PATH_PREFIXES = ("每日复盘/", "每月复盘/", "年度复盘/", "专题/")
 ALLOWED_EXACT = {"索引.md"}
 
 

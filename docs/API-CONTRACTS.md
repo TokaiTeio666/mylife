@@ -40,7 +40,7 @@
 | 整数 | token 数、计数、耗时均为 64 位整数；耗时单位毫秒（字段名后缀 `_ms`） |
 | 时间戳 | RFC3339 UTC，秒级或毫秒级均可，服务端统一输出 `2026-11-06T01:30:00Z` |
 | 业务日期 | `YYYY-MM-DD`（`date` 类型），不带时区 |
-| 周期键 `period_key` | daily `YYYY-MM-DD`；weekly ISO `YYYY-Www`（如 `2026-W43`）；yearly `YYYY` |
+| 周期键 `period_key` | daily `YYYY-MM-DD`；monthly `YYYY-MM`（如 `2026-10`）；yearly `YYYY` |
 | 时区 | IANA 名称（如 `Asia/Shanghai`），不接受 `UTC+8` 形式 |
 | ID | UUIDv7 小写字符串（36 字符，带连字符）；`event_id` 为 int64；`client_turn_id` 由客户端生成 UUIDv4/v7 |
 | 枚举 | 服务端严格校验，未知值返回 `VALIDATION_ERROR`；客户端必须容忍新增枚举（见 §10） |
@@ -303,7 +303,7 @@
 | `REVIEW_PERIOD_TOO_OLD` | 422 | 否 | — | 超出 `catchup_days` 或历史窗口 | 说明范围 |
 | `REVIEW_NO_SOURCE_DATA` | 422 | 否 | — | 周期内无任何素材（允许生成空日复盘，但需 `allow_empty=true`） | 确认后重试 |
 | `REVIEW_GATE_FAILED` | 422 | 否 | — | 确定性门禁 blocking 且不可修订 | 查看 verdict |
-| `REVIEW_REVISION_LIMIT` | 422 | 否 | — | 修订轮次耗尽（daily/weekly 2、yearly 3） | 转人工 |
+| `REVIEW_REVISION_LIMIT` | 422 | 否 | — | 修订轮次耗尽（daily/monthly 2、yearly 3） | 转人工 |
 | `REVIEW_HUMAN_REQUIRED` | 409 | 否 | — | 需人工审批（yearly 默认） | 展示审批页 |
 | `REVIEW_ALREADY_DECIDED` | 409 | 否 | — | 人工门已审批 | 刷新状态 |
 | `REVIEW_TOPIC_NEEDS_CONFIRM` | 409 | 否 | — | 专题首见条目待人工确认（决策 4B） | 打开确认列表 |
@@ -471,7 +471,7 @@
 | 响应 201 | `Workspace` |
 | 幂等 | `Idempotency-Key` 推荐 |
 | 错误码 | `VALIDATION_ERROR`、`CONFLICT`（slug 冲突，服务端自动重试加后缀）、`QUOTA_EXCEEDED`（每用户 Workspace 上限 5） |
-| 行为 | 创建 `workspaces` + `workspace_members(owner)` + 默认 `workspace_settings` + 默认 `workspace_schedules`（daily 01:00、weekly 周一 01:30、yearly 1/1 02:00，时区默认 `Asia/Shanghai`，FR-E13） |
+| 行为 | 创建 `workspaces` + `workspace_members(owner)` + 默认 `workspace_settings` + 默认 `workspace_schedules`（daily 01:00、monthly 每月 1 日 01:30、yearly 1/1 02:00，时区默认 `Asia/Shanghai`，FR-E13） |
 
 #### 3.2.3 `POST /workspaces/{id}/switch`
 
@@ -873,7 +873,7 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 
 | 字段 | 类型 | 必填 | 默认 | 约束 |
 |---|---|---|---|---|
-| `kind` | enum `daily`/`weekly`/`yearly` | 是 | — | — |
+| `kind` | enum `daily`/`monthly`/`yearly` | 是 | — | — |
 | `period_key` | string | 是 | — | 与 `kind` 严格匹配格式；不得为未来周期（按 workspace 时区） |
 | `timezone` | string | 否 | workspace 设置 | IANA；影响 period 边界计算 |
 | `trigger` | enum `manual`/`schedule`/`api` | 否 | `manual` | `schedule` 仅 dispatcher 可传 |
@@ -959,7 +959,7 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 | 字段 | 类型 | 可空 | 说明 |
 |---|---|---|---|
 | `run_id` | UUID | 否 | — |
-| `kind` | enum `chat`/`daily`/`weekly`/`yearly` | 否 | — |
+| `kind` | enum `chat`/`daily`/`monthly`/`yearly` | 否 | — |
 | `state` | enum | 否 | 见 §7.1 状态机；`chat` 用架构 §4.6 子集 |
 | `period_key` | string | 是 | chat 为 null |
 | `conversation_id` | UUID | 是 | chat 必填 |
@@ -1068,7 +1068,7 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 |---|---|
 | 权限 | 成员 |
 | 查询 | `timezone?`（默认 workspace 设置） |
-| 响应 200 | `{ "daily": ReviewSummary/null, "weekly": ReviewSummary/null, "yearly": ReviewSummary/null, "generated_at": timestamp, "completion_rate": float, "open_tasks": int }` |
+| 响应 200 | `{ "daily": ReviewSummary/null, "monthly": ReviewSummary/null, "yearly": ReviewSummary/null, "generated_at": timestamp, "completion_rate": float, "open_tasks": int }` |
 | 说明 | 各 kind 取 `period_key` 最大且 `status` 为 `delivered` 或 `approved` 的版本；`completion_rate` 与 `open_tasks` 与 `/dashboard/stats` 同源、同 60s 缓存，保证 FR-F1 一次取齐 |
 
 #### 3.8.2 `GET /dashboard/tasks`
@@ -1091,7 +1091,7 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 | 响应 200 | `{ "year": int, "months": MonthCell[], "days": DayCell[] }` |
 | 说明 | 月度视图返回 `days`；年度视图返回 `months` 且 `days` 为空数组 |
 
-`DayCell`：`{ "date", "has_daily": bool, "daily_status": enum/null, "degraded": bool, "open_tasks": int }`。`MonthCell`：`{ "month", "has_weekly": bool, "weekly_period_key": string/null, "completion_rate": float/null }`。
+`DayCell`：`{ "date", "has_daily": bool, "daily_status": enum/null, "degraded": bool, "open_tasks": int }`。`MonthCell`：`{ "month", "has_monthly": bool, "monthly_period_key": string/null, "completion_rate": float/null }`。
 
 #### 3.8.4 `GET /dashboard/stats`
 
@@ -1099,9 +1099,9 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 |---|---|
 | 权限 | 成员 |
 | 查询 | `range?` ∈ `7d`/`30d`/`90d`/`year`（默认 `30d`） |
-| 响应 200 | `{ "range", "completion_rate": float, "tasks": {"completed", "total", "carried_over"}, "reviews": {"daily", "weekly", "yearly"}, "no_evidence_ratio": float, "degraded_rate": float, "tokens": {"prompt", "completion"} }` |
+| 响应 200 | `{ "range", "completion_rate": float, "tasks": {"completed", "total", "carried_over"}, "reviews": {"daily", "monthly", "yearly"}, "no_evidence_ratio": float, "degraded_rate": float, "tokens": {"prompt", "completion"} }` |
 
-统计口径：`completion_rate = completed / total`，`total` 为区间内出现过的任务数；与周报 `ledger_recalc` 同源（FR-E7）。`no_evidence_ratio` 与 `degraded_rate` 来自 `usage_events`，用于质量看板（架构 §16.9）。
+统计口径：`completion_rate = completed / total`，`total` 为区间内出现过的任务数；与月报 `ledger_recalc` 同源（FR-E7）。`no_evidence_ratio` 与 `degraded_rate` 来自 `usage_events`，用于质量看板（架构 §16.9）。
 
 ### 3.9 settings
 
@@ -1169,9 +1169,9 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 | 项 | 值 |
 |---|---|
 | 权限 | 成员读 / `owner` 写 |
-| 请求（PUT） | `{ "timezone": string, "daily_at": "HH:MM", "weekly_at": "HH:MM", "yearly_at": "HH:MM", "catchup_days": int, "enabled": {"daily","weekly","yearly"} }` |
-| 响应 200 | `{ "timezone", "daily_at", "weekly_at", "yearly_at", "catchup_days", "enabled", "next_run_at": {"daily","weekly","yearly"} }` |
-| 默认 | `Asia/Shanghai`；daily `01:00`、weekly 周一 `01:30`、yearly 1/1 `02:00`；`catchup_days=7`（0–30） |
+| 请求（PUT） | `{ "timezone": string, "daily_at": "HH:MM", "monthly_at": "HH:MM", "yearly_at": "HH:MM", "catchup_days": int, "enabled": {"daily","monthly","yearly"} }` |
+| 响应 200 | `{ "timezone", "daily_at", "monthly_at", "yearly_at", "catchup_days", "enabled", "next_run_at": {"daily","monthly","yearly"} }` |
+| 默认 | `Asia/Shanghai`；daily `01:00`、monthly 每月 1 日 `01:30`、yearly 1/1 `02:00`；`catchup_days=7`（0–30） |
 | 语义 | 写 `workspace_settings` + `workspace_schedules`；重算 `next_run_at`（DST 不存在时刻顺延、重复时刻取较早 offset） |
 | 错误码 | `VALIDATION_ERROR`（时间格式/时区非法）、`FORBIDDEN` |
 | 审计 | `settings.schedule.updated` |
@@ -1369,7 +1369,7 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 | `plan_version` | int | 是 | 从 1 递增；修复重试时递增 |
 | `period_start` | date | 是 | 按 `timezone` 计算，daily 为当日 |
 | `period_end` | date | 是 | `>= period_start`；daily 与 start 相等 |
-| `sections` | SectionPlan[] | 是 | daily 7 / weekly 4 / yearly 5；`ordinal` 连续 |
+| `sections` | SectionPlan[] | 是 | daily 7 / monthly 4 / yearly 5；`ordinal` 连续 |
 | `tasks` | RetrievalTask[] | 是 | ≥1；`task_id` 唯一 |
 | `correlations` | CorrelationTarget[] | 是 | 可为空数组；每项 `max_items` ≤20 |
 | `budget` | Budget | 是 | 见 §4.4 |
@@ -1436,12 +1436,12 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `section_key` | string | 是 | daily ∈ `SectionId`；weekly ∈ `WeeklySectionId`；yearly ∈ `YearlySectionId`（架构 §5.1） |
-| `ordinal` | int | 是 | 从 1 连续，按 kind 固定基数：daily 1–7、weekly 1–4、yearly 1–5 |
+| `section_key` | string | 是 | daily ∈ `SectionId`；monthly ∈ `MonthlySectionId`；yearly ∈ `YearlySectionId`（架构 §5.1） |
+| `ordinal` | int | 是 | 从 1 连续，按 kind 固定基数：daily 1–7、monthly 1–4、yearly 1–5 |
 | `title` | string | 是 | 中文名，与架构 §5.1 表一致 |
 | `required_fields` | string[] | 是 | 与架构 §5.1 必填字段逐项相等 |
 | `evidence_task_ids` | string[] | 是 | 指向 `RetrievalTask.task_id`，≥1（required 章节） |
-| `max_evidence` | int | 是 | 单章上限：daily 12（`one_line_summary` 为 1）、weekly 12、yearly 20（`next_year_direction` 为 10） |
+| `max_evidence` | int | 是 | 单章上限：daily 12（`one_line_summary` 为 1）、monthly 12、yearly 20（`next_year_direction` 为 10） |
 | `required` | bool | 是 | 所有章节均为 true；缺失即 G1 blocking |
 
 ### 4.2 RetrievalTask
@@ -1471,8 +1471,8 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
-| `max_input_tokens` | int | 是 | 按 kind：daily 100000 / weekly 300000 / yearly 1000000 | 决策 5B |
-| `max_output_tokens` | int | 是 | daily 20000 / weekly 60000 / yearly 200000 | — |
+| `max_input_tokens` | int | 是 | 按 kind：daily 100000 / monthly 300000 / yearly 1000000 | 决策 5B |
+| `max_output_tokens` | int | 是 | daily 20000 / monthly 60000 / yearly 200000 | — |
 | `max_cost_usd` | float | 否 | null | 可选货币上限，优先级低于 token 上限 |
 | `warn_ratio` | float | 否 | 0.8 | 80% 告警 |
 | `hard_stop_ratio` | float | 否 | 1.0 | 100% 硬停，终止为 `failed` 或 `needs_human` |
@@ -1546,9 +1546,9 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 | `kind` | enum `git`/`object_store`/`ui_diff` | 是 | `ui_diff` 为 Git 不可用降级 |
 | `path` | string | 是 | 相对 `reviews_root`，如 `每日复盘/2026/2026-10-27.md` |
 | `content_hash` | string | 是 | sha256 渲染结果 |
-| `mode` | enum `create_only`/`update_allowed`/`append_only` | 是 | 日报/周报/年报 `update_allowed`；专题 `append_only`；快照 `create_only`（架构 §16.2） |
+| `mode` | enum `create_only`/`update_allowed`/`append_only` | 是 | 日报/月报/年报 `update_allowed`；专题 `append_only`；快照 `create_only`（架构 §16.2） |
 
-`PullRequestSpec`：`{ "title", "body_md", "base_branch", "head_branch", "draft": bool=false, "auto_merge": bool }`。`auto_merge` 仅 `kind=daily` 且 workspace 显式开启且 Gate 全通过时为 true（决策 3B）；weekly/yearly/topic 恒 false。
+`PullRequestSpec`：`{ "title", "body_md", "base_branch", "head_branch", "draft": bool=false, "auto_merge": bool }`。`auto_merge` 仅 `kind=daily` 且 workspace 显式开启且 Gate 全通过时为 true（决策 3B）；monthly/yearly/topic 恒 false。
 
 `ReviewRowRef`：`{ "review_id": UUID, "version": int, "content_hash": string, "git_path": string }`。
 
@@ -1898,7 +1898,7 @@ data: {"state":"succeeded","message_id":"0194...","usage":{"prompt_tokens":1820,
 | 范围 | 输入上限 | 输出上限 | 行为 |
 |---|---|---|---|
 | daily run | 100k | 20k | 80% 告警（`degraded` 事件 + UI 提示），100% 硬停 |
-| weekly run | 300k | 60k | 同上 |
+| monthly run | 300k | 60k | 同上 |
 | yearly run | 1M | 200k | 同上 |
 | workspace 月 | 5M | 1M | 100% 硬停，所有新 run 返回 `BUDGET_EXCEEDED` |
 | workspace 日 | 由月预算派生（默认月 1/20） | 同 | 100% 硬停 |
@@ -2379,7 +2379,7 @@ data: {"reason":"epoch_mismatch","scope":"stream","message":"事件流已重启�
 | FR-E4 | `POST /reviews`（日记目录匹配） | 按日期匹配日记 |
 | FR-E5 | `GET /reviews/{id}`（`learning_summary`） | 主题/概念/产出/待解决问题 |
 | FR-E6 | `POST /reviews`（daily）+ `ReviewDetail.sections` | 7 章齐全（含一句话总结） |
-| FR-E7 | `POST /reviews`（weekly）+ `completion_rate` | 7 天汇总、完成率与台账一致 |
+| FR-E7 | `POST /reviews`（monthly）+ `completion_rate` | 7 天汇总、完成率与台账一致 |
 | FR-E8 | `POST /reviews`（yearly）+ 5 章 | 分层聚合、错误 Top10 |
 | FR-E9 | `GET /reviews/{id}`（`git_path`）、`DeliveryTarget.path` | `wiki/复盘/...` 中文目录 |
 | FR-E10 | `GET /topics`、`GET /topics/{topic}/items` | 三专题页 |
@@ -2387,9 +2387,9 @@ data: {"reason":"epoch_mismatch","scope":"stream","message":"事件流已重启�
 | FR-E12 | `POST /reviews` | 指定日期/周/年手动触发 |
 | FR-E13 | `GET/PUT /settings/schedule` | 时区与生成时间；默认 01:00/01:30/02:00 |
 | FR-E14 | `POST /reviews`（同 period）、`GET /reviews/{id}/versions` | 覆盖同路径、version+1、历史保留 |
-| FR-F1 | `GET /dashboard/latest` | 最新日报/周报/年报 + 完成率 + 未完成数 |
+| FR-F1 | `GET /dashboard/latest` | 最新日报/月报/年报 + 完成率 + 未完成数 |
 | FR-F2 | `GET /dashboard/tasks` | 未完成 Todo + 首次出现 + 持续天数 |
-| FR-F3 | `GET /dashboard/calendar` | 按日/周/年浏览 |
+| FR-F3 | `GET /dashboard/calendar` | 按日/月/年浏览 |
 | FR-F4 | `GET /search`（`source_type=both`） | 笔记 + 复盘独立索引 |
 | FR-G1 | `GET/PUT /settings/llm`、`POST /settings/llm/test` | 兼容接口、加密存储、测试连接 |
 | FR-G2 | `GET/POST /settings/embedding*` | 模型与维度可配；蓝绿换维 |

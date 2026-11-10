@@ -56,7 +56,7 @@ async def count_active_review_runs(session: AsyncSession, *, workspace_id: UUID)
     result = await session.execute(
         text(
             "SELECT count(*) FROM agent_runs WHERE workspace_id = :ws "
-            "AND kind IN ('daily','weekly','yearly') AND is_active_state(state)"
+            "AND kind IN ('daily','monthly','yearly') AND is_active_state(state)"
         ),
         {"ws": workspace_id},
     )

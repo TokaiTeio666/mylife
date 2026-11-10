@@ -111,8 +111,8 @@ async def test_latest_and_completion_rate_matches_sql(client, admin_conn):
         title="2026-10-27 每日复盘",
     )
     _seed_review(
-        admin_conn, workspace_id=workspace_id, kind="weekly", period_key="2026-W43",
-        title="2026-W43 每周复盘",
+        admin_conn, workspace_id=workspace_id, kind="monthly", period_key="2026-10",
+        title="2026-10 每月复盘",
     )
     _seed_review(
         admin_conn, workspace_id=workspace_id, kind="yearly", period_key="2026",
@@ -124,7 +124,7 @@ async def test_latest_and_completion_rate_matches_sql(client, admin_conn):
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["daily"]["period_key"] == "2026-10-27"
-    assert body["weekly"]["period_key"] == "2026-W43"
+    assert body["monthly"]["period_key"] == "2026-10"
     assert body["yearly"]["period_key"] == "2026"
     assert abs(body["completion_rate"] - 6 / 9) < 0.001
     assert body["open_tasks"] == 3
@@ -178,8 +178,8 @@ async def test_calendar_month_and_year(client, admin_conn):
             title=f"2026-10-{day:02d} 每日复盘",
         )
     _seed_review(
-        admin_conn, workspace_id=workspace_id, kind="weekly", period_key="2026-W43",
-        title="2026-W43 每周复盘",
+        admin_conn, workspace_id=workspace_id, kind="monthly", period_key="2026-10",
+        title="2026-10 每月复盘",
     )
     response = await client.get(f"{API}/dashboard/calendar?year=2026&month=10")
     assert response.status_code == 200, response.text
@@ -194,8 +194,8 @@ async def test_calendar_month_and_year(client, admin_conn):
     assert len(body["months"]) == 12
     assert body["days"] == []
     october = next(item for item in body["months"] if item["month"] == 10)
-    assert october["has_weekly"] is True
-    assert october["weekly_period_key"] == "2026-W43"
+    assert october["has_monthly"] is True
+    assert october["monthly_period_key"] == "2026-10"
 
 
 @pytest.mark.asyncio

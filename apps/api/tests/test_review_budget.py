@@ -25,12 +25,12 @@ from mylife_contract.budget import Budget, BudgetState
 def test_budget_defaults_per_kind():
     assert budget_for_kind("daily").max_input_tokens == 100_000
     assert budget_for_kind("daily").max_output_tokens == 20_000
-    assert budget_for_kind("weekly").max_input_tokens == 300_000
+    assert budget_for_kind("monthly").max_input_tokens == 300_000
     assert budget_for_kind("yearly").max_output_tokens == 200_000
     chat = budget_for_kind("chat")
     assert chat.max_input_tokens == 32_000 and chat.max_output_tokens == 4_000
     with pytest.raises(ValueError):
-        budget_for_kind("monthly")
+        budget_for_kind("unknown")
 
 
 def test_workspace_quota_is_month_over_twenty():

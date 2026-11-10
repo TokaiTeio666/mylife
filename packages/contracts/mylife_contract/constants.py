@@ -44,7 +44,8 @@ INVITE_CODE_MAX_LENGTH: Final = 32
 DEFAULT_LIMITS: Final[dict[str, object]] = {
     "review_concurrency": 2,
     "daily_budget": {"input_tokens": 100_000, "output_tokens": 20_000},
-    "weekly_budget": {"input_tokens": 300_000, "output_tokens": 60_000},
+    # 月复盘单次运行预算；workspace 的月度配额见下一项 monthly_budget。
+    "review_monthly_budget": {"input_tokens": 300_000, "output_tokens": 60_000},
     "yearly_budget": {"input_tokens": 1_000_000, "output_tokens": 200_000},
     "monthly_budget": {"input_tokens": 5_000_000, "output_tokens": 1_000_000},
     "max_zip_bytes": 209_715_200,
@@ -53,12 +54,12 @@ DEFAULT_LIMITS: Final[dict[str, object]] = {
 }
 
 # --- 修订轮数上限（ARCHITECTURE §4.4）---
-REVISION_LIMIT: Final[dict[str, int]] = {"daily": 2, "weekly": 2, "yearly": 3}
+REVISION_LIMIT: Final[dict[str, int]] = {"daily": 2, "monthly": 2, "yearly": 3}
 
 # --- 预算默认值（决策 5B；ARCHITECTURE §9.4 / API-CONTRACTS §4.4）---
 DEFAULT_BUDGET_BY_KIND: Final[dict[str, dict[str, int]]] = {
     "daily": {"max_input_tokens": 100_000, "max_output_tokens": 20_000},
-    "weekly": {"max_input_tokens": 300_000, "max_output_tokens": 60_000},
+    "monthly": {"max_input_tokens": 300_000, "max_output_tokens": 60_000},
     "yearly": {"max_input_tokens": 1_000_000, "max_output_tokens": 200_000},
 }
 
@@ -128,10 +129,10 @@ SENTINELS: Final[dict[str, str]] = {
     "methods": "正确方法论：本日无新增方法论记录",
     "tomorrow_actions": "明日行动：无（未找到可执行依据）",
     "one_line_summary": "一句话总结：本日无可总结内容",
-    "completion_rate": "本周完成率：无记录",
-    "recurring_mistakes": "重复错误：本周无记录",
-    "method_landing": "方法论落地：本周无记录",
-    "next_week_actions": "下周行动：无（未找到可执行依据）",
+    "completion_rate": "本月完成率：无记录",
+    "recurring_mistakes": "重复错误：本月无记录",
+    "method_landing": "方法论落地：本月无记录",
+    "next_month_actions": "下月行动：无（未找到可执行依据）",
     "learning_map": "年度学习地图：本年无记录",
     "event_timeline": "事件线：本年无记录",
     "top_mistakes": "错误 Top10：本年无记录",
@@ -152,11 +153,11 @@ DAILY_SECTIONS: Final[tuple[tuple[int, str, str, int], ...]] = (
     (7, "one_line_summary", "一句话总结", 1),
 )
 
-WEEKLY_SECTIONS: Final[tuple[tuple[int, str, str, int], ...]] = (
+MONTHLY_SECTIONS: Final[tuple[tuple[int, str, str, int], ...]] = (
     (1, "completion_rate", "任务完成率", 12),
     (2, "recurring_mistakes", "重复错误", 12),
     (3, "method_landing", "方法论落地", 12),
-    (4, "next_week_actions", "下周行动", 12),
+    (4, "next_month_actions", "下月行动", 12),
 )
 
 YEARLY_SECTIONS: Final[tuple[tuple[int, str, str, int], ...]] = (
@@ -169,7 +170,7 @@ YEARLY_SECTIONS: Final[tuple[tuple[int, str, str, int], ...]] = (
 
 SECTION_ORDINALS: Final[dict[str, tuple[tuple[int, str, str, int], ...]]] = {
     "daily": DAILY_SECTIONS,
-    "weekly": WEEKLY_SECTIONS,
+    "monthly": MONTHLY_SECTIONS,
     "yearly": YEARLY_SECTIONS,
 }
 

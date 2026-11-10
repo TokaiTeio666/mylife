@@ -81,7 +81,7 @@ Caddy 自动签发 HTTPS。
 
 ```bash
 cd apps/api
-uv run pytest -q              # 全量契约 + 数据库集成（298 passed, 1 skipped）
+uv run pytest -q              # 全量契约 + 数据库集成（306 passed, 1 skipped）
 uv run pytest -q -m fixture   # Golden fixtures（FX-01..FX-12）
 uv run pytest -q -m "not db"  # 仅无数据库单元/契约测试
 cd ../..
@@ -99,6 +99,7 @@ make ac59                     # 容器 kill -9 / Redis 暂停恢复演练（AC-5
 
 - 管理后台（`/admin/*`）：用户查询与禁用/启用（即时吊销会话）、Workspace 统计、邀请码生成与撤销、脱敏审计日志、系统配置与跨租户聚合用量（`mylife_admin` 最小权限函数，零正文暴露）
 - LLM 与 Embedding 设置：API Key 信封加密存储、保存前连接探测、BGE-M3 等模型蓝绿换维（动态建 `document_chunks_v{dim}` + HNSW + FORCE RLS、100% 覆盖率原子切换、一键回滚、7 天快照退役）
+- 复盘 Writer：每日复盘的错误/方法论由配置的 LLM 做语义抽取，证据 ID、追溯字段、canonical_key 与 G0–G9 门禁仍由确定性代码校验；未配置模型或调用失败时回退确定性装配
 - 数据导出与删除收口：全类别 ZIP 导出与 `manifest.json` SHA-256 对账、删除前导出软前置、30 天冷却期全局写冻结与随时撤销、到期 39 张业务表及动态向量表 0 残留清除、账户级跨库注销、Git 历史保留边界显式告知
 - 审计与用量对账：登录/导入/删除/配置/复盘五类审计全覆盖，按 Workspace 时区聚合用量与成员级隔离
 - 备份、恢复与供应链安全：`backup_pg.sh` / `backup_data.sh`（`age`/`openssl` 加密、7d/30d 两档保留）、`restore_drill.py`（RTO ≤4h / RPO ≤24h）、CI `pip-audit` + `npm audit` + CycloneDX SBOM、SEC-01…SEC-30 全集通过
@@ -106,7 +107,7 @@ make ac59                     # 容器 kill -9 / Redis 暂停恢复演练（AC-5
 
 ## 已实现的 Phase 3–4 能力（M4–M5）
 
-- 复盘状态机（daily 7 章 / weekly 4 章 / yearly 5 章）、Todo 复选框台账与顺延统计、确定性门禁 G0–G9、80% 告警 / 100% 硬停预算守卫、`create_review` 预览确认协议、人工编辑重评审与版本回滚
+- 复盘状态机（daily 7 章 / monthly 4 章 / yearly 5 章）、Todo 复选框台账与顺延统计、确定性门禁 G0–G9、80% 告警 / 100% 硬停预算守卫、`create_review` 预览确认协议、人工编辑重评审与版本回滚
 - Git 分支/commit trailer/PR 交付与可选 daily 自动合并、对象存储 ZIP 降级交付、错误清单/正确方法论/行动清单三专题 `mylife:auto` 区间合并（保留人工备注与冲突并列）
 - 单副本 `dispatcher`（时区/DST/补算窗口调度、定时 Git 同步、过期租约回收、outbox 重投、导出过期与僵死任务清理）、仪表盘与复盘日历、笔记+复盘混合检索
 

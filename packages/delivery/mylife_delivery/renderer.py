@@ -85,8 +85,8 @@ def review_path(reviews_root: str, kind: str, period_key: str) -> str:
     root = (reviews_root or "wiki/复盘").rstrip("/")
     if kind == "daily":
         return f"{root}/每日复盘/{period_key[:4]}/{period_key}.md"
-    if kind == "weekly":
-        return f"{root}/每周复盘/{period_key[:4]}/{period_key}.md"
+    if kind == "monthly":
+        return f"{root}/每月复盘/{period_key[:4]}/{period_key}.md"
     return f"{root}/年度复盘/{period_key}.md"
 
 

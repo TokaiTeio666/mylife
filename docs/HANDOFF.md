@@ -16,7 +16,7 @@
 | Phase 4 / M4.5–M5（Git 交付、专题页、调度、仪表盘） | 见 `git log`（C1–C12 + 修复） | `PHASE4-STATUS.md`、`PHASE4-SPEC.md` |
 | Phase 5 / M6（管理后台、导出/删除收口、蓝绿换维、备份恢复、PWA/i18n/法务、SEC 全集签收） | 见 `git log`（Phase 5 C1–C13） | `PHASE5-STATUS.md`、`PHASE5-SPEC.md` |
 
-测试基线：`cd apps/api && uv run pytest -q` → **298 passed, 1 skipped**（Golden fixtures `uv run pytest -q -m fixture` → **11 passed**）。
+测试基线：`cd apps/api && uv run pytest -q` → **306 passed, 1 skipped**（Golden fixtures `uv run pytest -q -m fixture` → **11 passed**）。
 前端与静态门禁：`cd apps/web && npx tsc --noEmit && npm run lint && npm run build`；根目录 `uv run python scripts/check_boundaries.py && uv run python scripts/check_i18n.py`。
 
 ---
@@ -26,7 +26,7 @@
 ```text
 继续 mylife 项目。先读 docs/HANDOFF.md，再读 docs/PHASE5-STATUS.md
 与 docs/IMPLEMENTATION-NOTES.md §2E。MVP Phase 0–5 已全部交付签收
-（298 passed, 1 skipped；SEC-01..30 全集 PASS）。接下来可按需求推进
+（306 passed, 1 skipped；SEC-01..30 全集 PASS）。接下来可按需求推进
 生产环境部署（接入真实 DeepSeek/BGE-M3/GitHub App/可达 MinIO 镜像）或二期增强。
 ```
 

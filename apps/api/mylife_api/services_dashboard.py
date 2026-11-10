@@ -63,7 +63,7 @@ async def get_latest(
         return cached[1]
     tz = timezone or await _timezone(session, workspace_id)
     latest_reviews: dict[str, Any] = {}
-    for kind in ("daily", "weekly", "yearly"):
+    for kind in ("daily", "monthly", "yearly"):
         result = await session.execute(
             text(
                 "SELECT id, kind, period_key, title, version, status, git_path, "
@@ -93,7 +93,7 @@ async def get_latest(
     open_tasks = int(task_row.open_tasks)
     value = {
         "daily": latest_reviews["daily"],
-        "weekly": latest_reviews["weekly"],
+        "monthly": latest_reviews["monthly"],
         "yearly": latest_reviews["yearly"],
         "generated_at": datetime.now(UTC),
         "completion_rate": round(completed / total, 4) if total else 0.0,
@@ -222,51 +222,44 @@ async def calendar_view(
             )
         return {"year": year, "months": [], "days": days}
 
-    # 周报可能还没有 completion_rate 章节（仅 reviews 行），此时只标 has_weekly。
+    # 月报可能还没有 completion_rate 章节（仅 reviews 行），此时只标 has_monthly。
     result = await session.execute(
         text(
             "SELECT r.period_key, rs.structured_json FROM reviews r "
             "LEFT JOIN review_sections rs ON rs.workspace_id = r.workspace_id "
             "  AND rs.review_id = r.id AND rs.version = r.version "
             "  AND rs.section_key = 'completion_rate' "
-            "WHERE r.workspace_id = :ws AND r.kind = 'weekly' "
+            "WHERE r.workspace_id = :ws AND r.kind = 'monthly' "
             "  AND r.status IN ('delivered','approved') "
             "  AND r.period_key LIKE :prefix "
             "ORDER BY r.period_key DESC"
         ),
-        {"ws": workspace_id, "prefix": f"{year}-W%"},
+        {"ws": workspace_id, "prefix": f"{year}-%"},
     )
-    weekly: dict[int, dict[str, Any]] = {}
+    monthly: dict[int, dict[str, Any]] = {}
     for row in result:
         try:
-            iso_week = int(str(row.period_key).split("-W")[1])
+            month = int(str(row.period_key).split("-")[1])
         except (ValueError, IndexError):
             continue
         structured = row.structured_json or {}
         rate = structured.get("rate") if isinstance(structured, dict) else None
-        weekly.setdefault(
-            iso_week,
+        monthly.setdefault(
+            month,
             {
-                "has_weekly": True,
-                "weekly_period_key": row.period_key,
+                "has_monthly": True,
+                "monthly_period_key": row.period_key,
                 "completion_rate": float(rate) if rate is not None else None,
             },
         )
     months = []
     for month in range(1, 13):
-        hit = next(
-            (
-                value
-                for week, value in weekly.items()
-                if date.fromisocalendar(year, week, 1).month == month
-            ),
-            None,
-        )
+        hit = monthly.get(month)
         months.append(
             {
                 "month": month,
-                "has_weekly": bool(hit),
-                "weekly_period_key": (hit or {}).get("weekly_period_key"),
+                "has_monthly": bool(hit),
+                "monthly_period_key": (hit or {}).get("monthly_period_key"),
                 "completion_rate": (hit or {}).get("completion_rate"),
             }
         )
@@ -351,7 +344,7 @@ async def stats(
         },
         "reviews": {
             "daily": counts.get("daily", 0),
-            "weekly": counts.get("weekly", 0),
+            "monthly": counts.get("monthly", 0),
             "yearly": counts.get("yearly", 0),
         },
         "no_evidence_ratio": no_evidence_ratio,

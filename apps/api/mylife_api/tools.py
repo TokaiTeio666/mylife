@@ -278,9 +278,9 @@ def _review_title(kind: str, period_key: str) -> tuple[str, str]:
     if kind == "daily":
         year = period_key[:4]
         return f"{period_key} 每日复盘", f"wiki/复盘/每日复盘/{year}/{period_key}.md"
-    if kind == "weekly":
+    if kind == "monthly":
         year = period_key[:4]
-        return f"{period_key} 每周复盘", f"wiki/复盘/每周复盘/{year}/{period_key}.md"
+        return f"{period_key} 每月复盘", f"wiki/复盘/每月复盘/{year}/{period_key}.md"
     return f"{period_key} 年度复盘", f"wiki/复盘/年度复盘/{period_key}.md"
 
 

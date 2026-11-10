@@ -21,7 +21,7 @@ from tests import helpers
 
 def test_checkbox_variants():
     lines = [
-        "- [x] 写周报",
+        "- [x] 写月报",
         "- [X] 大写勾选",
         "* [ ] 读论文",
         "+ [ ] 星号列表",
@@ -34,7 +34,7 @@ def test_checkbox_variants():
     ]
     items = extract_occurrences(lines, body_start_line=1)
     assert [(item.line_number, item.checked, item.text) for item in items] == [
-        (1, True, "写周报"),
+        (1, True, "写月报"),
         (2, True, "大写勾选"),
         (3, False, "读论文"),
         (4, False, "星号列表"),
@@ -57,7 +57,7 @@ def test_fenced_code_is_ignored():
 
 
 def test_natural_language_produces_no_task():
-    lines = ["今天完成了写周报", "我打算读论文", "完成了 3 件事"]
+    lines = ["今天完成了写月报", "我打算读论文", "完成了 3 件事"]
     assert extract_occurrences(lines, body_start_line=1) == []
 
 
@@ -71,11 +71,11 @@ def test_body_start_line_offset():
 
 def test_normalize_task_text_and_key():
     # 连续空白（含 U+3000）折叠为一个半角空格，而不是删除
-    assert normalize_task_text("  写　周报  ") == "写 周报"
-    assert normalize_task_text("写　周报") == normalize_task_text("写 周报")
-    assert normalize_task_text("写周报。") == normalize_task_text("写周报.")
+    assert normalize_task_text("  写　月报  ") == "写 月报"
+    assert normalize_task_text("写　月报") == normalize_task_text("写 月报")
+    assert normalize_task_text("写月报。") == normalize_task_text("写月报.")
     assert task_key("Report") == task_key("report")
-    assert task_key("写周报") != task_key("读论文")
+    assert task_key("写月报") != task_key("读论文")
 
 
 # ---------------------------------------------------------------------------
@@ -121,9 +121,9 @@ def test_invalid_candidate_falls_back():
 pytestmark_db = pytest.mark.db
 
 FILES = {
-    "日记/2026/10.25.md": "# 10-25\n- [ ] 写周报\n- [x] 读论文\n",
-    "日记/2026/10.26.md": "# 10-26\n- [ ] 写周报\n",
-    "日记/2026/10.27.md": "# 10-27\n- [x] 写周报\n- [ ] 交报告\n",
+    "日记/2026/10.25.md": "# 10-25\n- [ ] 写月报\n- [x] 读论文\n",
+    "日记/2026/10.26.md": "# 10-26\n- [ ] 写月报\n",
+    "日记/2026/10.27.md": "# 10-27\n- [x] 写月报\n- [ ] 交报告\n",
 }
 
 
@@ -136,7 +136,7 @@ async def test_cross_day_merge_and_occurrence_uniqueness(client, admin_conn):
 
     rows = admin_conn.execute(
         "SELECT text, status, first_seen, last_seen, done_date, source_path, line_number "
-        "FROM tasks WHERE workspace_id = %s AND text = '写周报'",
+        "FROM tasks WHERE workspace_id = %s AND text = '写月报'",
         (workspace_id,),
     ).fetchall()
     assert len(rows) == 1

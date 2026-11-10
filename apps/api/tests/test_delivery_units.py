@@ -120,14 +120,14 @@ def test_index_page_fixed_order():
     text = render_index_markdown(
         {
             "daily": {"period_key": "2026-10-27", "version": 2},
-            "weekly": None,
+            "monthly": None,
             "yearly": {"period_key": "2026", "version": 1},
         },
         {"errors": 3, "methods": 2, "actions": 1},
         generated_at="2026-11-07T00:00:00Z",
     )
     assert "最新日报：2026-10-27（v2）" in text
-    assert "最新周报：暂无" in text
+    assert "最新月报：暂无" in text
     assert text.index("错误清单") < text.index("正确方法论") < text.index("行动清单")
 
 

@@ -32,8 +32,8 @@
 | AC-34 日记与日期 | PASS | `test_date_conflict_warning_persisted`；`test_date_priority_frontmatter_over_path`；FX-01 的 `journal_events` 证据 |
 | AC-35 学习摘要四要素 | PASS | `test_fixture_phase3.py::test_fx01_daily`（`learning_summary` 四字段 + `field_evidence`）；`test_review_gates.py` 的 G2 校验 |
 | AC-36 daily 7 章 | PASS | `test_review_api.py::test_daily_review_generates_seven_sections`（7 行、ordinal 1–7、每节非空、顺延进入 today_tasks）；FX-01 |
-| AC-37 weekly 4 章 | PASS | FX-02（4 节、完成率与台账逐位相等）；`test_review_rollup.py`（重复错误 ≥2、Top 排序） |
-| AC-38 yearly 5 章 | PASS | FX-03 两个场景（无周报 → 全哨兵；有周报 → 读 rollup）；`test_review_rollup.py::test_learning_map_reads_weekly_rollup_only`、`test_top_mistakes_frequency_desc_then_key_asc_and_cap_ten` |
+| AC-37 monthly 4 章 | PASS | FX-02（4 节、完成率与台账逐位相等）；`test_review_rollup.py`（重复错误 ≥2、Top 排序） |
+| AC-38 yearly 5 章 | PASS | FX-03 两个场景（无月报 → 全哨兵；有月报 → 读 rollup）；`test_review_rollup.py::test_learning_map_reads_monthly_rollup_only`、`test_top_mistakes_frequency_desc_then_key_asc_and_cap_ten` |
 | AC-41 可追溯与复算 | PASS | `test_review_gates.py::test_g4_requires_traceability_for_errors_and_methods`、`test_g3d_quote_hash_mismatch`、`test_g3b_hash_mismatch_is_stale_not_fabrication` |
 | AC-42 手动触发与版本 | PASS | `test_active_run_conflict_and_version_bump`（409 + existing_run_id；成功后 v2；旧版本可查）；`test_period_validation_and_max_revisions` |
 | AC-60 日志与回放 | PASS | `test_replays.py`（7 字段 JSON、敏感字段丢弃、chat/review 事件链一致、stream_epoch）；`scripts/verify_replay.py` |
@@ -62,8 +62,8 @@
 | FX | 结论 | 证据 |
 |---|---|---|
 | FX-01 fx_daily_2026-10-27 | PASS | `docs/evidence/phase3/fx01-daily.json`：7 节、ordinal 1–7、顺延 1 条、引用 1、证据 15、重跑 diff 0.0 |
-| FX-02 fx_weekly_W43 | PASS | `fx02-weekly.json`：4 节、`completion_rate` 与台账逐位相等 |
-| FX-03 fx_yearly_2026 | PASS | `fx03-yearly.json`：5 节；无周报时全哨兵（只读 rollup、不编造）；有周报场景见 `test_fx03_yearly_reads_weekly_rollup` |
+| FX-02 fx_monthly_W43 | PASS | `fx02-monthly.json`：4 节、`completion_rate` 与台账逐位相等 |
+| FX-03 fx_yearly_2026 | PASS | `fx03-yearly.json`：5 节；无月报时全哨兵（只读 rollup、不编造）；有月报场景见 `test_fx03_yearly_reads_monthly_rollup` |
 | FX-04 fx_empty_day | PASS | `fx04-empty-day.json`：7 节逐字哨兵、引用 0、`succeeded` |
 | FX-10 fx_cost_budget | PASS | `fx10-budget.json`：80% warn / 100% stop、workspace 月配额拒绝 |
 | FX-12 fx_concurrent_runs | PASS | `fx12-concurrent.json`：每 workspace 1 个 run + 9 个 409（同一 `existing_run_id`），跨 workspace 互不阻塞 |
