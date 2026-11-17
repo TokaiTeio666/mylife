@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -269,4 +270,12 @@ async def _clone(
 
 
 def run_job_sync(job_id: str, workspace_id: str) -> None:
+    # psycopg 异步模式不支持 Windows 默认的 ProactorEventLoop；
+    # 与 `mylife_api.devserver` 保持一致，宿主机 worker 使用 Selector。
+    if sys.platform == "win32":
+        asyncio.run(
+            run_job(UUID(job_id), UUID(workspace_id)),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+        return
     asyncio.run(run_job(UUID(job_id), UUID(workspace_id)))
