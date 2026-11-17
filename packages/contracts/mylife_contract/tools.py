@@ -57,7 +57,7 @@ class ReadNoteResult(ApiModel):
 
 
 class ListTasksArgs(ApiModel):
-    status: list[Literal["open", "done", "carried", "dropped"]] | None = None
+    status: list[Literal["open", "done", "carried", "paused", "dropped"]] | None = None
     from_date: date | None = Field(default=None, alias="from")
     to_date: date | None = Field(default=None, alias="to")
     section_keys: list[str] | None = None

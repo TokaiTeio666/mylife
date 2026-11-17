@@ -164,6 +164,30 @@ async def test_days_open_by_workspace_timezone(client, admin_conn):
 
 
 @pytest.mark.asyncio
+async def test_paused_task_listed_and_not_open(client, admin_conn):
+    clear_dashboard_cache()
+    workspace_id, _ = await helpers.prepare_workspace_with_docs(
+        client, admin_conn, email="dash-paused@example.com", files={}
+    )
+    today = date.today()
+    admin_conn.execute(
+        "INSERT INTO tasks (id, workspace_id, key, text, status, first_seen, last_seen) "
+        "VALUES (%s, %s, %s, %s, 'paused', %s, %s)",
+        (uuid7(), workspace_id, "paused-1", "暂停任务", today - timedelta(days=2), today),
+    )
+
+    paused = await client.get(f"{API}/dashboard/tasks?status=paused")
+    assert paused.status_code == 200, paused.text
+    assert [item["status"] for item in paused.json()["items"]] == ["paused"]
+    assert paused.json()["counts"]["paused"] == 1
+    assert paused.json()["counts"]["open"] == 0
+
+    latest = await client.get(f"{API}/dashboard/latest")
+    assert latest.status_code == 200, latest.text
+    assert latest.json()["open_tasks"] == 0
+
+
+@pytest.mark.asyncio
 async def test_calendar_month_and_year(client, admin_conn):
     clear_dashboard_cache()
     workspace_id, _ = await helpers.prepare_workspace_with_docs(

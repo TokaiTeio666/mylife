@@ -412,7 +412,7 @@ export interface DeliveryDetail {
 export interface TaskItem {
   id: string;
   text: string;
-  status: "open" | "done" | "carried" | "dropped";
+  status: "open" | "done" | "carried" | "paused" | "dropped";
   first_seen: string;
   last_seen: string;
   days_open: number;
@@ -435,7 +435,7 @@ export interface DashboardTaskList {
   items: TaskItem[];
   next_cursor: string | null;
   has_more: boolean;
-  counts: { open: number; carried: number; done_today: number };
+  counts: { open: number; carried: number; paused: number; done_today: number };
 }
 
 export interface DayCell {
@@ -462,7 +462,7 @@ export interface DashboardCalendar {
 export interface DashboardStats {
   range: string;
   completion_rate: number;
-  tasks: { completed: number; total: number; carried_over: number };
+  tasks: { completed: number; total: number; carried_over: number; paused: number };
   reviews: { daily: number; monthly: number; yearly: number };
   no_evidence_ratio: number;
   degraded_rate: number;

@@ -135,6 +135,55 @@ async def collect_carry_tasks(
     return rows
 
 
+async def collect_paused_tasks(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    period_start: date,
+    collector: EvidenceCollector,
+    section_key: str = "today_tasks",
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    """「暂停中」的跨天延续：status='paused' 且最后一次出现早于周期起点。
+
+    与 open 的「以往顺延」对称：暂停任务在恢复/完成前应持续出现在
+    「暂停中」组，而不是第二天消失。
+    """
+    result = await session.execute(
+        text(
+            "SELECT id, text, last_seen, source_path, line_number "
+            "FROM tasks WHERE workspace_id = :ws AND status = 'paused' "
+            "  AND last_seen < :start ORDER BY last_seen ASC, id ASC LIMIT :limit"
+        ),
+        {"ws": workspace_id, "start": period_start, "limit": limit},
+    )
+    rows: list[dict[str, Any]] = []
+    for row in result:
+        line_range = (
+            [row.line_number, row.line_number] if row.line_number else None
+        )
+        evidence_id = collector.add(
+            section_key,
+            source_type="task",
+            quote=row.text[:MAX_QUOTE_CHARS],
+            source_path=row.source_path,
+            source_date=row.last_seen,
+            occurred_on=row.last_seen,
+            line_range=line_range,
+        )
+        rows.append(
+            {
+                "text": row.text,
+                "source_date": row.last_seen,
+                "source_path": row.source_path,
+                "line_range": line_range,
+                "evidence_id": evidence_id,
+                "task_id": str(row.id),
+            }
+        )
+    return rows
+
+
 async def collect_period_tasks(
     session: AsyncSession,
     *,
@@ -144,20 +193,29 @@ async def collect_period_tasks(
     collector: EvidenceCollector,
     section_key: str = "today_tasks",
 ) -> dict[str, list[dict[str, Any]]]:
-    """当日 occurrence 分完成/未完成两组。"""
+    """当日 occurrence 分已完成/未完成/暂停中三组。"""
     result = await session.execute(
         text(
-            "SELECT o.checked, o.raw_text, o.line_number, o.occurrence_date, d.path, "
-            "       d.content_hash, d.id AS document_id "
+            "SELECT o.checked, o.paused, o.raw_text, o.line_number, o.occurrence_date, "
+            "       d.path, d.content_hash, d.id AS document_id "
             "FROM task_occurrences o JOIN documents d ON d.id = o.document_id "
             "WHERE o.workspace_id = :ws AND o.occurrence_date BETWEEN :start AND :end "
             "ORDER BY o.occurrence_date ASC, d.path ASC, o.line_number ASC"
         ),
         {"ws": workspace_id, "start": period_start, "end": period_end},
     )
-    groups: dict[str, list[dict[str, Any]]] = {"completed": [], "open": []}
+    groups: dict[str, list[dict[str, Any]]] = {
+        "completed": [],
+        "open": [],
+        "paused": [],
+    }
     for row in result:
-        bucket = "completed" if row.checked else "open"
+        if row.paused:
+            bucket = "paused"
+        elif row.checked:
+            bucket = "completed"
+        else:
+            bucket = "open"
         if len(groups[bucket]) >= 12:
             continue
         # 台账行的行号是文件绝对行号（含 frontmatter），与正文行号基准不同，

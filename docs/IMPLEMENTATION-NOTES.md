@@ -205,6 +205,22 @@ Phase 3 的 Writer 原本完全确定性：错误/方法论通过“做错的事
 
 ---
 
+## 2H. Todo「暂停中」状态（2026-11-11）
+
+产品明确 Todo 的三态为：已完成 / 未完成 / 暂停中。实现口径：
+
+| 项 | 现状 |
+|---|---|
+| 输入文法 | `- [x]` 完成、`- [ ]` 未完成、`- [-]` 暂停中；`[-]` 从“不识别”改为识别 |
+| 存储 | `task_occurrences.paused boolean`；`tasks.status='paused'`（最新 occurrence 决定） |
+| 完成率 | 暂停任务**不计入**分母：`count(*) FILTER (WHERE status <> 'paused')` |
+| 复盘章节 | `today_tasks` 固定三组：已完成 / 未完成 / 暂停中；以往顺延不单列，在“未完成”中标注“自 … 顺延”；暂停任务在恢复/完成前持续展示 |
+| 仪表盘 | `open_tasks` 与 calendar 的未完成计数排除 paused；任务列表新增 `paused` 状态与计数 |
+| 契约 | `TodayTasksSection.paused`、`TaskCounts.paused`、`DashboardTaskStats.paused`、工具 `status` 枚举 |
+| 迁移 | `apps/api/migrations/versions/0014_phase7_task_paused.py` |
+
+---
+
 ## 3. 运行时与平台注意事项
 
 1. **Windows + async psycopg**：psycopg 异步模式不支持 `ProactorEventLoop`。
@@ -279,3 +295,4 @@ Phase 3 的 Writer 原本完全确定性：错误/方法论通过“做错的事
 | v0.5 | 2026-11-08 | Phase 5：新增 §2E（13 项实现偏差）、SEC-21/28/29/30 安全落点补充 |
 | v0.6 | 2026-11-09 | 复盘 Writer：错误/方法论改为 LLM 语义抽取 + 确定性回退，新增 §2F |
 | v0.7 | 2026-11-10 | 周复盘改为月复盘；年复盘 rollup 修复；新增 §2G |
+| v0.8 | 2026-11-11 | Todo 新增「暂停中」（`- [-]`），完成率排除 paused；新增 §2H |

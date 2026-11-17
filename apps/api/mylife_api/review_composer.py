@@ -185,6 +185,7 @@ def _today_tasks(
 ) -> ComposedSection:
     completed = period_tasks.get("completed", [])
     open_tasks = period_tasks.get("open", [])
+    paused_tasks = period_tasks.get("paused", [])
     carried = [
         {
             "text": row["text"],
@@ -197,7 +198,7 @@ def _today_tasks(
         }
         for row in carried_tasks
     ]
-    if not (completed or open_tasks or carried):
+    if not (completed or open_tasks or paused_tasks or carried):
         return _sentinel_section(ordinal, key, title)
 
     structured = {
@@ -215,19 +216,41 @@ def _today_tasks(
             }
             for item in open_tasks
         ],
+        "paused": [
+            {
+                k: item[k]
+                for k in ("text", "source_date", "source_path", "line_range", "evidence_id")
+            }
+            for item in paused_tasks
+        ],
         "carried_over": carried,
     }
+    # 三种状态：已完成 / 未完成 / 暂停中。以往顺延不单列一组，
+    # 作为「未完成」里的顺延标注保留（AC-33 的事实不丢）。
+    display_open: list[dict[str, Any]] = [dict(item) for item in open_tasks]
+    open_texts = {item["text"] for item in open_tasks}
+    display_open.extend(
+        {**item, "_carried": True} for item in carried if item["text"] not in open_texts
+    )
     lines = ["### 已完成", ""]
     lines.extend(f"- {item['text']}" for item in completed) if completed else lines.append("- 无")
     lines.extend(["", "### 未完成", ""])
-    lines.extend(f"- {item['text']}" for item in open_tasks) if open_tasks else lines.append("- 无")
-    lines.extend(["", "### 以往顺延", ""])
-    lines.extend(
-        f"- {item['text']}（自 {item['source_date']}）" for item in carried
-    ) if carried else lines.append("- 无")
+    if display_open:
+        for item in display_open:
+            suffix = f"（自 {item['source_date']} 顺延）" if item.get("_carried") else ""
+            lines.append(f"- {item['text']}{suffix}")
+    else:
+        lines.append("- 无")
+    lines.extend(["", "### 暂停中", ""])
+    if paused_tasks:
+        lines.extend(f"- {item['text']}" for item in paused_tasks)
+    else:
+        lines.append("- 无")
 
     evidence_ids = [
-        item["evidence_id"] for item in (*completed, *open_tasks) if item.get("evidence_id")
+        item["evidence_id"]
+        for item in (*completed, *open_tasks, *paused_tasks)
+        if item.get("evidence_id")
     ]
     claim_id = None
     if evidence_ids:
@@ -236,7 +259,7 @@ def _today_tasks(
             section_key=key,
             text=(
                 f"本日共完成 {len(completed)} 项、未完成 {len(open_tasks)} 项、"
-                f"顺延 {len(carried)} 项"
+                f"暂停 {len(paused_tasks)} 项、顺延 {len(carried)} 项"
             ),
             evidence_ids=evidence_ids,
             claim_type="task_status",

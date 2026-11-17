@@ -349,8 +349,8 @@ $$;
 ^(?P<indent>[ \t]*)(?P<bullet>[-*+])(?P<sep1>[ \t]+)\[(?P<mark>[ xX])\](?P<sep2>[ \t]+)(?P<text>\S.*?)[ \t]*$
 ```
 
-- `mark ∈ {x,X}` → `checked=true`；`mark=' '` → `checked=false`。
-- `[] | [  ] | [-] | [✓] | [v] | [ x]` 不识别。
+- `mark ∈ {x,X}` → `checked=true`；`mark=' '` → `checked=false`；`mark='-'` → `paused=true`（2026-11-11 起，见 IMPLEMENTATION-NOTES §2H）。
+- `[] | [  ] | [✓] | [v] | [ x]` 不识别。
 - 跳过 fenced code（``` / ~~~，同 marker 成对）。
 - 缩进不建立父子关系。
 - 不含复选框的自然语言句**不产生任何行**（AC-31 第三条）。

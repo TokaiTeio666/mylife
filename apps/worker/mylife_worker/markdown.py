@@ -60,6 +60,7 @@ class TaskOccurrenceData:
     line_number: int
     checked: bool
     text: str
+    paused: bool = False
 
 
 @dataclass(slots=True)
@@ -431,7 +432,10 @@ def parse_document(path: str, text: str, *, parser_version: str = PARSER_VERSION
         parse_warnings=parse_warnings,
         task_occurrences=[
             TaskOccurrenceData(
-                line_number=item.line_number, checked=item.checked, text=item.text
+                line_number=item.line_number,
+                checked=item.checked,
+                paused=item.paused,
+                text=item.text,
             )
             for item in extract_occurrences(
                 body_lines, body_start_line=body_start_line

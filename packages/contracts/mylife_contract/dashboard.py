@@ -12,7 +12,7 @@ from mylife_contract.common import ApiModel, UtcDateTime
 from mylife_contract.review import ReviewSummary
 
 DashboardRange = Literal["7d", "30d", "90d", "year"]
-TaskStatus = Literal["open", "done", "carried", "dropped"]
+TaskStatus = Literal["open", "done", "carried", "paused", "dropped"]
 
 
 class DashboardLatest(ApiModel):
@@ -40,6 +40,7 @@ class TaskItem(ApiModel):
 class TaskCounts(ApiModel):
     open: int = 0
     carried: int = 0
+    paused: int = 0
     done_today: int = 0
 
 
@@ -75,6 +76,7 @@ class DashboardTaskStats(ApiModel):
     completed: int = 0
     total: int = 0
     carried_over: int = 0
+    paused: int = 0
 
 
 class DashboardReviewStats(ApiModel):

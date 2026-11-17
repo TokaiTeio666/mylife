@@ -1076,8 +1076,8 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 | 项 | 值 |
 |---|---|
 | 权限 | 成员 |
-| 查询 | `status?`（`open`/`done`/`carried`/`dropped`，默认 `open,carried`）、`limit`（1–200，默认 50）、`cursor` |
-| 响应 200 | `{ "items": TaskItem[], "next_cursor", "has_more", "counts": {"open": int, "carried": int, "done_today": int} }` |
+| 查询 | `status?`（`open`/`done`/`carried`/`paused`/`dropped`，默认 `open,carried,paused`）、`limit`（1–200，默认 50）、`cursor` |
+| 响应 200 | `{ "items": TaskItem[], "next_cursor", "has_more", "counts": {"open": int, "carried": int, "paused": int, "done_today": int} }` |
 | 排序 | `first_seen asc, id asc`（最久未完成在前） |
 
 `TaskItem`：`{ "id", "text", "status", "first_seen", "last_seen", "days_open", "done_date", "source_path", "line_number", "occurrence_count" }`。`days_open = (today_local - first_seen).days`，`today_local` 按 workspace 时区。
@@ -1099,7 +1099,7 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 |---|---|
 | 权限 | 成员 |
 | 查询 | `range?` ∈ `7d`/`30d`/`90d`/`year`（默认 `30d`） |
-| 响应 200 | `{ "range", "completion_rate": float, "tasks": {"completed", "total", "carried_over"}, "reviews": {"daily", "monthly", "yearly"}, "no_evidence_ratio": float, "degraded_rate": float, "tokens": {"prompt", "completion"} }` |
+| 响应 200 | `{ "range", "completion_rate": float, "tasks": {"completed", "total", "carried_over", "paused"}, "reviews": {"daily", "monthly", "yearly"}, "no_evidence_ratio": float, "degraded_rate": float, "tokens": {"prompt", "completion"} }` |
 
 统计口径：`completion_rate = completed / total`，`total` 为区间内出现过的任务数；与月报 `ledger_recalc` 同源（FR-E7）。`no_evidence_ratio` 与 `degraded_rate` 来自 `usage_events`，用于质量看板（架构 §16.9）。
 
@@ -1600,7 +1600,7 @@ chat 走架构 §4.6 精简分支：`created → retrieving → drafting → ver
 | 项 | 值 |
 |---|---|
 | 入参 | `{ "status"?: enum[], "from"?: date, "to"?: date, "section_keys"?: string[], "limit"?: int }` |
-| 出参 | `{ "items": TaskItem[], "counts": {"open","done","carried","dropped"}, "ledger_recalc": {"completed","total","rate"} }` |
+| 出参 | `{ "items": TaskItem[], "counts": {"open","done","carried","paused","dropped"}, "ledger_recalc": {"completed","total","rate"} }`；暂停任务不计入 `ledger_recalc.total` |
 | 权限 | Planner：允许（仅计数与聚合，**不可读文本**）；Worker：允许；Writer/Reviewer：禁止 |
 | 约束 | Planner 调用时 `include_text` 强制 false（返回项只有 `id/status/dates/count`）；`limit` ≤200 |
 
@@ -2373,7 +2373,7 @@ data: {"reason":"epoch_mismatch","scope":"stream","message":"事件流已重启�
 | FR-D7 | `ToolGateway` 入参无 `workspace_id` + 跨租户测试 | 服务端注入，LLM 不可指定 |
 | FR-D8 | `GET /settings/usage`、`Message.usage` | prompt/completion/model/耗时入库 |
 | FR-D9 | `GET/PUT /settings/retrieval`、`RunOptions` | 检索条数/上下文窗口/Web 开关（首版关闭） |
-| FR-E1 | `GET /dashboard/tasks`、`list_tasks` | 复选框唯一来源；`10.27.md` 解析 |
+| FR-E1 | `GET /dashboard/tasks`、`list_tasks` | 复选框唯一来源（`[x]`/`[ ]`/`[-]`）；`10.27.md` 解析 |
 | FR-E2 | `TaskItem`（`first_seen`/`last_seen`/`done_date`/`source_path`/`line_number`） | 台账字段完整 |
 | FR-E3 | `GET /dashboard/tasks`（`carried`） | 顺延与回填 |
 | FR-E4 | `POST /reviews`（日记目录匹配） | 按日期匹配日记 |

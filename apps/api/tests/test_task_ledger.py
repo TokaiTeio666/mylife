@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
 import pytest
@@ -26,19 +27,22 @@ def test_checkbox_variants():
         "* [ ] 读论文",
         "+ [ ] 星号列表",
         "    - [ ] 缩进任务",
+        "- [-] 暂停中任务",
         "- [] 空标记不识别",
         "- [  ] 双空格不识别",
-        "- [-] 横线不识别",
         "- [✓] 对勾不识别",
         "- [ x] 空格后 x 不识别",
     ]
     items = extract_occurrences(lines, body_start_line=1)
-    assert [(item.line_number, item.checked, item.text) for item in items] == [
-        (1, True, "写月报"),
-        (2, True, "大写勾选"),
-        (3, False, "读论文"),
-        (4, False, "星号列表"),
-        (5, False, "缩进任务"),
+    assert [
+        (item.line_number, item.checked, item.paused, item.text) for item in items
+    ] == [
+        (1, True, False, "写月报"),
+        (2, True, False, "大写勾选"),
+        (3, False, False, "读论文"),
+        (4, False, False, "星号列表"),
+        (5, False, False, "缩进任务"),
+        (6, False, True, "暂停中任务"),
     ]
 
 
@@ -241,6 +245,89 @@ async def test_carried_derived_not_persisted(client, admin_conn):
         (workspace_id,),
     ).fetchall()
     assert same_day == []
+
+
+PAUSED_FILES = {
+    "日记/2026/10.26.md": "# 10-26\n- [ ] 写月报\n- [-] 暂停实验\n",
+    "日记/2026/10.27.md": "# 10-27\n- [x] 写月报\n- [ ] 交报告\n- [-] 暂停实验\n",
+}
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_paused_task_status_and_completion_rate(client, admin_conn):
+    workspace_id, _ = await helpers.prepare_workspace_with_docs(
+        client, admin_conn, email="ledger-paused@example.com", files=PAUSED_FILES
+    )
+
+    status = admin_conn.execute(
+        "SELECT status FROM tasks WHERE workspace_id = %s AND text = '暂停实验'",
+        (workspace_id,),
+    ).fetchone()[0]
+    assert status == "paused"
+
+    flags = {
+        row[0]
+        for row in admin_conn.execute(
+            "SELECT DISTINCT paused FROM task_occurrences WHERE workspace_id = %s "
+            "AND raw_text = '暂停实验'",
+            (workspace_id,),
+        ).fetchall()
+    }
+    assert flags == {True}
+
+    from mylife_api import repo_chat
+    from mylife_api.db import get_session_factory, set_rls_context
+
+    factory = get_session_factory()
+    async with factory() as session:
+        await set_rls_context(session, uuid.UUID(workspace_id), None)
+        ledger = await repo_chat.task_ledger_recalc(
+            session, uuid.UUID(workspace_id)
+        )
+        await session.rollback()
+
+    # 暂停任务不计入完成率分母；已完成 1 / 总数 2。
+    assert ledger == {"completed": 1, "total": 2, "rate": 0.5}
+
+
+PAUSED_HISTORY_FILES = {
+    "日记/2026/10.26.md": "---\ndate: 2026-10-26\n---\n# 10-26\n- [-] 暂停实验\n",
+    "日记/2026/10.27.md": "---\ndate: 2026-10-27\n---\n# 10-27\n- [ ] 写月报\n",
+}
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_paused_task_carries_into_next_daily_review(client, admin_conn):
+    from mylife_api.services_review import wait_for_run
+    from tests.helpers import API
+
+    workspace_id, _ = await helpers.prepare_workspace_with_docs(
+        client,
+        admin_conn,
+        email="ledger-paused-carry@example.com",
+        files=PAUSED_HISTORY_FILES,
+    )
+    token = await helpers.csrf(client)
+    response = await client.post(
+        f"{API}/reviews",
+        json={"kind": "daily", "period_key": "2026-10-27"},
+        headers=helpers.csrf_headers(token),
+    )
+    assert response.status_code in {200, 201}, response.text
+    body = response.json()
+    state = await wait_for_run(
+        uuid.UUID(workspace_id), uuid.UUID(body["run_id"])
+    )
+    assert state == "succeeded", state
+
+    structured = admin_conn.execute(
+        "SELECT structured_json FROM review_sections WHERE workspace_id = %s "
+        "AND review_id = %s AND version = %s AND section_key = 'today_tasks'",
+        (workspace_id, body["review_id"], body["version"]),
+    ).fetchone()[0]
+    assert [item["text"] for item in structured["paused"]] == ["暂停实验"]
 
 
 @pytest.mark.db

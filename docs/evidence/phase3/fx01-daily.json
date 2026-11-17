@@ -20,8 +20,11 @@
   "carried_over": [
     "读论文"
   ],
-  "citations": 1,
-  "evidence": 35,
+  "paused": [
+    "暂停实验"
+  ],
+  "citations": 2,
+  "evidence": 36,
   "rerun_diff_ratio": 0.0,
   "state": "succeeded"
 }

@@ -664,7 +664,7 @@ class SearchResult(BaseModel):
 
 | # | section_key | 中文名 | 必填字段 | 哨兵文案 | 单章证据上限 |
 |---|---|---|---|---|---|
-| 1 | `today_tasks` | 今日待办 | 已完成 / 未完成 / 以往顺延三组 | `今日待办：无记录` | 12 |
+| 1 | `today_tasks` | 今日待办 | 已完成 / 未完成 / 暂停中三组；以往顺延在未完成中标注 | `今日待办：无记录` | 12 |
 | 2 | `learning_summary` | 学习内容摘要 | `topic, concept_or_method, output, open_questions` | `学习内容摘要：本日无学习内容记录` | 12 |
 | 3 | `journal_events` | 日记事件摘要 | `event, person, decision, emotion, result` | `日记事件摘要：本日无日记事件记录` | 12 |
 | 4 | `mistakes` | 做错的事 | `event, root_cause, cost, correct_action, recurrence_trigger` | `做错的事：本日无明显错误记录` | 12 |

@@ -80,7 +80,7 @@ async def get_latest(
     task_row = (
         await session.execute(
             text(
-                "SELECT count(*) FILTER (WHERE status <> 'dropped') AS total, "
+                "SELECT count(*) FILTER (WHERE status NOT IN ('dropped','paused')) AS total, "
                 "       count(*) FILTER (WHERE status = 'done') AS completed, "
                 "       count(*) FILTER (WHERE status = 'open') AS open_tasks "
                 "FROM tasks WHERE workspace_id = :ws"
@@ -114,7 +114,7 @@ async def tasks(
 ) -> dict[str, Any]:
     tz = timezone or await _timezone(session, workspace_id)
     today_local = datetime.now(_tz(tz)).date()
-    wanted = set(status or ["open", "carried"])
+    wanted = set(status or ["open", "carried", "paused"])
 
     result = await session.execute(
         text(
@@ -130,7 +130,7 @@ async def tasks(
     )
     rows = [dict(row._mapping) for row in result]
     items = []
-    counts = {"open": 0, "carried": 0, "done_today": 0}
+    counts = {"open": 0, "carried": 0, "paused": 0, "done_today": 0}
     for row in rows:
         if row["status"] == "dropped":
             derived = "dropped"
@@ -138,12 +138,16 @@ async def tasks(
             derived = "done"
             if row["done_date"] == today_local:
                 counts["done_today"] += 1
+        elif row["status"] == "paused":
+            derived = "paused"
         elif row["first_seen"] is not None and row["first_seen"] < today_local:
             derived = "carried"
         else:
             derived = "open"
         if derived == "carried":
             counts["carried"] += 1
+        elif derived == "paused":
+            counts["paused"] += 1
         elif derived == "open":
             counts["open"] += 1
         if derived not in wanted:
@@ -194,6 +198,7 @@ async def calendar_view(
             text(
                 "SELECT first_seen, done_date FROM tasks WHERE workspace_id = :ws "
                 "AND first_seen <= :end "
+                "AND status <> 'paused' "
                 "AND (status <> 'done' OR done_date IS NULL OR done_date > :end)"
             ),
             {"ws": workspace_id, "end": end},
@@ -275,8 +280,9 @@ async def stats(
     task_row = (
         await session.execute(
             text(
-                "SELECT count(*) AS total, "
+                "SELECT count(*) FILTER (WHERE status <> 'paused') AS total, "
                 "       count(*) FILTER (WHERE status = 'done') AS completed, "
+                "       count(*) FILTER (WHERE status = 'paused') AS paused, "
                 "       count(*) FILTER (WHERE status = 'open' "
                 "         AND first_seen < :start) AS carried "
                 "FROM tasks WHERE workspace_id = :ws AND last_seen >= :start"
@@ -341,6 +347,7 @@ async def stats(
             "completed": completed,
             "total": total,
             "carried_over": int(task_row.carried),
+            "paused": int(task_row.paused),
         },
         "reviews": {
             "daily": counts.get("daily", 0),

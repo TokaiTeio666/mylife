@@ -50,6 +50,7 @@ class TaskRef(ApiModel):
 class TodayTasksSection(ApiModel):
     completed: list[TaskRef] = Field(default_factory=list)
     open: list[TaskRef] = Field(default_factory=list)
+    paused: list[TaskRef] = Field(default_factory=list)
     carried_over: list[TaskRef] = Field(default_factory=list)
 
 

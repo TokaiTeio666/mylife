@@ -1,6 +1,7 @@
 """Todo 台账的确定性解析（REQUIREMENTS §6.1；AC-31/32/33）。
 
 纯函数、无 IO、无 LLM：只认 Markdown 复选框，绝不从自然语言推测完成状态。
+`[x]` = 已完成，`[ ]` = 未完成，`[-]` = 暂停中。
 DB 写入在 `apps/worker/mylife_worker/task_ledger.py`。
 """
 
@@ -12,10 +13,11 @@ from dataclasses import dataclass
 
 from mylife_contract.constants import PUNCT_NORMALIZATION
 
-#: `- [x] text` / `* [ ] text` / `+ [X] text`；缩进不建立父子关系。
+#: `- [x] text` / `* [ ] text` / `+ [X] text` / `- [-] text`；缩进不建立父子关系。
+#: `-` 是暂停中（Obsidian cancelled/paused 写法），不是删除。
 CHECKBOX_RE = re.compile(
     r"^(?P<indent>[ \t]*)(?P<bullet>[-*+])(?P<sep1>[ \t]+)"
-    r"\[(?P<mark>[ xX])\](?P<sep2>[ \t]+)(?P<text>\S.*?)[ \t]*$"
+    r"\[(?P<mark>[ xX-])\](?P<sep2>[ \t]+)(?P<text>\S.*?)[ \t]*$"
 )
 _FENCE = re.compile(r"^\s*(```|~~~)")
 _WS = re.compile(r"\s+", re.UNICODE)
@@ -28,6 +30,13 @@ class TaskOccurrence:
     line_number: int
     checked: bool
     text: str
+    paused: bool = False
+
+    @property
+    def state(self) -> str:
+        if self.paused:
+            return "paused"
+        return "done" if self.checked else "open"
 
 
 def normalize_task_text(raw: str) -> str:
@@ -71,10 +80,12 @@ def extract_occurrences(
         text = display_text(match.group("text"))
         if not text:
             continue
+        mark = match.group("mark")
         occurrences.append(
             TaskOccurrence(
                 line_number=body_start_line + index,
-                checked=match.group("mark") in {"x", "X"},
+                checked=mark in {"x", "X"},
+                paused=mark == "-",
                 text=text,
             )
         )

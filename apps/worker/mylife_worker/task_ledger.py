@@ -61,6 +61,7 @@ async def sync_document_occurrences(
                 "doc": document_id,
                 "date": occurred_on,
                 "checked": bool(item.checked),
+                "paused": bool(getattr(item, "paused", False)),
                 "line": item.line_number,
                 "raw": item.text,
                 "key": key,
@@ -93,8 +94,8 @@ async def sync_document_occurrences(
         text(
             "INSERT INTO task_occurrences "
             "(id, workspace_id, task_id, document_id, occurrence_date, checked, "
-            " line_number, raw_text) "
-            "VALUES (:id, :ws, :task, :doc, :date, :checked, :line, :raw) "
+            " paused, line_number, raw_text) "
+            "VALUES (:id, :ws, :task, :doc, :date, :checked, :paused, :line, :raw) "
             "ON CONFLICT (workspace_id, document_id, occurrence_date, line_number) DO NOTHING"
         ),
         [
@@ -105,6 +106,7 @@ async def sync_document_occurrences(
                 "doc": row["doc"],
                 "date": row["date"],
                 "checked": row["checked"],
+                "paused": row["paused"],
                 "line": row["line"],
                 "raw": row["raw"],
             }
@@ -141,7 +143,7 @@ async def rebuild_tasks(session: AsyncSession, *, workspace_id: UUID) -> int:
               GROUP BY task_id
             ), latest AS (
               SELECT DISTINCT ON (o.task_id)
-                     o.task_id, o.raw_text, o.checked, d.path, o.line_number
+                     o.task_id, o.raw_text, o.checked, o.paused, d.path, o.line_number
               FROM task_occurrences o
               JOIN documents d ON d.id = o.document_id
               WHERE o.workspace_id = :ws
@@ -150,7 +152,11 @@ async def rebuild_tasks(session: AsyncSession, *, workspace_id: UUID) -> int:
             UPDATE tasks t
             SET first_seen = agg.first_seen,
                 last_seen = agg.last_seen,
-                status = CASE WHEN latest.checked THEN 'done' ELSE 'open' END,
+                status = CASE
+                  WHEN latest.paused THEN 'paused'
+                  WHEN latest.checked THEN 'done'
+                  ELSE 'open'
+                END,
                 done_date = CASE WHEN latest.checked THEN agg.last_done ELSE NULL END,
                 text = latest.raw_text,
                 source_path = latest.path,

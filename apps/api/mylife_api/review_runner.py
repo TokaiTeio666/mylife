@@ -256,6 +256,16 @@ class ReviewRunner:
                 period_end=period_end,
                 collector=collector,
             )
+            # 暂停任务与 open 的「以往顺延」对称：恢复/完成前持续展示。
+            paused_history = await review_evidence.collect_paused_tasks(
+                session,
+                workspace_id=self.workspace_id,
+                period_start=period_start,
+                collector=collector,
+            )
+            context["period_tasks"]["paused"] = (
+                (context["period_tasks"].get("paused") or []) + paused_history
+            )[:MAX_SECTION_EVIDENCE]
             context["carried"] = await review_evidence.collect_carry_tasks(
                 session,
                 workspace_id=self.workspace_id,

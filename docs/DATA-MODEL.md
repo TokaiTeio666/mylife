@@ -181,7 +181,7 @@ CREATE TABLE tasks (
   key text NOT NULL,                         -- 归一化任务文本的 canonical_key
   text text NOT NULL,
   status text NOT NULL DEFAULT 'open'
-    CHECK (status IN ('open','done','carried','dropped')),
+    CHECK (status IN ('open','done','carried','dropped','paused')),
   first_seen date NOT NULL,
   last_seen date NOT NULL,
   done_date date,
@@ -435,6 +435,7 @@ CREATE TABLE task_occurrences (
   document_id uuid NOT NULL,
   occurrence_date date NOT NULL,
   checked boolean NOT NULL,
+  paused boolean NOT NULL DEFAULT false,
   line_number int NOT NULL,
   raw_text text NOT NULL,
   UNIQUE (workspace_id, document_id, occurrence_date, line_number)

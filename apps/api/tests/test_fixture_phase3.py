@@ -65,6 +65,7 @@ async def test_fx01_daily(client, admin_conn):
     today = next(row for row in rows if row[0] == "today_tasks")
     carried = today[3].get("carried_over", [])
     assert [item["text"] for item in carried] == ["读论文"]
+    assert [item["text"] for item in today[3].get("paused", [])] == ["暂停实验"]
 
     # 错误/方法论当日无抽取来源 → 哨兵（AC-36 允许）
     mistakes = next(row for row in rows if row[0] == "mistakes")
@@ -100,6 +101,7 @@ async def test_fx01_daily(client, admin_conn):
             "sections": [row[0] for row in rows],
             "ordinals": [row[1] for row in rows],
             "carried_over": [item["text"] for item in carried],
+            "paused": [item["text"] for item in today[3].get("paused", [])],
             "citations": citations,
             "evidence": evidence,
             "rerun_diff_ratio": round(diff_ratio, 4),

@@ -9,7 +9,7 @@ sections:
     - section_key: today_tasks
       ordinal: 1
       title: 今日待办
-      required_fields: [completed, open, carried_over]
+      required_fields: [completed, open, paused, carried_over]
       sentinel: 今日待办：无记录
       max_evidence: 12
     - section_key: learning_summary

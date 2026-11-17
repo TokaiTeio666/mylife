@@ -579,7 +579,7 @@ async def task_ledger_recalc(
 ) -> dict[str, Any]:
     result = await session.execute(
         text(
-            "SELECT count(*) AS total, "
+            "SELECT count(*) FILTER (WHERE status <> 'paused') AS total, "
             "       count(*) FILTER (WHERE status = 'done') AS completed "
             "FROM tasks WHERE workspace_id = :ws"
         ),

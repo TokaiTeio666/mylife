@@ -169,7 +169,13 @@ export default function DashboardPage() {
               <ul className="flex flex-col gap-2 text-small">
                 {tasks.data.items.slice(0, 8).map((task) => (
                   <li key={task.id} className="flex items-center gap-2">
-                    <Badge variant={task.status === "carried" ? "warning" : "muted"}>
+                    <Badge
+                      variant={
+                        task.status === "carried" || task.status === "paused"
+                          ? "warning"
+                          : "muted"
+                      }
+                    >
                       {task.days_open}d
                     </Badge>
                     <span className="truncate">{task.text}</span>
