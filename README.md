@@ -89,7 +89,14 @@ cd ../..
 make backup                   # PostgreSQL + 数据根加密备份（AC-61 / SEC-28）
 make restore-drill            # 备份恢复到临时库并核对计数与哈希（AC-61）
 make ac59                     # 容器 kill -9 / Redis 暂停恢复演练（AC-59）
+
+# 复盘能力评测
+make eval-review              # 离线：台账/日期/门禁/装配/rollup/确定性，无需 DB 与模型
+make eval-review-llm          # 含真实模型语义抽取（读 MYLIFE_LLM_*，每用例采样 3 次）
 ```
+
+评测语料、维度权重与基线见 [`evals/review/README.md`](./evals/review/README.md)，
+最近一次结果见 [`docs/evidence/review-eval/report.md`](./docs/evidence/review-eval/report.md)。
 
 数据库测试默认连接 `localhost:25432/mylife_test`（可用
 `MYLIFE_TEST_DB_HOST` / `MYLIFE_TEST_DB_PORT` / `MYLIFE_TEST_ADMIN_URL` 覆盖）。

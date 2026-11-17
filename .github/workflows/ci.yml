@@ -45,7 +45,7 @@ jobs:
       - run: cp .env.example .env
       # 顶层 compose 的 migrate 服务先跑一次，确保生产迁移路径可用
       - run: uv sync --all-packages
-      - run: uv run ruff check packages/contracts packages/knowledge-runtime packages/retrieval packages/agent packages/delivery apps/api apps/worker
+      - run: uv run ruff check packages/contracts packages/knowledge-runtime packages/retrieval packages/agent packages/delivery apps/api apps/worker evals/review
       - name: Alembic 迁移可执行（生产路径）
         working-directory: apps/api
         env:
@@ -65,6 +65,8 @@ jobs:
           MYLIFE_LLM_PROVIDER: mock
           MYLIFE_ALLOW_LOCAL_GIT: "true"
         run: uv run pytest -q
+      - name: 复盘能力离线评测（无需真实模型）
+        run: uv run python evals/review/run_eval.py --fail-under 90 --out /tmp/review-eval
 
   frontend:
     name: 前端（tsc + lint + build）

@@ -1,7 +1,7 @@
 SHELL := /bin/sh
 COMPOSE := docker compose -f infra/compose/docker-compose.yml --env-file .env
 
-.PHONY: help up down logs migrate test test-fast lint fmt api web upgrade backup restore-drill ac59
+.PHONY: help up down logs migrate test test-fast lint fmt api web upgrade backup restore-drill ac59 eval-review eval-review-llm
 
 help:
 	@echo "mylife Phase 0 targets:"
@@ -16,6 +16,8 @@ help:
 	@echo "  make backup    - pg_dump 备份（AC-61）"
 	@echo "  make restore-drill - 备份恢复演练并写证据（AC-61）"
 	@echo "  make ac59      - 容器重启/断网演练（AC-59）"
+	@echo "  make eval-review     - 复盘能力离线评测（无需 DB/模型）"
+	@echo "  make eval-review-llm - 复盘能力评测（含真实模型语义抽取）"
 
 up:
 	$(COMPOSE) up -d --build
@@ -67,3 +69,9 @@ restore-drill:
 
 ac59:
 	uv run python scripts/e2e_ac59.py
+
+eval-review:
+	uv run python evals/review/run_eval.py --fail-under 90 --out docs/evidence/review-eval-offline
+
+eval-review-llm:
+	uv run --env-file .env python evals/review/run_eval.py --llm --repeat 3 --fail-under 80

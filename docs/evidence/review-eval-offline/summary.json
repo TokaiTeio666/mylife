@@ -1,0 +1,567 @@
+{
+  "generated_at": "2026-11-11T04:20:03+00:00",
+  "corpus_version": "review-eval-v1",
+  "llm": null,
+  "overall": 94.23,
+  "weights": {
+    "injection_safety": 0.1538,
+    "gate_enforcement": 0.2308,
+    "todo_ledger": 0.1538,
+    "action_generation": 0.0769,
+    "assembly": 0.0769,
+    "rollup": 0.1538,
+    "date_resolution": 0.0769,
+    "determinism": 0.0769
+  },
+  "dimensions": {
+    "todo_ledger": 1.0,
+    "date_resolution": 1.0,
+    "gate_enforcement": 1.0,
+    "assembly": 1.0,
+    "action_generation": 0.25,
+    "rollup": 1.0,
+    "determinism": 1.0,
+    "injection_safety": 1.0
+  },
+  "llm_aggregate": null,
+  "offline": {
+    "dimensions": [
+      {
+        "dimension": "todo_ledger",
+        "label": "Todo 台账文法",
+        "passed": 12,
+        "total": 12,
+        "score": 1.0,
+        "failed": []
+      },
+      {
+        "dimension": "date_resolution",
+        "label": "业务日期解析",
+        "passed": 9,
+        "total": 9,
+        "score": 1.0,
+        "failed": []
+      },
+      {
+        "dimension": "gate_enforcement",
+        "label": "G0–G9 门禁",
+        "passed": 21,
+        "total": 21,
+        "score": 1.0,
+        "failed": []
+      },
+      {
+        "dimension": "assembly",
+        "label": "章节装配与哨兵",
+        "passed": 20,
+        "total": 20,
+        "score": 1.0,
+        "failed": []
+      },
+      {
+        "dimension": "action_generation",
+        "label": "行动清单生成（FR-E6/E7）",
+        "passed": 1,
+        "total": 4,
+        "score": 0.25,
+        "failed": [
+          "daily_action_from_method",
+          "daily_action_from_error",
+          "monthly_action_from_daily_entries"
+        ]
+      },
+      {
+        "dimension": "rollup",
+        "label": "月/年 rollup",
+        "passed": 7,
+        "total": 7,
+        "score": 1.0,
+        "failed": []
+      },
+      {
+        "dimension": "determinism",
+        "label": "确定性重跑",
+        "passed": 3,
+        "total": 3,
+        "score": 1.0,
+        "failed": []
+      },
+      {
+        "dimension": "injection_scanner",
+        "label": "injection_scanner",
+        "passed": 9,
+        "total": 9,
+        "score": 1.0,
+        "failed": []
+      }
+    ],
+    "suites": {
+      "todo_ledger": {
+        "checks": [
+          {
+            "name": "todo:basic_markers",
+            "passed": true,
+            "detail": "expected=[{'paused': False, 'line': 1, 'checked': True, 'text': '写月报'}, {'paused': False, 'line': 2, 'checked': False, 'text': '读论文'}, {'paused': False, 'line': 3, 'checked': True, 'text': '跑步'}] actual=[{'line': 1, 'checked': True, 'paused': False, 'text': '写月报'}, {'line': 2, 'checked': False, 'paused': False, 'text': '读论文'}, {'line': 3, 'checked': True, 'paused': False, 'text': '跑步'}]"
+          },
+          {
+            "name": "todo:indented_is_still_a_task",
+            "passed": true,
+            "detail": "expected=[{'paused': False, 'line': 1, 'checked': False, 'text': '子任务'}, {'paused': False, 'line': 2, 'checked': True, 'text': '另一个'}] actual=[{'line': 1, 'checked': False, 'paused': False, 'text': '子任务'}, {'line': 2, 'checked': True, 'paused': False, 'text': '另一个'}]"
+          },
+          {
+            "name": "todo:fenced_code_skipped",
+            "passed": true,
+            "detail": "expected=[{'paused': False, 'line': 4, 'checked': False, 'text': '应识别'}] actual=[{'line': 4, 'checked': False, 'paused': False, 'text': '应识别'}]"
+          },
+          {
+            "name": "todo:invalid_markers",
+            "passed": true,
+            "detail": "expected=[] actual=[]"
+          },
+          {
+            "name": "todo:paused_marker",
+            "passed": true,
+            "detail": "expected=[{'paused': True, 'line': 1, 'checked': False, 'text': '暂停实验'}, {'paused': True, 'line': 2, 'checked': False, 'text': '暂停归档'}, {'paused': False, 'line': 3, 'checked': False, 'text': '未完成'}] actual=[{'line': 1, 'checked': False, 'paused': True, 'text': '暂停实验'}, {'line': 2, 'checked': False, 'paused': True, 'text': '暂停归档'}, {'line': 3, 'checked': False, 'paused': False, 'text': '未完成'}]"
+          },
+          {
+            "name": "todo:natural_language_is_not_a_task",
+            "passed": true,
+            "detail": "expected=[] actual=[]"
+          },
+          {
+            "name": "todo:body_start_line_offset",
+            "passed": true,
+            "detail": "expected=[{'paused': False, 'line': 5, 'checked': False, 'text': '带 frontmatter 偏移'}] actual=[{'line': 5, 'checked': False, 'paused': False, 'text': '带 frontmatter 偏移'}]"
+          },
+          {
+            "name": "todo:whitespace_collapsed_in_display",
+            "passed": true,
+            "detail": "expected=[{'paused': False, 'line': 1, 'checked': False, 'text': '多个空格 折叠'}] actual=[{'line': 1, 'checked': False, 'paused': False, 'text': '多个空格 折叠'}]"
+          },
+          {
+            "name": "normalize:'  写\\u3000月报，完成！ '",
+            "passed": true,
+            "detail": "expected='写 月报,完成!' actual='写 月报,完成!'"
+          },
+          {
+            "name": "normalize:'Fix BUG：缓存'",
+            "passed": true,
+            "detail": "expected='fix bug:缓存' actual='fix bug:缓存'"
+          },
+          {
+            "name": "normalize:'  Fix   BUG  '",
+            "passed": true,
+            "detail": "expected='Fix BUG' actual='Fix BUG'"
+          },
+          {
+            "name": "normalize:'读论文。'",
+            "passed": true,
+            "detail": "expected='读论文.' actual='读论文.'"
+          }
+        ],
+        "score": 1.0
+      },
+      "date_resolution": {
+        "checks": [
+          {
+            "name": "date:frontmatter_date_wins_with_conflict",
+            "passed": true,
+            "detail": "date=2026-11-03 expected=2026-11-03 warnings=['DATE_SOURCE_CONFLICT'] expected_warnings=['DATE_SOURCE_CONFLICT']"
+          },
+          {
+            "name": "date:frontmatter_occurred_on_fallback",
+            "passed": true,
+            "detail": "date=2026-11-04 expected=2026-11-04 warnings=[] expected_warnings=[]"
+          },
+          {
+            "name": "date:directory_full_date",
+            "passed": true,
+            "detail": "date=2026-11-05 expected=2026-11-05 warnings=[] expected_warnings=[]"
+          },
+          {
+            "name": "date:filename_full_date",
+            "passed": true,
+            "detail": "date=2026-11-06 expected=2026-11-06 warnings=[] expected_warnings=[]"
+          },
+          {
+            "name": "date:short_filename_with_year_dir",
+            "passed": true,
+            "detail": "date=2026-11-07 expected=2026-11-07 warnings=[] expected_warnings=[]"
+          },
+          {
+            "name": "date:short_filename_with_full_date_dir",
+            "passed": true,
+            "detail": "date=2026-11-08 expected=2026-11-08 warnings=['DATE_SOURCE_CONFLICT'] expected_warnings=['DATE_SOURCE_CONFLICT']"
+          },
+          {
+            "name": "date:missing_year_is_not_guessed",
+            "passed": true,
+            "detail": "date=None expected=None warnings=['DATE_YEAR_MISSING'] expected_warnings=['DATE_YEAR_MISSING']"
+          },
+          {
+            "name": "date:invalid_frontmatter_warns_but_falls_back",
+            "passed": true,
+            "detail": "date=2026-11-10 expected=2026-11-10 warnings=['DATE_INVALID'] expected_warnings=['DATE_INVALID']"
+          },
+          {
+            "name": "date:no_date_source",
+            "passed": true,
+            "detail": "date=None expected=None warnings=[] expected_warnings=[]"
+          }
+        ],
+        "score": 1.0
+      },
+      "gate_enforcement": {
+        "checks": [
+          {
+            "name": "G_clean_draft",
+            "passed": true,
+            "detail": "blocking=[]"
+          },
+          {
+            "name": "G1_missing_section",
+            "passed": true,
+            "detail": "expected=['SECTION_SET_MISMATCH'] blocking=['SECTION_ORDINAL_MISMATCH', 'SECTION_SET_MISMATCH']"
+          },
+          {
+            "name": "G1_bad_ordinal",
+            "passed": true,
+            "detail": "expected=['SECTION_ORDINAL_MISMATCH'] blocking=['SECTION_ORDINAL_MISMATCH']"
+          },
+          {
+            "name": "G1_empty_content",
+            "passed": true,
+            "detail": "expected=['SECTION_EMPTY'] blocking=['SECTION_EMPTY']"
+          },
+          {
+            "name": "G2_missing_field",
+            "passed": true,
+            "detail": "expected=['SCHEMA_INVALID'] blocking=['SCHEMA_INVALID']"
+          },
+          {
+            "name": "G2_extra_field",
+            "passed": true,
+            "detail": "expected=['SCHEMA_INVALID'] blocking=['SCHEMA_INVALID']"
+          },
+          {
+            "name": "G3a_no_snapshot",
+            "passed": true,
+            "detail": "expected=['SNAPSHOT_MISMATCH'] blocking=['SNAPSHOT_MISMATCH']"
+          },
+          {
+            "name": "G3b_stale_hash",
+            "passed": true,
+            "detail": "next_state=revising (must not abort)"
+          },
+          {
+            "name": "G3c_quote_not_found",
+            "passed": true,
+            "detail": "expected=['QUOTE_NOT_FOUND'] blocking=['QUOTE_NOT_FOUND']"
+          },
+          {
+            "name": "G3d_hash_mismatch",
+            "passed": true,
+            "detail": "expected=['QUOTE_HASH_MISMATCH'] blocking=['QUOTE_HASH_MISMATCH']"
+          },
+          {
+            "name": "G4_traceability",
+            "passed": true,
+            "detail": "expected=['TRACEABILITY_MISSING'] blocking=['TRACEABILITY_MISSING']"
+          },
+          {
+            "name": "G5_no_evidence",
+            "passed": true,
+            "detail": "expected=['UNSUPPORTED_CLAIM'] blocking=['UNSUPPORTED_CLAIM']"
+          },
+          {
+            "name": "G5_unknown_evidence",
+            "passed": true,
+            "detail": "expected=['UNSUPPORTED_CLAIM'] blocking=['UNSUPPORTED_CLAIM']"
+          },
+          {
+            "name": "G6_missing_trigger",
+            "passed": true,
+            "detail": "expected=['ACTION_NOT_EXECUTABLE'] blocking=['ACTION_NOT_EXECUTABLE', 'SCHEMA_INVALID']"
+          },
+          {
+            "name": "G6_bad_action_line",
+            "passed": true,
+            "detail": "expected=['ACTION_NOT_EXECUTABLE'] blocking=['ACTION_NOT_EXECUTABLE']"
+          },
+          {
+            "name": "G7_sentinel_changed",
+            "passed": true,
+            "detail": "expected=['SENTINEL_VIOLATION'] blocking=['SENTINEL_VIOLATION']"
+          },
+          {
+            "name": "G7_sentinel_leak",
+            "passed": true,
+            "detail": "expected=['SENTINEL_VIOLATION'] blocking=['SENTINEL_VIOLATION']"
+          },
+          {
+            "name": "G9_path",
+            "passed": true,
+            "detail": "expected=['PATH_NOT_ALLOWED'] blocking=['PATH_NOT_ALLOWED']"
+          },
+          {
+            "name": "G8_coverage_gap_warning",
+            "passed": true,
+            "detail": "warnings=['COVERAGE_GAP'] blocking=[]"
+          },
+          {
+            "name": "G1_evidence_overflow",
+            "passed": true,
+            "detail": "expected=['EVIDENCE_OVERFLOW'] blocking=['EVIDENCE_OVERFLOW']"
+          },
+          {
+            "name": "G0_tenant_leak_abort",
+            "passed": true,
+            "detail": "next_state=security_abort"
+          }
+        ],
+        "score": 1.0
+      },
+      "assembly": {
+        "checks": [
+          {
+            "name": "daily_section_set",
+            "passed": true,
+            "detail": "['today_tasks', 'learning_summary', 'journal_events', 'mistakes', 'methods', 'tomorrow_actions', 'one_line_summary']"
+          },
+          {
+            "name": "daily_ordinals",
+            "passed": true,
+            "detail": "[1, 2, 3, 4, 5, 6, 7]"
+          },
+          {
+            "name": "daily_schema_validation",
+            "passed": true,
+            "detail": "[]"
+          },
+          {
+            "name": "daily_content_non_empty",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "daily_citation_closure",
+            "passed": true,
+            "detail": "claims=5 citations=7"
+          },
+          {
+            "name": "daily_action_format",
+            "passed": true,
+            "detail": "- [ ] 发布前核对备份记录（触发：每次发布前；验证：发布记录中存在备份时间）"
+          },
+          {
+            "name": "daily_no_evidence_ratio",
+            "passed": true,
+            "detail": "0.0"
+          },
+          {
+            "name": "daily_todo_three_states",
+            "passed": true,
+            "detail": "### 已完成\n\n- 写月报\n\n### 未完成\n\n- 读论文\n- 整理旧笔记（自 2026-10-25 顺延）\n\n### 暂停中\n\n- 暂停实验"
+          },
+          {
+            "name": "daily_paused_structured",
+            "passed": true,
+            "detail": "[{'text': '暂停实验', 'source_date': datetime.date(2026, 11, 3), 'source_path': '日记/2026/11.03.md', 'line_range': [7, 7], 'evidence_id': 'e3'}]"
+          },
+          {
+            "name": "daily_carried_kept_in_open_group",
+            "passed": true,
+            "detail": "### 已完成\n\n- 写月报\n\n### 未完成\n\n- 读论文\n- 整理旧笔记（自 2026-10-25 顺延）\n\n### 暂停中\n\n- 暂停实验"
+          },
+          {
+            "name": "empty_day_all_sentinels",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "empty_day_no_claims",
+            "passed": true,
+            "detail": "claims=0 citations=0 ratio=1.0"
+          },
+          {
+            "name": "monthly_section_set",
+            "passed": true,
+            "detail": "['completion_rate', 'recurring_mistakes', 'method_landing', 'next_month_actions']"
+          },
+          {
+            "name": "monthly_schema_validation",
+            "passed": true,
+            "detail": "[]"
+          },
+          {
+            "name": "monthly_ledger_consistency",
+            "passed": true,
+            "detail": "{'completed': 3, 'total': 5, 'rate': 0.6, 'ledger_recalc': {'completed': 3, 'total': 5, 'rate': 0.6}}"
+          },
+          {
+            "name": "monthly_coverage_gaps_kept",
+            "passed": true,
+            "detail": "[{'date': '2026-11-02', 'reason': 'missing_daily'}]"
+          },
+          {
+            "name": "yearly_section_set",
+            "passed": true,
+            "detail": "['learning_map', 'event_timeline', 'top_mistakes', 'method_system', 'next_year_direction']"
+          },
+          {
+            "name": "yearly_schema_validation",
+            "passed": true,
+            "detail": "[]"
+          },
+          {
+            "name": "yearly_timeline_sorted",
+            "passed": true,
+            "detail": "{'items': [{'date': '2026-10-01', 'event': '开始学习', 'result': '完成'}, {'date': '2026-11-03', 'event': '发布事故', 'result': '回滚'}]}"
+          },
+          {
+            "name": "yearly_top_mistakes_rank",
+            "passed": true,
+            "detail": "{'items': [{'rank': 1, 'item': '发布前未备份', 'occurrences': 3, 'cost': '两小时', 'source': '日记/2026/11.03.md'}]}"
+          }
+        ],
+        "score": 1.0
+      },
+      "action_generation": {
+        "checks": [
+          {
+            "name": "daily_action_from_method",
+            "passed": false,
+            "detail": "sentinel=True content='明日行动：无（未找到可执行依据）'"
+          },
+          {
+            "name": "daily_action_from_error",
+            "passed": false,
+            "detail": "sentinel=True content='明日行动：无（未找到可执行依据）'"
+          },
+          {
+            "name": "monthly_action_from_daily_entries",
+            "passed": false,
+            "detail": "sentinel=True content='下月行动：无（未找到可执行依据）'"
+          },
+          {
+            "name": "explicit_action_renders",
+            "passed": true,
+            "detail": "sentinel=False content='- [ ] 发布前核对备份记录（触发：每次发布前；验证：发布记录中存在备份时间）'"
+          }
+        ],
+        "score": 0.25
+      },
+      "rollup": {
+        "checks": [
+          {
+            "name": "recurring_occurrences",
+            "passed": true,
+            "detail": "[{'canonical_key': 'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk', 'occurrences': 3, 'first_seen': '2026-11-01', 'last_seen': '2026-11-05'}]"
+          },
+          {
+            "name": "recurring_first_last",
+            "passed": true,
+            "detail": "[{'canonical_key': 'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk', 'occurrences': 3, 'first_seen': '2026-11-01', 'last_seen': '2026-11-05'}]"
+          },
+          {
+            "name": "top_mistakes_order",
+            "passed": true,
+            "detail": "[(3, '未备份'), (1, '另一次错误')]"
+          },
+          {
+            "name": "method_landing_pending",
+            "passed": true,
+            "detail": "[{'method': '发布前先备份', 'action_count': 0, 'verification_status': 'pending'}]"
+          },
+          {
+            "name": "learning_map_from_monthly",
+            "passed": true,
+            "detail": "{'topics': ['发布前先备份'], 'concepts': ['done'], 'outputs': [], 'related_months': ['2026-10']}"
+          },
+          {
+            "name": "timeline_from_monthly_actions",
+            "passed": true,
+            "detail": "[{'date': '2026-11-01', 'event': '补备份清单', 'result': '清单已更新'}]"
+          },
+          {
+            "name": "direction_from_first_action",
+            "passed": true,
+            "detail": "{'direction': '补备份清单', 'basis': '本月事故', 'first_action': '清单已更新'}"
+          }
+        ],
+        "score": 1.0
+      },
+      "determinism": {
+        "checks": [
+          {
+            "name": "compose_daily_repeatable",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "render_repeatable",
+            "passed": true,
+            "detail": "8fd3e030b371c0e2c6cfb253054da8a5efd5055b710422e44c1f6707252a0e0c"
+          },
+          {
+            "name": "gate_fingerprint_repeatable",
+            "passed": true,
+            "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "score": 1.0
+      },
+      "injection_scanner": {
+        "checks": [
+          {
+            "name": "scanner:instruction_override",
+            "passed": true,
+            "detail": "['instruction_override', 'secret_exfiltration']"
+          },
+          {
+            "name": "scanner:external_image",
+            "passed": true,
+            "detail": "['external_image']"
+          },
+          {
+            "name": "scanner:html_script",
+            "passed": true,
+            "detail": "['html_script']"
+          },
+          {
+            "name": "scanner:path_traversal",
+            "passed": true,
+            "detail": "['path_traversal']"
+          },
+          {
+            "name": "scanner:fake_evidence_delimiter",
+            "passed": true,
+            "detail": "['fake_evidence_delimiter']"
+          },
+          {
+            "name": "scanner:secret_exfiltration",
+            "passed": true,
+            "detail": "['secret_exfiltration']"
+          },
+          {
+            "name": "scanner:write_tool_request",
+            "passed": true,
+            "detail": "['write_tool_request']"
+          },
+          {
+            "name": "scanner:cross_workspace_read",
+            "passed": true,
+            "detail": "['cross_workspace_read']"
+          },
+          {
+            "name": "neutralize_delimiters",
+            "passed": true,
+            "detail": "＜＜＜NOTE_BLOCKED x>>>\n＜＜＜END_BLOCKED>>>"
+          }
+        ],
+        "score": 1.0
+      }
+    }
+  },
+  "semantic": null
+}
